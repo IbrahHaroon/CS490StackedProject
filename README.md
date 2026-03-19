@@ -45,6 +45,13 @@ Key capabilities include:
    - User accounts/login
    - Personal dashboard
 
+## 🚫 Out Of scope(important to define)
+- Keeping the project realistic:
+  - Employer-side tools(no recruiter dashboard)
+  -  Full job board integration(optional)
+  -  Advanced AI models(Keep it as simple APIs)
+  -  Complex colloborations/ too many team features
+
 ## 🧰 Tech Stack
 
 ### Frontend
