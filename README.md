@@ -45,12 +45,40 @@ Key capabilities include:
    - User accounts/login
    - Personal dashboard
 
-## 🚫 Out Of scope(important to define)
-- Keeping the project realistic:
-  - Employer-side tools(no recruiter dashboard)
-  -  Full job board integration(optional)
-  -  Advanced AI models(Keep it as simple APIs)
+## 🚫 Out Of scope
+- To keep the project focused and realistic, the following features are not included:
+
+  -  Employer-side tools(no recruiter dashboard)
+  -  Full job board integration(optional stretch)
+  -  Advanced AI models(Using simple APIs instead)
   -  Complex colloborations/ too many team features
+
+## 👥 Audience
+
+### 🎯 Primary audience
+- Active job seekers
+  - Students and new graduates
+  - Career switchers
+  - Professionals applying to more than one role   
+
+### 🎯 Secondary Audience
+  - Passive job seekers exploring oppurtunities
+  - Freelancer tracking job oppurtunities
+  - Bootcamp students or career program participants
+
+
+### 🧠 Key Problems
+  - Losing track of job applications
+  - Rewriting resumes repeatedly
+  - Lack of visibility into application progress
+  - Disogranized notes and deadlines
+  - No data on what strategies are effective
+
+### 💡 Value Proposition
+- **Organization** - Centralized tracking system for applications
+- **Automation** - AI-assisted resume and cover letter generation
+- **Insight** - Data-driven understanding of job search performance
+- **Control** - Candidate-focused tools instead of employer-centric systems  
 
 ## 🧰 Tech Stack
 
