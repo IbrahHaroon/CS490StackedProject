@@ -82,19 +82,72 @@ Key capabilities include:
 
 ## Coding Standards
 
-### Naming Conventions
-  - React components: PascalCase (e.g., JobCard.jsx)
-  - JavaScript variables/functions: camelCase (addUser,searchBar())
-  - Javascript constants
-    - True constants: UPPERCASE (e.g, PI, API_URL)
-    - Regular constants: camelCase (e.g, const userName, const totalPrice)
-    - Boolean constans: start with "is", "has", "can" (e.g, isActive, hasPermission, canEdit)
-    - Object & arrays: camelCase (e.g, const userProfile = { name: "Alice", age:26 }, const itemList = {"apple", "orange"});
-    - Class-level or module constants: UPPERCASE {e.g, const DEFAULT_TIMEOUT, const ERROR_MESSAGE})   
-  
-  - Python backend
-    variables/functions: snake_case
-  - Constants: UPPER_SNAKE_CASE
+## 🏷️ Naming Conventions
+
+Consistent naming improves readability, maintainability, and collaboration across the team.
+
+### Frontend (React / JavaScript)
+
+- **React components:** use PascalCase  
+  Example: `JobCard.jsx`, `ApplicationBoard.jsx`
+
+- **Component file names:** use PascalCase  
+  Example: `LoginForm.jsx`, `DashboardLayout.jsx`
+
+- **Variables and functions:** use camelCase  
+  Example: `addUser`, `searchJobs`, `handleSubmit`
+
+- **Custom hooks:** use camelCase and start with `use`  
+  Example: `useAuth`, `useApplications`
+
+- **Boolean variables:** start with `is`, `has`, or `can`  
+  Example: `isLoading`, `hasError`, `canEdit`
+
+- **Constants:** use UPPER_SNAKE_CASE for true constants  
+  Example: `API_URL`, `MAX_RETRIES`, `DEFAULT_STATUS`
+
+- **Regular variables declared with const:** still use camelCase  
+  Example: `userName`, `totalPrice`, `selectedJob`
+
+- **Objects and arrays:** use camelCase variable names  
+  Example: `userProfile`, `jobApplications`
+
+- **Event handler functions:** prefix with `handle` when appropriate  
+  Example: `handleLogin`, `handleDeleteApplication`
+
+---
+
+### Backend (Python / FastAPI)
+
+All Python code should follow the PEP 8 style guide:  
+https://peps.python.org/pep-0008/
+
+- **Variables and functions:** use snake_case  
+  Example: `get_user`, `create_application`
+
+- **File names:** use snake_case  
+  Example: `main.py`, `application_service.py`
+
+- **Classes:** use PascalCase  
+  Example: `UserService`, `ApplicationCreate`
+
+- **Pydantic schemas:** use PascalCase  
+  Example: `ApplicationCreate`, `ApplicationResponse`
+
+- **SQLAlchemy models:** use PascalCase  
+  Example: `User`, `Application`, `SavedJob`
+
+- **Constants:** use UPPER_SNAKE_CASE  
+  Example: `DEFAULT_PAGE_SIZE`, `JWT_SECRET_KEY`
+
+- **Router variables:** use descriptive snake_case  
+  Example: `application_router`, `auth_router`
+
+- **Database table names:** use snake_case  
+  Example: `users`, `job_applications`
+
+- **Boolean variables:** use descriptive names  
+  Example: `is_active`, `has_resume`, `can_edit`
 
 ### 🔧 Linting & Formatting
 
