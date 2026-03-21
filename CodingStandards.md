@@ -95,6 +95,107 @@ Key capabilities include:
   - Python backend
     variables/functions: snake_case
   - Constants: UPPER_SNAKE_CASE
+
+### 🔧 Linting & Formatting
+
+Frontend:
+- Use ESLint for linting
+- Use Prettier for formatting
+- 2-space indentation
+- Use semicolons consistently
+
+Backend:
+- Follow PEP 8 style guide
+- https://peps.python.org/pep-0008/ 
+- Use Black for formatting
+- https://black.readthedocs.io/en/stable/
+- Maximum line length: 88 characters(default black setting)
+
+## ⚠️ Error Handling
+
+Backend:
+- Use FastAPI HTTPException for API errors
+- Return clear and consistent error messages
+
+Example:
+{
+  "success": false,
+  "error": "Not Found",
+  "message": "Job application does not exist"
+}
+
+- Avoid exposing internal server errors to users
+
+Frontend:
+- Display user-friendly error messages
+- Handle API errors gracefully (no crashes)
+
+## 🔌 API Response Conventions
+
+All API responses should follow a consistent JSON format.
+
+Success:
+{
+  "success": true,
+  "data": {...}
+}
+
+Error:
+{
+  "success": false,
+  "error": "Bad Request",
+  "message": "Invalid input"
+}
+
+Rules:
+- Always return JSON responses
+- Use consistent keys: success, data, error, message
+- Use proper HTTP status codes (200, 201, 400, 404, 500)
+
+## 📁 Project Folder Structure
+
+```plaintext
+cs490-stacked-project/
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # reusable UI components (buttons, cards, modals)
+│   │   ├── pages/           # page-level views (Dashboard, Login, Board)
+│   │   ├── layouts/         # layout wrappers (Navbar, Sidebar)
+│   │   ├── hooks/           # custom React hooks
+│   │   ├── services/        # API calls to backend
+│   │   ├── utils/           # helper functions
+│   │   ├── assets/          # images, icons, styles
+│   │   └── App.jsx          # root React component
+│   │
+│   ├── package.json
+│   └── vite.config.js (or similar)
+│
+├── backend/
+│   ├── app/
+│   │   ├── routers/         # API routes/endpoints
+│   │   ├── models/          # SQLAlchemy database models
+│   │   ├── schemas/         # Pydantic request/response models
+│   │   ├── services/        # business logic
+│   │   ├── dependencies/    # shared dependencies (auth, validation)
+│   │   ├── db/              # database connection/config
+│   │   ├── utils/           # helper functions
+│   │   └── main.py          # FastAPI entry point
+│   │
+│   └── requirements.txt
+│
+├── tests/                  # unit and integration tests
+├── .env                    # environment variables (not committed)
+├── .gitignore
+└── README.md
+```
+
+### 📌 Notes
+
+- Frontend and backend are separated for clarity and scalability  
+- Keep business logic out of UI components and API routes  
+- Use `services/` for logic and `utils/` for helpers  
+- Follow this structure consistently across the team  
+
 ## 🧰 Tech Stack
 
 ### Frontend
