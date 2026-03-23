@@ -208,19 +208,15 @@ Backend:
 Backend:
 - Use FastAPI HTTPException for API errors
 - Return clear and consistent error messages
-
-Example:
-{
-  "success": false,
-  "error": "Not Found",
-  "message": "Job application does not exist"
-}
-
 - Avoid exposing internal server errors to users
+- <img width="657" height="174" alt="image" src="https://github.com/user-attachments/assets/7c87fa26-b934-465f-b304-34aba2d15842" />
+
 
 Frontend:
 - Display user-friendly error messages
 - Handle API errors gracefully (no crashes)
+- Always account for loading, success, and error states
+- <img width="667" height="199" alt="image" src="https://github.com/user-attachments/assets/24dd0a78-0fca-412b-9436-56a0a6826322" />
 
 ## 🔌 API Response Conventions
 
