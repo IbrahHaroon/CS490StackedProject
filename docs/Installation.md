@@ -129,13 +129,13 @@ sudo -u postgres psql
 
 ```sql
 -- Create the application database
-CREATE DATABASE myapp_db;
+CREATE DATABASE jobsdb;
 
 -- Create the application user with a password
 CREATE USER myuser WITH PASSWORD 'mypassword';
 
 -- Grant full privileges on the database to the user
-GRANT ALL PRIVILEGES ON DATABASE myapp_db TO myuser;
+GRANT ALL PRIVILEGES ON DATABASE jobsdb TO myuser;
 ```
 
 > **Note:** Replace `'mypassword'` with a strong password. Never use this default in staging or production.
