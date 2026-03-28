@@ -1,0 +1,16 @@
+.applications-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.applications-page h1 {
+  font-size: 2rem;
+  font-weight: 300;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.applications-placeholder {
+  color: #666;
+  font-style: italic;
+}
