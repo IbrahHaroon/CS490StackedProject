@@ -1,32 +1,45 @@
+import os
+import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, jobs, profile
+
+# Ensure the backend directory is in sys.path so `database`, `routers`, and
+# `schemas` are always importable regardless of where the process is launched from.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from routers import auth, jobs, profile, users, education, documents, company
 from database import engine, Base
-import asyncio
+import database.models  # Required to register models for metadata
 
-app = FastAPI(title="ATS API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create tables if they don't exist
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Shutdown logic goes here if needed
 
-# Setup CORS
+app = FastAPI(title="ATS API", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# This creates your tables automatically when the app starts
-@app.on_event("startup")
-async def init_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+# Include Routers
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 app.include_router(profile.router, prefix="/profile", tags=["Profile"])
+app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(education.router, prefix="/education", tags=["Education"])
+app.include_router(documents.router, prefix="/documents", tags=["Documents"])
+app.include_router(company.router, prefix="/company", tags=["Company"])
 
 @app.get("/")
-async def root():
+def root():
     return {"status": "Backend Online"}
 
 if __name__ == "__main__":

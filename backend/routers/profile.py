@@ -1,7 +1,74 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from database import get_db
+from database.models.user import User
+from database.models.profile import create_profile, get_profile, update_profile
+from database.auth import get_current_user
+from schemas import ProfileCreate, ProfileResponse, ProfileUpdate
 
 router = APIRouter()
 
-@router.get("/")
-async def get_profile():
-    return {"profile": {}}
+
+@router.post("/", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
+def create_profile_endpoint(
+    body: ProfileCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if body.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot create profile for another user")
+    profile = create_profile(
+        session,
+        user_id=body.user_id,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        dob=body.dob,
+        address=body.address.address,
+        state=body.address.state,
+        zip_code=body.address.zip_code,
+        phone_number=body.phone_number,
+        summary=body.summary,
+    )
+    return profile
+
+
+@router.get("/{profile_id}", response_model=ProfileResponse)
+def read_profile(
+    profile_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = get_profile(session, profile_id)
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+    if profile.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return profile
+
+
+@router.put("/{profile_id}", response_model=ProfileResponse)
+def update_profile_endpoint(
+    profile_id: int,
+    body: ProfileUpdate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = get_profile(session, profile_id)
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+    if profile.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    if body.first_name is not None:
+        profile.first_name = body.first_name
+    if body.last_name is not None:
+        profile.last_name = body.last_name
+    if body.dob is not None:
+        profile.dob = body.dob
+    if body.phone_number is not None:
+        profile.phone_number = body.phone_number
+    if body.summary is not None:
+        profile.summary = body.summary
+
+    update_profile(session, profile)
+    return get_profile(session, profile_id)
