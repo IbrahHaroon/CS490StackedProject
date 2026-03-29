@@ -1,5 +1,4 @@
 import os
-
 from dotenv import load_dotenv
 
 try:
@@ -7,7 +6,6 @@ try:
 except ImportError:
     create_client = None
 
-# Load .env automatically
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")

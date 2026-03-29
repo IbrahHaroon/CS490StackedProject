@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+
 from router.auth import router as auth_router
 from router.jobs import router as jobs_router
 
@@ -16,19 +17,29 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
         return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"error": "Unauthorized", "detail": "Invalid or missing authentication token"},
+            status_code=401,
+            content={
+                "error": "Unauthorized",
+                "detail": "Invalid or missing authentication token",
+            },
         )
+
     if exc.status_code == status.HTTP_403_FORBIDDEN:
         return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"error": "Forbidden", "detail": "You do not have access to this resource"},
+            status_code=403,
+            content={
+                "error": "Forbidden",
+                "detail": "You do not have access to this resource",
+            },
         )
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": "Error", "detail": str(exc.detail)},
     )
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
