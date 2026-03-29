@@ -4,17 +4,20 @@ from sqlalchemy.orm import Session
 from database import get_db
 from database.auth import get_current_user
 from database.models.applied_jobs import (
+    PIPELINE_STAGES,
     create_applied_jobs,
     get_all_applied_jobs,
     get_applied_jobs,
     update_applied_job,
 )
+from database.models.job_activity import create_job_activity, get_job_activities
 from database.models.position import create_position, get_position
 from database.models.user import User
 from schemas import (
     ApplicationCreate,
     ApplicationResponse,
     ApplicationUpdate,
+    JobActivityResponse,
     PositionCreate,
     PositionResponse,
 )
@@ -78,9 +81,11 @@ def read_applications(user_id: int, session: Session = Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
 )
 def apply_for_job(body: ApplicationCreate, session: Session = Depends(get_db)):
-    return create_applied_jobs(
+    job = create_applied_jobs(
         session, body.user_id, body.position_id, body.years_of_experience
     )
+    create_job_activity(session, job.job_id, "Interested")
+    return job
 
 
 @router.put("/applications/{job_id}", response_model=ApplicationResponse)
@@ -99,6 +104,13 @@ def update_application(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
+    if body.application_status is not None and body.application_status not in PIPELINE_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid stage. Must be one of: {PIPELINE_STAGES}",
+        )
+    if body.application_status is not None:
+        create_job_activity(session, job_id, body.application_status)
     updated = update_applied_job(
         session,
         job_id,
@@ -106,3 +118,22 @@ def update_application(
         years_of_experience=body.years_of_experience,
     )
     return updated
+
+
+@router.get("/applications/{job_id}/activity", response_model=list[JobActivityResponse])
+def get_application_activity(
+    job_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the stage history for a job application."""
+    job = get_applied_jobs(session, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+        )
+    if job.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+    return get_job_activities(session, job_id)

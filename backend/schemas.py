@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -212,3 +212,13 @@ class ApplicationResponse(BaseModel):
     years_of_experience: int
     application_date: date
     application_status: str
+    stage_changed_at: datetime | None = None
+
+
+class JobActivityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    activity_id: int
+    job_id: int
+    stage: str
+    changed_at: datetime
