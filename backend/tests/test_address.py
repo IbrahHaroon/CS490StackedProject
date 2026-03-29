@@ -1,15 +1,13 @@
 """Tests for address.py — create_address, get_address, update_address."""
 
-import pytest
 from database.models.address import create_address, get_address, update_address
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # create_address
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateAddress:
 
+class TestCreateAddress:
     def test_returns_address_object(self, session):
         addr = create_address(session, "123 Main St", "NJ", 8534)
         assert addr is not None
@@ -46,8 +44,8 @@ class TestCreateAddress:
 # get_address
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetAddress:
 
+class TestGetAddress:
     def test_returns_correct_address(self, session):
         addr = create_address(session, "10 Elm St", "TX", 73301)
         fetched = get_address(session, addr.address_id)
@@ -84,8 +82,8 @@ class TestGetAddress:
 # update_address
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestUpdateAddress:
 
+class TestUpdateAddress:
     def test_update_returns_true_on_success(self, session):
         addr = create_address(session, "Old St", "NJ", 8000)
         addr.address = "New St"

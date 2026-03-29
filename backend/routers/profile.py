@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from database import get_db
-from database.models.user import User
-from database.models.profile import create_profile, get_profile, update_profile
 from database.auth import get_current_user
+from database.models.profile import create_profile, get_profile, update_profile
+from database.models.user import User
 from schemas import ProfileCreate, ProfileResponse, ProfileUpdate
 
 router = APIRouter()
@@ -16,7 +17,10 @@ def create_profile_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     if body.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot create profile for another user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot create profile for another user",
+        )
     profile = create_profile(
         session,
         user_id=body.user_id,
@@ -40,9 +44,13 @@ def read_profile(
 ):
     profile = get_profile(session, profile_id)
     if not profile:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
     return profile
 
 
@@ -55,9 +63,13 @@ def update_profile_endpoint(
 ):
     profile = get_profile(session, profile_id)
     if not profile:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
     if body.first_name is not None:
         profile.first_name = body.first_name

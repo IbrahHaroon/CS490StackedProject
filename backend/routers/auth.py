@@ -1,17 +1,29 @@
-import secrets
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from utils.email import send_password_reset_email
+
 from database import get_db
-from database.models.user import User
+from database.auth import (
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
+)
 from database.models.credentials import Credentials
 from database.models.password_reset import PasswordResetToken
-from schemas import Token, RegisterRequest, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
-from database.auth import get_password_hash, verify_password, create_access_token, get_current_user
-from utils.email import send_password_reset_email
+from database.models.user import User
+from schemas import (
+    ForgotPasswordRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    Token,
+    UserResponse,
+)
 
 router = APIRouter()
 
@@ -25,13 +37,15 @@ def get_me(current_user: User = Depends(get_current_user)):
 def logout(_: User = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 def register(user: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user.email).first()
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     new_user = User(email=user.email)
@@ -39,8 +53,7 @@ def register(user: RegisterRequest, db: Session = Depends(get_db)):
     db.flush()
 
     new_creds = Credentials(
-        user_id=new_user.user_id,
-        hashed_password=get_password_hash(user.password)
+        user_id=new_user.user_id, hashed_password=get_password_hash(user.password)
     )
     db.add(new_creds)
     db.commit()
@@ -48,10 +61,10 @@ def register(user: RegisterRequest, db: Session = Depends(get_db)):
 
     return new_user
 
+
 @router.post("/login", response_model=Token)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     db_user = db.query(User).filter(User.email == form_data.username).first()
 
@@ -62,9 +75,13 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    db_creds = db.query(Credentials).filter(Credentials.user_id == db_user.user_id).first()
+    db_creds = (
+        db.query(Credentials).filter(Credentials.user_id == db_user.user_id).first()
+    )
 
-    if not db_creds or not verify_password(form_data.password, db_creds.hashed_password):
+    if not db_creds or not verify_password(
+        form_data.password, db_creds.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -80,7 +97,9 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     # Always return 200 so we don't reveal whether the email exists
     if not user:
-        return {"message": "If that email is registered, a reset token has been issued."}
+        return {
+            "message": "If that email is registered, a reset token has been issued."
+        }
 
     # Invalidate any existing unused tokens for this user
     db.query(PasswordResetToken).filter(
@@ -92,11 +111,13 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    db.add(PasswordResetToken(
-        user_id=user.user_id,
-        token_hash=token_hash,
-        expires_at=expires_at,
-    ))
+    db.add(
+        PasswordResetToken(
+            user_id=user.user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+    )
     db.commit()
 
     send_password_reset_email(user.email, raw_token)
@@ -107,10 +128,14 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
 def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(body.token.encode()).hexdigest()
 
-    record = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token_hash == token_hash,
-        PasswordResetToken.used == False,
-    ).first()
+    record = (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used == False,
+        )
+        .first()
+    )
 
     if not record:
         raise HTTPException(
@@ -126,7 +151,9 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 
     creds = db.query(Credentials).filter(Credentials.user_id == record.user_id).first()
     if not creds:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User credentials not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User credentials not found"
+        )
 
     creds.hashed_password = get_password_hash(body.new_password)
     record.used = True

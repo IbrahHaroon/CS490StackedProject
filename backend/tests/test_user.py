@@ -1,15 +1,15 @@
 """Tests for user.py — create_user, get_user."""
 
 import pytest
-from database.models.user import create_user, get_user
 
+from database.models.user import create_user, get_user
 
 # ─────────────────────────────────────────────────────────────────────────────
 # create_user
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateUser:
 
+class TestCreateUser:
     def test_returns_user_object(self, session):
         user = create_user(session, "alice@example.com")
         assert user is not None
@@ -44,8 +44,8 @@ class TestCreateUser:
 # get_user
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetUser:
 
+class TestGetUser:
     def test_returns_correct_user(self, session):
         user = create_user(session, "eve@example.com")
         fetched = get_user(session, user.user_id)

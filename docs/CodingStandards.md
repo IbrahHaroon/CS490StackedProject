@@ -211,15 +211,19 @@ https://peps.python.org/pep-0008/
 ### 🔧 Linting & Formatting
 
 ### Frontend
-- Use ESLint for linting
+- Use ESLint for linting (with `eslint-plugin-react` and `eslint-plugin-react-hooks`)
 - Use Prettier for formatting
 - 2-space indentation
 - Use semicolons consistently
+- Run locally: `cd frontend && npm run lint` and `npm run format`
 
 ### Backend
 - Follow the PEP 8 style guide
-- Use Black for formatting
-- Maximum line length: 88 characters (default Black setting)
+- Use Ruff for linting and formatting (replaces Black + flake8)
+- Maximum line length: 88 characters
+- Run locally: `ruff check backend/` and `ruff format backend/`
+
+Both are enforced automatically in CI on every pull request.
 
 
 ## ⚠️ Error Handling

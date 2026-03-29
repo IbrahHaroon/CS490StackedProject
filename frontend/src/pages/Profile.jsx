@@ -33,9 +33,8 @@ function Profile() {
 
   // Count how many fields are completed
   const completedCount = useMemo(() => {
-    return completionFields.filter((field) =>
-      isFieldComplete(profileData[field.key])
-    ).length;
+    return completionFields.filter((field) => isFieldComplete(profileData[field.key]))
+      .length;
   }, [profileData]);
 
   // Calculate percentage
@@ -70,9 +69,7 @@ function Profile() {
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Profile Completion</h2>
 
-        <p style={styles.percentageText}>
-          {completionPercentage}% complete
-        </p>
+        <p style={styles.percentageText}>{completionPercentage}% complete</p>
 
         <div style={styles.progressBar}>
           <div
@@ -95,37 +92,27 @@ function Profile() {
         <div style={styles.summaryGrid}>
           <div>
             <p style={styles.summaryLabel}>Full Name</p>
-            <p style={styles.summaryValue}>
-              {profileData.fullName || "Not added"}
-            </p>
+            <p style={styles.summaryValue}>{profileData.fullName || "Not added"}</p>
           </div>
 
           <div>
             <p style={styles.summaryLabel}>Email</p>
-            <p style={styles.summaryValue}>
-              {profileData.email || "Not added"}
-            </p>
+            <p style={styles.summaryValue}>{profileData.email || "Not added"}</p>
           </div>
 
           <div>
             <p style={styles.summaryLabel}>Phone</p>
-            <p style={styles.summaryValue}>
-              {profileData.phone || "Not added"}
-            </p>
+            <p style={styles.summaryValue}>{profileData.phone || "Not added"}</p>
           </div>
 
           <div>
             <p style={styles.summaryLabel}>Location</p>
-            <p style={styles.summaryValue}>
-              {profileData.location || "Not added"}
-            </p>
+            <p style={styles.summaryValue}>{profileData.location || "Not added"}</p>
           </div>
 
           <div>
             <p style={styles.summaryLabel}>LinkedIn</p>
-            <p style={styles.summaryValue}>
-              {profileData.linkedin || "Not added"}
-            </p>
+            <p style={styles.summaryValue}>{profileData.linkedin || "Not added"}</p>
           </div>
 
           <div>
@@ -162,9 +149,7 @@ function Profile() {
         <h2 style={styles.cardTitle}>Missing Information</h2>
 
         {missingFields.length === 0 ? (
-          <p style={styles.successText}>
-            Your profile is fully complete.
-          </p>
+          <p style={styles.successText}>Your profile is fully complete.</p>
         ) : (
           <ul style={styles.missingList}>
             {missingFields.map((field) => (

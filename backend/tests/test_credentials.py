@@ -1,9 +1,10 @@
 """Tests for database/models/credentials.py — create_credentials, get_credentials_by_user_id."""
 
 import pytest
-from database.models.user import create_user
-from database.models.credentials import create_credentials, get_credentials_by_user_id
+
 from database.auth import get_password_hash, verify_password
+from database.models.credentials import create_credentials, get_credentials_by_user_id
+from database.models.user import create_user
 
 
 @pytest.fixture
@@ -15,8 +16,8 @@ def user(session):
 # create_credentials
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateCredentials:
 
+class TestCreateCredentials:
     def test_returns_credentials_object(self, session, user):
         creds = create_credentials(session, user.user_id, get_password_hash("pass"))
         assert creds is not None
@@ -41,7 +42,9 @@ class TestCreateCredentials:
         assert verify_password("mypassword", creds.hashed_password) is True
 
     def test_plain_password_not_stored(self, session, user):
-        creds = create_credentials(session, user.user_id, get_password_hash("mypassword"))
+        creds = create_credentials(
+            session, user.user_id, get_password_hash("mypassword")
+        )
         assert creds.hashed_password != "mypassword"
 
     def test_duplicate_user_id_raises(self, session, user):
@@ -54,8 +57,8 @@ class TestCreateCredentials:
 # get_credentials_by_user_id
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetCredentialsByUserId:
 
+class TestGetCredentialsByUserId:
     def test_returns_correct_credentials(self, session, user):
         hashed = get_password_hash("pass")
         create_credentials(session, user.user_id, hashed)

@@ -33,22 +33,21 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from database.base import Base, engine
 from database.auth import get_password_hash
-from database.models.address import create_address
-from database.models.user import create_user, get_user_by_email
-from database.models.credentials import create_credentials
-from database.models.profile import create_profile
-from database.models.education import create_education
-from database.models.documents import create_document
-from database.models.company import create_company
-from database.models.position import create_position
+from database.base import Base, engine
 from database.models.applied_jobs import create_applied_jobs
-
+from database.models.company import create_company
+from database.models.credentials import create_credentials
+from database.models.documents import create_document
+from database.models.education import create_education
+from database.models.position import create_position
+from database.models.profile import create_profile
+from database.models.user import create_user, get_user_by_email
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def get_or_create_user(session: Session, email: str):
     existing = get_user_by_email(session, email)
@@ -127,23 +126,37 @@ EDUCATIONS = [
 
 DOCUMENTS = [
     [
-        {"document_type": "resume",       "document_location": "/uploads/alice_resume.pdf"},
-        {"document_type": "cover_letter", "document_location": "/uploads/alice_cover.pdf"},
+        {"document_type": "resume", "document_location": "/uploads/alice_resume.pdf"},
+        {
+            "document_type": "cover_letter",
+            "document_location": "/uploads/alice_cover.pdf",
+        },
     ],
     [
-        {"document_type": "resume",       "document_location": "/uploads/bob_resume.pdf"},
-        {"document_type": "portfolio",    "document_location": "/uploads/bob_portfolio.pdf"},
+        {"document_type": "resume", "document_location": "/uploads/bob_resume.pdf"},
+        {
+            "document_type": "portfolio",
+            "document_location": "/uploads/bob_portfolio.pdf",
+        },
     ],
     [
-        {"document_type": "resume",       "document_location": "/uploads/carol_resume.pdf"},
-        {"document_type": "transcript",   "document_location": "/uploads/carol_transcript.pdf"},
+        {"document_type": "resume", "document_location": "/uploads/carol_resume.pdf"},
+        {
+            "document_type": "transcript",
+            "document_location": "/uploads/carol_transcript.pdf",
+        },
     ],
 ]
 
 COMPANIES = [
-    {"name": "Acme Corp",       "address": "500 Market St",   "state": "CA", "zip_code": 94105},
-    {"name": "Globex Inc",      "address": "700 Congress Ave", "state": "TX", "zip_code": 78701},
-    {"name": "Initech Ltd",     "address": "350 5th Ave",      "state": "NY", "zip_code": 10118},
+    {"name": "Acme Corp", "address": "500 Market St", "state": "CA", "zip_code": 94105},
+    {
+        "name": "Globex Inc",
+        "address": "700 Congress Ave",
+        "state": "TX",
+        "zip_code": 78701,
+    },
+    {"name": "Initech Ltd", "address": "350 5th Ave", "state": "NY", "zip_code": 10118},
 ]
 
 POSITIONS = [
@@ -174,16 +187,25 @@ POSITIONS = [
 ]
 
 APPLICATIONS = [
-    {"user_idx": 0, "position_idx": 0, "years_of_experience": 8},   # Alice → Backend
-    {"user_idx": 1, "position_idx": 1, "years_of_experience": 5},   # Bob   → Frontend
-    {"user_idx": 2, "position_idx": 2, "years_of_experience": 6},   # Carol → Data Scientist
-    {"user_idx": 0, "position_idx": 2, "years_of_experience": 8},   # Alice → Data Scientist (cross-apply)
+    {"user_idx": 0, "position_idx": 0, "years_of_experience": 8},  # Alice → Backend
+    {"user_idx": 1, "position_idx": 1, "years_of_experience": 5},  # Bob   → Frontend
+    {
+        "user_idx": 2,
+        "position_idx": 2,
+        "years_of_experience": 6,
+    },  # Carol → Data Scientist
+    {
+        "user_idx": 0,
+        "position_idx": 2,
+        "years_of_experience": 8,
+    },  # Alice → Data Scientist (cross-apply)
 ]
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def seed():
     # Ensure tables exist (no-op if they're already there).
@@ -199,17 +221,19 @@ def seed():
 
             # Create credentials only if none exist yet.
             from database.models.credentials import get_credentials_by_user_id
+
             if not get_credentials_by_user_id(session, user.user_id):
                 hashed = get_password_hash("Password123!")
                 create_credentials(session, user.user_id, hashed)
-                print(f"    → credentials created")
+                print("    → credentials created")
 
         print("\n── Profiles ─────────────────────────────────────────────────")
         for user, p in zip(users, PROFILES):
             # Skip if profile already exists (unique constraint on user_id).
-            from database.models.profile import get_profile
             from sqlalchemy import select
+
             from database.models.profile import Profile
+
             existing = session.execute(
                 select(Profile).where(Profile.user_id == user.user_id)
             ).scalar_one_or_none()
@@ -228,7 +252,9 @@ def seed():
                 phone_number=p["phone_number"],
                 summary=p["summary"],
             )
-            print(f"  profile_id={profile.profile_id}  name={profile.first_name} {profile.last_name}")
+            print(
+                f"  profile_id={profile.profile_id}  name={profile.first_name} {profile.last_name}"
+            )
 
         print("\n── Education ────────────────────────────────────────────────")
         for user, e in zip(users, EDUCATIONS):
@@ -242,7 +268,9 @@ def seed():
                 state=e["state"],
                 zip_code=e["zip_code"],
             )
-            print(f"  education_id={edu.education_id}  degree={edu.degree}  school={edu.school_or_college}")
+            print(
+                f"  education_id={edu.education_id}  degree={edu.degree}  school={edu.school_or_college}"
+            )
 
         print("\n── Documents ────────────────────────────────────────────────")
         for user, doc_list in zip(users, DOCUMENTS):
@@ -253,7 +281,9 @@ def seed():
                     document_type=d["document_type"],
                     document_location=d["document_location"],
                 )
-                print(f"  doc_id={doc.doc_id}  type={doc.document_type}  user_id={doc.user_id}")
+                print(
+                    f"  doc_id={doc.doc_id}  type={doc.document_type}  user_id={doc.user_id}"
+                )
 
         print("\n── Companies ────────────────────────────────────────────────")
         companies = []
@@ -282,7 +312,9 @@ def seed():
                 listing_date=pos["listing_date"],
             )
             positions.append(position)
-            print(f"  position_id={position.position_id}  title={position.title}  company_id={position.company_id}")
+            print(
+                f"  position_id={position.position_id}  title={position.title}  company_id={position.company_id}"
+            )
 
         print("\n── Applications ─────────────────────────────────────────────")
         for app in APPLICATIONS:

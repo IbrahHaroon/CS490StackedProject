@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, String, ForeignKey, select
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+
+from sqlalchemy import ForeignKey, Integer, String, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 
 if TYPE_CHECKING:
@@ -11,8 +14,12 @@ if TYPE_CHECKING:
 class Credentials(Base):
     __tablename__ = "credentials"
 
-    credential_id:   Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id:         Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False, unique=True)
+    credential_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.user_id"), nullable=False, unique=True
+    )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Relationships
@@ -23,7 +30,10 @@ class Credentials(Base):
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
 
-def create_credentials(session: Session, user_id: int, hashed_password: str) -> "Credentials":
+
+def create_credentials(
+    session: Session, user_id: int, hashed_password: str
+) -> "Credentials":
     """Create a Credentials row for an existing User."""
     new_creds = Credentials(user_id=user_id, hashed_password=hashed_password)
     session.add(new_creds)

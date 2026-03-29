@@ -32,11 +32,9 @@ function JobForm() {
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.jobTitle.trim())
-      newErrors.jobTitle = "Job title is required.";
+    if (!formData.jobTitle.trim()) newErrors.jobTitle = "Job title is required.";
 
-    if (!formData.company.trim())
-      newErrors.company = "Company is required.";
+    if (!formData.company.trim()) newErrors.company = "Company is required.";
 
     return newErrors;
   };

@@ -1,12 +1,12 @@
-import { Routes, Route } from 'react-router-dom'
-import { MyAppNav } from './components/Navbar.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Profile from './pages/Profile.jsx'
-import DocumentLibrary from './pages/DocumentLibrary.jsx'
-import Settings from './pages/Settings.jsx'
-import Applications from './pages/Applications.jsx'
+import { Routes, Route } from "react-router-dom";
+import { MyAppNav } from "./components/Navbar.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Profile from "./pages/Profile.jsx";
+import DocumentLibrary from "./pages/DocumentLibrary.jsx";
+import Settings from "./pages/Settings.jsx";
+import Applications from "./pages/Applications.jsx";
 import JobForm from "./pages/JobForm";
-import './App.css'
+import "./App.css";
 
 function App() {
   return (
@@ -23,7 +23,7 @@ function App() {
         </Routes>
       </main>
     </>
-  )
+  );
 }
 
-export default App
+export default App;

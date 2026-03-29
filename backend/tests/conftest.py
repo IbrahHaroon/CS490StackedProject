@@ -12,7 +12,7 @@ import os
 import sys
 
 # Add backend dir so `database/`, `schemas`, `routers`, and `index` are all importable.
-_tests_dir   = os.path.dirname(os.path.abspath(__file__))
+_tests_dir = os.path.dirname(os.path.abspath(__file__))
 _backend_dir = os.path.dirname(_tests_dir)
 
 sys.path.insert(0, _backend_dir)
@@ -22,19 +22,20 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
 import pytest
+from fastapi.testclient import TestClient
+from index import app
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
 
-from database.base import Base
 import database.models  # noqa: F401 — registers all ORM classes with Base
 from database import get_db
-from index import app
+from database.base import Base
 
 # ---------------------------------------------------------------------------
 # Session-scoped engine — StaticPool shares one in-memory DB across tests.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def engine():
@@ -58,6 +59,7 @@ def engine():
 # Function-scoped session — wipes and rebuilds tables before every test.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="function")
 def session(engine):
     Base.metadata.drop_all(engine)
@@ -72,6 +74,7 @@ def session(engine):
 # ---------------------------------------------------------------------------
 # Function-scoped TestClient — shares the same fresh session.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="function")
 def client(session):
@@ -88,7 +91,10 @@ def client(session):
 # Auth helpers — register + login a user, return (user_id, auth_headers).
 # ---------------------------------------------------------------------------
 
-def _register_and_login(client, email: str, password: str = "testpass123") -> tuple[int, dict]:
+
+def _register_and_login(
+    client, email: str, password: str = "testpass123"
+) -> tuple[int, dict]:
     reg = client.post("/auth/register", json={"email": email, "password": password})
     user_id = reg.json()["user_id"]
     login = client.post("/auth/login", data={"username": email, "password": password})

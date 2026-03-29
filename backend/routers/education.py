@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from database import get_db
 from database.models.education import create_education, get_education
 from schemas import EducationCreate, EducationResponse
@@ -8,7 +9,9 @@ router = APIRouter()
 
 
 @router.post("/", response_model=EducationResponse, status_code=status.HTTP_201_CREATED)
-def create_education_endpoint(body: EducationCreate, session: Session = Depends(get_db)):
+def create_education_endpoint(
+    body: EducationCreate, session: Session = Depends(get_db)
+):
     education = create_education(
         session,
         user_id=body.user_id,

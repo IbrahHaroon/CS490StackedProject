@@ -1,19 +1,18 @@
 """Tests for database/auth.py — password hashing and JWT utilities."""
 
 from database.auth import (
-    get_password_hash,
-    verify_password,
     create_access_token,
     decode_access_token,
+    get_password_hash,
+    verify_password,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # get_password_hash
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetPasswordHash:
 
+class TestGetPasswordHash:
     def test_returns_a_string(self):
         result = get_password_hash("mysecret")
         assert isinstance(result, str)
@@ -41,8 +40,8 @@ class TestGetPasswordHash:
 # verify_password
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestVerifyPassword:
 
+class TestVerifyPassword:
     def test_correct_password_returns_true(self):
         hashed = get_password_hash("correct")
         assert verify_password("correct", hashed) is True
@@ -71,8 +70,8 @@ class TestVerifyPassword:
 # create_access_token
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateAccessToken:
 
+class TestCreateAccessToken:
     def test_returns_a_string(self):
         token = create_access_token({"sub": "1"})
         assert isinstance(token, str)
@@ -96,8 +95,8 @@ class TestCreateAccessToken:
 # decode_access_token
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestDecodeAccessToken:
 
+class TestDecodeAccessToken:
     def test_valid_token_returns_dict(self):
         token = create_access_token({"sub": "42"})
         result = decode_access_token(token)

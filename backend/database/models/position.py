@@ -1,14 +1,17 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+
 from datetime import date
 from decimal import Decimal
-from sqlalchemy import Integer, String, Numeric, Date, Sequence, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Date, ForeignKey, Integer, Numeric, Sequence, String
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 
 if TYPE_CHECKING:
-    from database.models.company import Company
     from database.models.applied_jobs import AppliedJobs
+    from database.models.company import Company
 
 
 class Position(Base):
@@ -20,22 +23,25 @@ class Position(Base):
         primary_key=True,
         autoincrement=True,
     )
-    company_id:     Mapped[int]     = mapped_column(ForeignKey("company.company_id"), nullable=False)
-    title:          Mapped[str]     = mapped_column(String(255), nullable=False)
-    salary:         Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=True)
-    education_req:  Mapped[str]     = mapped_column(String(255), nullable=True)
-    experience_req: Mapped[str]     = mapped_column(String(255), nullable=True)
-    description:    Mapped[str]     = mapped_column(String(2000), nullable=True)
-    listing_date:   Mapped[date]    = mapped_column(Date, nullable=False)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("company.company_id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    salary: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=True)
+    education_req: Mapped[str] = mapped_column(String(255), nullable=True)
+    experience_req: Mapped[str] = mapped_column(String(255), nullable=True)
+    description: Mapped[str] = mapped_column(String(2000), nullable=True)
+    listing_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     # Relationships
-    company:      Mapped["Company"]           = relationship(back_populates="positions")
+    company: Mapped["Company"] = relationship(back_populates="positions")
     applied_jobs: Mapped[list["AppliedJobs"]] = relationship(back_populates="position")
 
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
+
 
 def create_position(
     session: Session,

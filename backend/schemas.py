@@ -1,11 +1,12 @@
 from datetime import date
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, EmailStr
 
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 # --------------------------------------------------------------------------- #
 #  Auth                                                                         #
 # --------------------------------------------------------------------------- #
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -35,6 +36,7 @@ class ResetPasswordRequest(BaseModel):
 #  User                                                                         #
 # --------------------------------------------------------------------------- #
 
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,6 +47,7 @@ class UserResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 #  Address  (used as a nested input inside Profile, Education, and Company)    #
 # --------------------------------------------------------------------------- #
+
 
 class AddressCreate(BaseModel):
     address: str
@@ -64,6 +67,7 @@ class AddressResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 #  Profile                                                                      #
 # --------------------------------------------------------------------------- #
+
 
 class ProfileCreate(BaseModel):
     user_id: int
@@ -99,6 +103,7 @@ class ProfileResponse(BaseModel):
 #  Education                                                                    #
 # --------------------------------------------------------------------------- #
 
+
 class EducationCreate(BaseModel):
     user_id: int
     highest_education: str
@@ -121,6 +126,7 @@ class EducationResponse(BaseModel):
 #  Documents                                                                    #
 # --------------------------------------------------------------------------- #
 
+
 class DocumentCreate(BaseModel):
     user_id: int
     document_type: str
@@ -140,6 +146,7 @@ class DocumentResponse(BaseModel):
 #  Company                                                                      #
 # --------------------------------------------------------------------------- #
 
+
 class CompanyCreate(BaseModel):
     name: str
     address: AddressCreate
@@ -155,6 +162,7 @@ class CompanyResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 #  Position                                                                     #
 # --------------------------------------------------------------------------- #
+
 
 class PositionCreate(BaseModel):
     company_id: int
@@ -182,6 +190,7 @@ class PositionResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 #  Applied Jobs                                                                 #
 # --------------------------------------------------------------------------- #
+
 
 class ApplicationCreate(BaseModel):
     user_id: int

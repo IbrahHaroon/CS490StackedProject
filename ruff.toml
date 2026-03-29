@@ -1,0 +1,18 @@
+target-version = "py311"
+line-length = 88
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+"backend/tests/conftest.py" = ["E402"]
+"backend/routers/auth.py" = ["E712"]
+
+[lint.isort]
+known-first-party = ["database", "routers", "schemas"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

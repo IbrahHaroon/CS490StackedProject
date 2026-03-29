@@ -1,13 +1,12 @@
-import { NavLink } from 'react-router-dom'
-import './Navbar.css'
+import { NavLink } from "react-router-dom";
+import "./Navbar.css";
 
 // Navbar component — displayed at the top of every page
 // Uses Link or NavLink from react-router-dom for client-side navigation (no page reloads)
 // Should contain navigation links to: Dashboard, Profile, Document Library, Settings
 
-
-export function MyAppNav(){
-  return(
+export function MyAppNav() {
+  return (
     <nav>
       <NavLink to="/" end>
         Dashboard
@@ -30,5 +29,5 @@ export function MyAppNav(){
         Add Job
       </NavLink>
     </nav>
-  )
+  );
 }
