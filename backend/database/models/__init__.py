@@ -7,3 +7,4 @@ from database.models.documents import Documents
 from database.models.company import Company
 from database.models.position import Position
 from database.models.applied_jobs import AppliedJobs
+from database.models.password_reset import PasswordResetToken

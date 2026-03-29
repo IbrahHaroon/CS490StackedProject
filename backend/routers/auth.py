@@ -1,11 +1,17 @@
+import secrets
+import hashlib
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from database import get_db
 from database.models.user import User
 from database.models.credentials import Credentials
-from schemas import Token, RegisterRequest, UserResponse
+from database.models.password_reset import PasswordResetToken
+from schemas import Token, RegisterRequest, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
 from database.auth import get_password_hash, verify_password, create_access_token, get_current_user
+from utils.email import send_password_reset_email
 
 router = APIRouter()
 
@@ -67,3 +73,63 @@ def login(
 
     access_token = create_access_token(data={"sub": db_user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == body.email).first()
+    # Always return 200 so we don't reveal whether the email exists
+    if not user:
+        return {"message": "If that email is registered, a reset token has been issued."}
+
+    # Invalidate any existing unused tokens for this user
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.user_id,
+        PasswordResetToken.used == False,
+    ).update({"used": True})
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+    db.add(PasswordResetToken(
+        user_id=user.user_id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    ))
+    db.commit()
+
+    send_password_reset_email(user.email, raw_token)
+    return {"message": "If that email is registered, a reset token has been issued."}
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+
+    record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used == False,
+    ).first()
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or already-used reset token",
+        )
+
+    if datetime.now(timezone.utc) > record.expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired",
+        )
+
+    creds = db.query(Credentials).filter(Credentials.user_id == record.user_id).first()
+    if not creds:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User credentials not found")
+
+    creds.hashed_password = get_password_hash(body.new_password)
+    record.used = True
+    db.commit()
+
+    return {"message": "Password updated successfully"}
