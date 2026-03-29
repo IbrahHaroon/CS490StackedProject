@@ -1,8 +1,9 @@
 from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
-from main import app
 import dependencies.auth as auth_dep
+from main import app
 
 client = TestClient(app)
 

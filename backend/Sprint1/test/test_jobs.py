@@ -1,12 +1,11 @@
 from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
 import dependencies.auth as auth_dep
-from routers.jobs import router as jobs_router, mock_jobs
-
-client = TestClient(app)
+from main import app
+from router.jobs import mock_jobs
 
 client = TestClient(app)
 
@@ -26,10 +25,10 @@ class MockSupabase:
     def __init__(self, user):
         self.auth = MockSupabaseAuth(user)
 
+
 @pytest.fixture(autouse=True)
 def reset_mock_jobs():
     """Reset mock jobs before each test."""
-    from routers.jobs import mock_jobs
     mock_jobs.clear()
     mock_jobs.extend([
         {"id": 1, "title": "Job 1", "description": "Desc 1", "user_id": "user-1"},
@@ -37,10 +36,6 @@ def reset_mock_jobs():
         {"id": 3, "title": "Job 3", "description": "Desc 3", "user_id": "user-2"},
     ])
     yield
-
-
-def token_for_user(user_id: str):
-    return "valid-token-user-1" if user_id == "user-1" else "valid-token-user-2"
 
 
 def test_user_can_access_own_jobs(monkeypatch):

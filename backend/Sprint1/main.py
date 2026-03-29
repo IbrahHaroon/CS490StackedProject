@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
-from routers.auth import router as auth_router
-from routers.jobs import router as jobs_router
+from router.auth import router as auth_router
+from router.jobs import router as jobs_router
 
 app = FastAPI(title="ATS SaaS Backend", version="1.0.0")
 
