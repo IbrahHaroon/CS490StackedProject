@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-
 from router.auth import router as auth_router
 from router.jobs import router as jobs_router
 
