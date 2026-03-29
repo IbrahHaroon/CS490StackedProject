@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
 from dependencies.auth import get_current_user
 from services.authorization import authorize_resource_owner
 

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
+
 import dependencies.auth as auth_dep
 from main import app
 from router.jobs import mock_jobs

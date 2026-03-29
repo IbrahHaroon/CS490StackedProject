@@ -2,6 +2,7 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from config import supabase
 
 security = HTTPBearer(auto_error=False)
