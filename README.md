@@ -60,11 +60,11 @@ A full-stack Applicant Tracking System built for CS490. Users can register, log 
 
 3. **Create your `.env` file** inside `backend/`
    ```
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/jobsdb
-   SECRET_KEY=super-secret-key-for-sprint-1
+   DATABASE_URL=postgresql://<db_user>:<db_password>@localhost:5432/<db_name>
+   SECRET_KEY=<your_secret_key>
    ALGORITHM=HS256
    ACCESS_TOKEN_EXPIRE_MINUTES=30
-   GEMINI_API_KEY=your_key_here
+   GEMINI_API_KEY=<your_gemini_api_key>
 
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
@@ -129,7 +129,7 @@ Password reset emails are sent via Gmail SMTP. To use this locally:
    SMTP_PASSWORD=xxxx xxxx xxxx xxxx
    ```
 
-> **Note:** `Nowshinh02@gmail.com` is currently the configured sender on Nowshin's local setup. Each developer needs their own credentials in their local `.env`.
+> **Note:** Each developer needs their own Gmail credentials in their local `.env`.
 > The `.env` file is gitignored — never commit it.
 
 ---
