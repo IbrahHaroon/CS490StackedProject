@@ -27,11 +27,11 @@ os.environ.setdefault(
 )
 os.environ.setdefault("SECRET_KEY", "seed-script-secret-change-me")
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from database.auth import get_password_hash
 from database.base import Base, engine
@@ -42,7 +42,7 @@ from database.models.documents import create_document
 from database.models.education import create_education
 from database.models.job_activity import create_job_activity
 from database.models.position import create_position
-from database.models.profile import create_profile, Profile
+from database.models.profile import Profile, create_profile
 from database.models.user import create_user, get_user_by_email
 
 
@@ -55,7 +55,6 @@ def seed():
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:
-
         # ── Users & Credentials ───────────────────────────────────────────────
         print("── Users & Credentials ──────────────────────────────────────")
 
@@ -66,7 +65,9 @@ def seed():
             if not get_credentials_by_user_id(session, user.user_id):
                 hashed = get_password_hash("Demo1234!")
                 create_credentials(session, user.user_id, hashed)
-                print(f"  user_id={user.user_id}  email={user.email}  → credentials created")
+                print(
+                    f"  user_id={user.user_id}  email={user.email}  → credentials created"
+                )
             else:
                 print(f"  user_id={user.user_id}  email={user.email}  → already exists")
 
@@ -89,11 +90,13 @@ def seed():
                 zip_code=7030,
                 phone_number="201-555-0101",
                 summary="Computer Science senior seeking full-time software engineering roles. "
-                        "Experienced in Python, React, and PostgreSQL.",
+                "Experienced in Python, React, and PostgreSQL.",
             )
-            print(f"  profile_id={profile.profile_id}  name={profile.first_name} {profile.last_name}")
+            print(
+                f"  profile_id={profile.profile_id}  name={profile.first_name} {profile.last_name}"
+            )
         else:
-            print(f"  profile already exists for user_a, skipping")
+            print("  profile already exists for user_a, skipping")
 
         # ── Education (User A only) ───────────────────────────────────────────
         print("\n── Education ────────────────────────────────────────────────")
@@ -108,15 +111,26 @@ def seed():
             state="NJ",
             zip_code=7102,
         )
-        print(f"  education_id={edu.education_id}  degree={edu.degree}  school={edu.school_or_college}")
+        print(
+            f"  education_id={edu.education_id}  degree={edu.degree}  school={edu.school_or_college}"
+        )
 
         # ── Documents (User A only) ───────────────────────────────────────────
         print("\n── Documents ────────────────────────────────────────────────")
 
         for doc in [
-            {"document_type": "resume", "document_location": "/uploads/alex_resume_v1.pdf"},
-            {"document_type": "cover_letter", "document_location": "/uploads/alex_cover_google.pdf"},
-            {"document_type": "resume", "document_location": "/uploads/alex_resume_v2_backend.pdf"},
+            {
+                "document_type": "resume",
+                "document_location": "/uploads/alex_resume_v1.pdf",
+            },
+            {
+                "document_type": "cover_letter",
+                "document_location": "/uploads/alex_cover_google.pdf",
+            },
+            {
+                "document_type": "resume",
+                "document_location": "/uploads/alex_resume_v2_backend.pdf",
+            },
         ]:
             d = create_document(
                 session,
@@ -130,10 +144,30 @@ def seed():
         print("\n── Companies ────────────────────────────────────────────────")
 
         companies_data = [
-            {"name": "Google", "address": "1600 Amphitheatre Pkwy", "state": "CA", "zip_code": 94043},
-            {"name": "Microsoft", "address": "1 Microsoft Way", "state": "WA", "zip_code": 98052},
-            {"name": "Amazon", "address": "410 Terry Ave N", "state": "WA", "zip_code": 98109},
-            {"name": "Meta", "address": "1 Hacker Way", "state": "CA", "zip_code": 94025},
+            {
+                "name": "Google",
+                "address": "1600 Amphitheatre Pkwy",
+                "state": "CA",
+                "zip_code": 94043,
+            },
+            {
+                "name": "Microsoft",
+                "address": "1 Microsoft Way",
+                "state": "WA",
+                "zip_code": 98052,
+            },
+            {
+                "name": "Amazon",
+                "address": "410 Terry Ave N",
+                "state": "WA",
+                "zip_code": 98109,
+            },
+            {
+                "name": "Meta",
+                "address": "1 Hacker Way",
+                "state": "CA",
+                "zip_code": 94025,
+            },
         ]
 
         companies = []
@@ -231,8 +265,10 @@ def seed():
             stage_order = ["Interested", "Applied", "Interview", "Offer"]
             target = app["stage"]
             if target != "Interested":
-                for stage in stage_order[1:stage_order.index(target) + 1]:
-                    update_applied_job(session, application.job_id, application_status=stage)
+                for stage in stage_order[1 : stage_order.index(target) + 1]:
+                    update_applied_job(
+                        session, application.job_id, application_status=stage
+                    )
                     create_job_activity(session, application.job_id, stage)
 
             print(
