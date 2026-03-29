@@ -1,16 +1,35 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, Integer, Sequence, String, func, select
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Sequence,
+    String,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
 
 if TYPE_CHECKING:
+    from database.models.job_activity import JobActivity
     from database.models.position import Position
     from database.models.user import User
+
+PIPELINE_STAGES = [
+    "Interested",
+    "Applied",
+    "Interview",
+    "Offer",
+    "Rejected",
+    "Archived",
+]
 
 
 class AppliedJobs(Base):
@@ -29,12 +48,14 @@ class AppliedJobs(Base):
     years_of_experience: Mapped[int] = mapped_column(Integer, nullable=False)
     application_date: Mapped[date] = mapped_column(Date, nullable=False)
     application_status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="pending review"
+        String(50), nullable=False, default="Interested"
     )
+    stage_changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="applied_jobs")
     position: Mapped["Position"] = relationship(back_populates="applied_jobs")
+    activities: Mapped[list["JobActivity"]] = relationship(back_populates="job")
 
 
 # --------------------------------------------------------------------------- #
@@ -50,14 +71,16 @@ def create_applied_jobs(
 ) -> "AppliedJobs":
     """
     Create a new AppliedJobs row.
-    Application date is set to today and status initialised to 'pending review'.
+    Application date is set to today and status initialised to 'Interested'.
     """
+    now = datetime.utcnow()
     new_application = AppliedJobs(
         user_id=user_id,
         position_id=position_id,
         years_of_experience=years_of_experience,
         application_date=date.today(),
-        application_status="pending review",
+        application_status="Interested",
+        stage_changed_at=now,
     )
     session.add(new_application)
     session.commit()
@@ -82,6 +105,7 @@ def update_applied_job(
         return None
     if application_status is not None:
         job.application_status = application_status
+        job.stage_changed_at = datetime.utcnow()
     if years_of_experience is not None:
         job.years_of_experience = years_of_experience
     session.commit()

@@ -4,6 +4,7 @@ from database.models.company import Company
 from database.models.credentials import Credentials
 from database.models.documents import Documents
 from database.models.education import Education
+from database.models.job_activity import JobActivity
 from database.models.password_reset import PasswordResetToken
 from database.models.position import Position
 from database.models.profile import Profile

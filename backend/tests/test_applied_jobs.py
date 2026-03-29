@@ -52,9 +52,11 @@ class TestCreateAppliedJobs:
         assert job.job_id is not None
         assert job.job_id >= 1
 
-    def test_application_status_initialized_to_pending(self, session, user, position):
+    def test_application_status_initialized_to_interested(
+        self, session, user, position
+    ):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
-        assert job.application_status == "pending review"
+        assert job.application_status == "Interested"
 
     def test_application_date_set_to_today(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
@@ -96,7 +98,7 @@ class TestGetAppliedJobs:
         job = create_applied_jobs(session, user.user_id, position.position_id, 4)
         fetched = get_applied_jobs(session, job.job_id)
         assert fetched.years_of_experience == 4
-        assert fetched.application_status == "pending review"
+        assert fetched.application_status == "Interested"
 
     def test_returns_none_for_negative_id(self, session):
         result = get_applied_jobs(session, -1)

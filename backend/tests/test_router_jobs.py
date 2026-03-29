@@ -135,7 +135,7 @@ class TestApplyForJob:
             "years_of_experience": 3,
         }
         application = client.post(f"{JOBS_URL}/applications/", json=payload).json()
-        assert application["application_status"] == "pending review"
+        assert application["application_status"] == "Interested"
 
     def test_missing_field_returns_422(self, client, session):
         user = create_user(session, "applicant@example.com")
