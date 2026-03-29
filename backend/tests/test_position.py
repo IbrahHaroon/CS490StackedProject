@@ -1,8 +1,10 @@
 """Tests for position.py — create_position, get_position, update_position."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
+
+import pytest
+
 from database.models.company import create_company
 from database.models.position import create_position, get_position, update_position
 
@@ -29,8 +31,8 @@ def make_position(session, company_id, title="Software Engineer"):
 # create_position
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreatePosition:
 
+class TestCreatePosition:
     def test_returns_position_object(self, session, company):
         pos = make_position(session, company.company_id)
         assert pos is not None
@@ -62,8 +64,8 @@ class TestCreatePosition:
 # get_position
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetPosition:
 
+class TestGetPosition:
     def test_returns_correct_position(self, session, company):
         pos = make_position(session, company.company_id)
         fetched = get_position(session, pos.position_id)
@@ -97,8 +99,8 @@ class TestGetPosition:
 # update_position
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestUpdatePosition:
 
+class TestUpdatePosition:
     def test_update_returns_true(self, session, company):
         pos = make_position(session, company.company_id)
         pos.title = "Senior Engineer"

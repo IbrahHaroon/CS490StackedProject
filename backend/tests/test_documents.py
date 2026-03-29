@@ -1,8 +1,14 @@
 """Tests for documents.py — create_document, get_document, lookup_documents, get_all_documents."""
 
 import pytest
+
+from database.models.documents import (
+    create_document,
+    get_all_documents,
+    get_document,
+    lookup_documents,
+)
 from database.models.user import create_user
-from database.models.documents import create_document, get_document, lookup_documents, get_all_documents
 
 
 @pytest.fixture
@@ -14,8 +20,8 @@ def user(session):
 # create_document
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateDocument:
 
+class TestCreateDocument:
     def test_returns_document_object(self, session, user):
         doc = create_document(session, user.user_id, "Resume", "/docs/resume.pdf")
         assert doc is not None
@@ -30,7 +36,9 @@ class TestCreateDocument:
         assert doc.document_type == "Cover Letter"
 
     def test_document_location_stored_correctly(self, session, user):
-        doc = create_document(session, user.user_id, "Resume", "/storage/user1/resume.pdf")
+        doc = create_document(
+            session, user.user_id, "Resume", "/storage/user1/resume.pdf"
+        )
         assert doc.document_location == "/storage/user1/resume.pdf"
 
     def test_user_id_linked_correctly(self, session, user):
@@ -47,8 +55,8 @@ class TestCreateDocument:
 # get_document
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetDocument:
 
+class TestGetDocument:
     def test_returns_correct_document(self, session, user):
         doc = create_document(session, user.user_id, "Resume", "/docs/r.pdf")
         fetched = get_document(session, doc.doc_id)
@@ -84,8 +92,8 @@ class TestGetDocument:
 # lookup_documents
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLookupDocuments:
 
+class TestLookupDocuments:
     def test_returns_zero_for_user_with_no_docs(self, session, user):
         count = lookup_documents(session, user.user_id)
         assert count == 0
@@ -127,8 +135,8 @@ class TestLookupDocuments:
 # get_all_documents
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetAllDocuments:
 
+class TestGetAllDocuments:
     def test_returns_empty_tuple_for_no_docs(self, session, user):
         result = get_all_documents(session, user.user_id)
         assert result == ()
@@ -146,6 +154,7 @@ class TestGetAllDocuments:
 
     def test_all_items_are_document_objects(self, session, user):
         from database.models.documents import Documents
+
         create_document(session, user.user_id, "Resume", "/r.pdf")
         create_document(session, user.user_id, "Portfolio", "/p.pdf")
         result = get_all_documents(session, user.user_id)

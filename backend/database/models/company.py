@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, String, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+
+from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 from database.models.address import create_address
 
@@ -13,18 +16,23 @@ if TYPE_CHECKING:
 class Company(Base):
     __tablename__ = "company"
 
-    company_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    address_id: Mapped[int] = mapped_column(ForeignKey("address.address_id"), nullable=False)
-    name:       Mapped[str] = mapped_column(String(255), nullable=False)
+    company_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    address_id: Mapped[int] = mapped_column(
+        ForeignKey("address.address_id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Relationships
-    address:   Mapped["Address"]        = relationship(back_populates="company")
+    address: Mapped["Address"] = relationship(back_populates="company")
     positions: Mapped[list["Position"]] = relationship(back_populates="company")
 
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
+
 
 def create_company(
     session: Session,

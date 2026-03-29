@@ -1,33 +1,41 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, String, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+
+from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 from database.models.address import create_address
 
 if TYPE_CHECKING:
-    from database.models.user import User
     from database.models.address import Address
+    from database.models.user import User
 
 
 class Education(Base):
     __tablename__ = "education"
 
-    education_id:      Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id:           Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
-    address_id:        Mapped[int] = mapped_column(ForeignKey("address.address_id"), nullable=False)
+    education_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
+    address_id: Mapped[int] = mapped_column(
+        ForeignKey("address.address_id"), nullable=False
+    )
     highest_education: Mapped[str] = mapped_column(String(100), nullable=False)
-    degree:            Mapped[str] = mapped_column(String(100), nullable=False)
+    degree: Mapped[str] = mapped_column(String(100), nullable=False)
     school_or_college: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Relationships
-    user:    Mapped["User"]    = relationship(back_populates="educations")
+    user: Mapped["User"] = relationship(back_populates="educations")
     address: Mapped["Address"] = relationship(back_populates="education")
 
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
+
 
 def create_education(
     session: Session,

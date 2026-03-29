@@ -1,36 +1,46 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+
 from datetime import date
-from sqlalchemy import Integer, String, Date, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 from database.models.address import create_address
 
 if TYPE_CHECKING:
-    from database.models.user import User
     from database.models.address import Address
+    from database.models.user import User
 
 
 class Profile(Base):
     __tablename__ = "profile"
 
-    profile_id:   Mapped[int]  = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id:      Mapped[int]  = mapped_column(ForeignKey("user.user_id"), nullable=False, unique=True)
-    address_id:   Mapped[int]  = mapped_column(ForeignKey("address.address_id"), nullable=False)
-    first_name:   Mapped[str]  = mapped_column(String(100), nullable=False)
-    last_name:    Mapped[str]  = mapped_column(String(100), nullable=False)
-    dob:          Mapped[date] = mapped_column(Date, nullable=False)
-    phone_number: Mapped[str]  = mapped_column(String(20), nullable=True)
-    summary:      Mapped[str]  = mapped_column(String(1000), nullable=True)
+    profile_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.user_id"), nullable=False, unique=True
+    )
+    address_id: Mapped[int] = mapped_column(
+        ForeignKey("address.address_id"), nullable=False
+    )
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dob: Mapped[date] = mapped_column(Date, nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    summary: Mapped[str] = mapped_column(String(1000), nullable=True)
 
     # Relationships
-    user:    Mapped["User"]    = relationship(back_populates="profile")
+    user: Mapped["User"] = relationship(back_populates="profile")
     address: Mapped["Address"] = relationship(back_populates="profile")
 
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
+
 
 def create_profile(
     session: Session,

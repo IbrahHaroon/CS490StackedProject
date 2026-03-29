@@ -1,15 +1,13 @@
 """Tests for company.py — create_company, get_company."""
 
-import pytest
 from database.models.company import create_company, get_company
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # create_company
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateCompany:
 
+class TestCreateCompany:
     def test_returns_company_object(self, session):
         company = create_company(session, "Acme Corp", "1 Business Rd", "NY", 10001)
         assert company is not None
@@ -43,8 +41,8 @@ class TestCreateCompany:
 # get_company
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetCompany:
 
+class TestGetCompany:
     def test_returns_correct_company(self, session):
         company = create_company(session, "Acme Corp", "1 Business Rd", "NY", 10001)
         fetched = get_company(session, company.company_id)

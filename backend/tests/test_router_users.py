@@ -2,7 +2,6 @@
 
 from database.models.user import create_user
 
-
 USERS_URL = "/users"
 
 
@@ -10,8 +9,8 @@ USERS_URL = "/users"
 # GET /users/{user_id}
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestReadUser:
 
+class TestReadUser:
     def test_returns_200_for_existing_user(self, client, session):
         user = create_user(session, "reader@example.com")
         response = client.get(f"{USERS_URL}/{user.user_id}")

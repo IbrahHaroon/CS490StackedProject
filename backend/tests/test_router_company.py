@@ -1,6 +1,5 @@
 """Tests for POST /company/ and GET /company/{company_id}."""
 
-
 COMPANY_URL = "/company"
 
 ADDRESS_PAYLOAD = {"address": "1 Corp Way", "state": "CA", "zip_code": 94105}
@@ -16,8 +15,8 @@ def _company_payload(**overrides):
 # POST /company/
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateCompany:
 
+class TestCreateCompany:
     def test_returns_201_on_success(self, client):
         response = client.post(f"{COMPANY_URL}/", json=_company_payload())
         assert response.status_code == 201
@@ -31,8 +30,12 @@ class TestCreateCompany:
         assert response.json()["name"] == "Acme Corp"
 
     def test_different_companies_get_unique_ids(self, client):
-        c1 = client.post(f"{COMPANY_URL}/", json=_company_payload(name="Alpha Inc")).json()
-        c2 = client.post(f"{COMPANY_URL}/", json=_company_payload(name="Beta LLC")).json()
+        c1 = client.post(
+            f"{COMPANY_URL}/", json=_company_payload(name="Alpha Inc")
+        ).json()
+        c2 = client.post(
+            f"{COMPANY_URL}/", json=_company_payload(name="Beta LLC")
+        ).json()
         assert c1["company_id"] != c2["company_id"]
 
     def test_missing_name_returns_422(self, client):
@@ -48,15 +51,17 @@ class TestCreateCompany:
 # GET /company/{company_id}
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestReadCompany:
 
+class TestReadCompany:
     def test_returns_200_for_existing_company(self, client):
         created = client.post(f"{COMPANY_URL}/", json=_company_payload()).json()
         response = client.get(f"{COMPANY_URL}/{created['company_id']}")
         assert response.status_code == 200
 
     def test_returns_correct_company(self, client):
-        created = client.post(f"{COMPANY_URL}/", json=_company_payload(name="Targetcorp")).json()
+        created = client.post(
+            f"{COMPANY_URL}/", json=_company_payload(name="Targetcorp")
+        ).json()
         response = client.get(f"{COMPANY_URL}/{created['company_id']}")
         assert response.json()["name"] == "Targetcorp"
 

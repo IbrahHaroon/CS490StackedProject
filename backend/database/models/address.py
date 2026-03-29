@@ -1,13 +1,16 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, String, Sequence
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+
+from sqlalchemy import Integer, Sequence, String
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+
 from database.base import Base
 
 if TYPE_CHECKING:
-    from database.models.profile import Profile
-    from database.models.education import Education
     from database.models.company import Company
+    from database.models.education import Education
+    from database.models.profile import Profile
 
 
 class Address(Base):
@@ -19,19 +22,20 @@ class Address(Base):
         primary_key=True,
         autoincrement=True,
     )
-    address:  Mapped[str] = mapped_column(String(255), nullable=False)
-    state:    Mapped[str] = mapped_column(String(100), nullable=False)
+    address: Mapped[str] = mapped_column(String(255), nullable=False)
+    state: Mapped[str] = mapped_column(String(100), nullable=False)
     zip_code: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Back references
-    profile:   Mapped["Profile"]   = relationship(back_populates="address")
+    profile: Mapped["Profile"] = relationship(back_populates="address")
     education: Mapped["Education"] = relationship(back_populates="address")
-    company:   Mapped["Company"]   = relationship(back_populates="address")
+    company: Mapped["Company"] = relationship(back_populates="address")
 
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
 # --------------------------------------------------------------------------- #
+
 
 def create_address(
     session: Session,

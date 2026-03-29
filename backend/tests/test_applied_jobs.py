@@ -1,18 +1,20 @@
 """Tests for applied_jobs.py — create_applied_jobs, get_applied_jobs,
 lookup_applied_jobs, get_all_applied_jobs."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
-from database.models.user import create_user
-from database.models.company import create_company
-from database.models.position import create_position
+
+import pytest
+
 from database.models.applied_jobs import (
     create_applied_jobs,
+    get_all_applied_jobs,
     get_applied_jobs,
     lookup_applied_jobs,
-    get_all_applied_jobs,
 )
+from database.models.company import create_company
+from database.models.position import create_position
+from database.models.user import create_user
 
 
 @pytest.fixture
@@ -39,8 +41,8 @@ def position(session):
 # create_applied_jobs
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestCreateAppliedJobs:
 
+class TestCreateAppliedJobs:
     def test_returns_applied_jobs_object(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
         assert job is not None
@@ -75,8 +77,8 @@ class TestCreateAppliedJobs:
 # get_applied_jobs
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetAppliedJobs:
 
+class TestGetAppliedJobs:
     def test_returns_correct_job(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
         fetched = get_applied_jobs(session, job.job_id)
@@ -110,8 +112,8 @@ class TestGetAppliedJobs:
 # lookup_applied_jobs
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLookupAppliedJobs:
 
+class TestLookupAppliedJobs:
     def test_returns_zero_for_user_with_no_applications(self, session, user):
         count = lookup_applied_jobs(session, user.user_id)
         assert count == 0
@@ -121,7 +123,9 @@ class TestLookupAppliedJobs:
         count = lookup_applied_jobs(session, user.user_id)
         assert count == 1
 
-    def test_returns_correct_count_for_multiple_applications(self, session, user, position):
+    def test_returns_correct_count_for_multiple_applications(
+        self, session, user, position
+    ):
         create_applied_jobs(session, user.user_id, position.position_id, 1)
         create_applied_jobs(session, user.user_id, position.position_id, 2)
         create_applied_jobs(session, user.user_id, position.position_id, 3)
@@ -153,8 +157,8 @@ class TestLookupAppliedJobs:
 # get_all_applied_jobs
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetAllAppliedJobs:
 
+class TestGetAllAppliedJobs:
     def test_returns_empty_tuple_for_no_applications(self, session, user):
         result = get_all_applied_jobs(session, user.user_id)
         assert result == ()
@@ -172,6 +176,7 @@ class TestGetAllAppliedJobs:
 
     def test_all_items_are_applied_jobs_objects(self, session, user, position):
         from database.models.applied_jobs import AppliedJobs
+
         create_applied_jobs(session, user.user_id, position.position_id, 1)
         create_applied_jobs(session, user.user_id, position.position_id, 2)
         result = get_all_applied_jobs(session, user.user_id)

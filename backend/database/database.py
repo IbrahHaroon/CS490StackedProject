@@ -1,7 +1,9 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
+
 
 class Settings(BaseSettings):
     database_url: str = "postgresql://user:postgres@localhost/jobsdb"
@@ -17,9 +19,11 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+
 @lru_cache()
 def get_settings():
     return Settings()
+
 
 settings = get_settings()
 
@@ -31,6 +35,7 @@ engine = create_engine(sync_url, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()

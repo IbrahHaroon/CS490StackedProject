@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from database import get_db
-from database.models.documents import create_document, get_document, get_all_documents
+from database.models.documents import create_document, get_all_documents, get_document
 from schemas import DocumentCreate, DocumentResponse
 
 router = APIRouter()
@@ -9,7 +10,9 @@ router = APIRouter()
 
 @router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 def create_document_endpoint(body: DocumentCreate, session: Session = Depends(get_db)):
-    return create_document(session, body.user_id, body.document_type, body.document_location)
+    return create_document(
+        session, body.user_id, body.document_type, body.document_location
+    )
 
 
 @router.get("/user/{user_id}", response_model=list[DocumentResponse])

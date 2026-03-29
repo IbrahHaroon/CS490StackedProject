@@ -1,10 +1,9 @@
 """Tests for POST /auth/register and POST /auth/login."""
 
-
 REGISTER_URL = "/auth/register"
-LOGIN_URL    = "/auth/login"
+LOGIN_URL = "/auth/login"
 
-VALID_EMAIL    = "auth_test@example.com"
+VALID_EMAIL = "auth_test@example.com"
 VALID_PASSWORD = "securepassword123"
 
 
@@ -12,33 +11,47 @@ VALID_PASSWORD = "securepassword123"
 # POST /auth/register
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestRegister:
 
+class TestRegister:
     def test_returns_201_on_success(self, client):
-        response = client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        response = client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
         assert response.status_code == 201
 
     def test_response_contains_user_id(self, client):
-        response = client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        response = client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
         assert "user_id" in response.json()
 
     def test_response_contains_email(self, client):
-        response = client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        response = client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
         assert response.json()["email"] == VALID_EMAIL
 
     def test_response_does_not_contain_password(self, client):
-        response = client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        response = client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
         body = response.json()
         assert "password" not in body
         assert "hashed_password" not in body
 
     def test_duplicate_email_returns_400(self, client):
-        client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
-        response = client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
+        response = client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
         assert response.status_code == 400
 
     def test_invalid_email_format_returns_422(self, client):
-        response = client.post(REGISTER_URL, json={"email": "notanemail", "password": VALID_PASSWORD})
+        response = client.post(
+            REGISTER_URL, json={"email": "notanemail", "password": VALID_PASSWORD}
+        )
         assert response.status_code == 422
 
     def test_missing_password_returns_422(self, client):
@@ -54,10 +67,12 @@ class TestRegister:
 # POST /auth/login
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLogin:
 
+class TestLogin:
     def _register(self, client):
-        client.post(REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD})
+        client.post(
+            REGISTER_URL, json={"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        )
 
     def _login(self, client, email=VALID_EMAIL, password=VALID_PASSWORD):
         # OAuth2PasswordRequestForm expects form data with field name "username"
@@ -105,8 +120,8 @@ class TestLogin:
 # GET /auth/me
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetMe:
 
+class TestGetMe:
     def test_returns_200_with_valid_token(self, client, user_with_auth):
         _, headers = user_with_auth
         response = client.get("/auth/me", headers=headers)
@@ -127,7 +142,9 @@ class TestGetMe:
         assert response.status_code == 401
 
     def test_invalid_token_returns_401(self, client):
-        response = client.get("/auth/me", headers={"Authorization": "Bearer invalid.token.here"})
+        response = client.get(
+            "/auth/me", headers={"Authorization": "Bearer invalid.token.here"}
+        )
         assert response.status_code == 401
 
 
@@ -135,8 +152,8 @@ class TestGetMe:
 # POST /auth/logout
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLogout:
 
+class TestLogout:
     def test_returns_200_with_valid_token(self, client, user_with_auth):
         _, headers = user_with_auth
         response = client.post("/auth/logout", headers=headers)
