@@ -7,22 +7,28 @@ import './Navbar.css'
 
 
 export function MyAppNav(){
-    return(
-        <nav>
-            <NavLink to="/" end>
-                Dashboard
-            </NavLink>
-            <NavLink to="/profile" end>
-                Profile
-            </NavLink>
-            <NavLink to="/documents" end>
-                Document Library
-            </NavLink>
-            <NavLink to="/settings" end>
-                Settings
-            </NavLink>
-        </nav>
-    )
+  return(
+    <nav>
+      <NavLink to="/" end>
+        Dashboard
+      </NavLink>
+
+      <NavLink to="/profile" end>
+        Profile
+      </NavLink>
+
+      <NavLink to="/documents" end>
+        Document Library
+      </NavLink>
+
+      <NavLink to="/settings" end>
+        Settings
+      </NavLink>
+
+      {/* This is the new link for your job form */}
+      <NavLink to="/jobs/new" end>
+        Add Job
+      </NavLink>
+    </nav>
+  )
 }
-
-

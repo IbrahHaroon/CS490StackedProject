@@ -5,6 +5,7 @@ import Profile from './pages/Profile.jsx'
 import DocumentLibrary from './pages/DocumentLibrary.jsx'
 import Settings from './pages/Settings.jsx'
 import Applications from './pages/Applications.jsx'
+import JobForm from "./pages/JobForm";
 import './App.css'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/jobs/new" element={<JobForm />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/documents" element={<DocumentLibrary />} />
           <Route path="/settings" element={<Settings />} />
