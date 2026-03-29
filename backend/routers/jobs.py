@@ -104,7 +104,10 @@ def update_application(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    if body.application_status is not None and body.application_status not in PIPELINE_STAGES:
+    if (
+        body.application_status is not None
+        and body.application_status not in PIPELINE_STAGES
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid stage. Must be one of: {PIPELINE_STAGES}",

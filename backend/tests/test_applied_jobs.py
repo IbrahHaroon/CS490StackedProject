@@ -52,7 +52,9 @@ class TestCreateAppliedJobs:
         assert job.job_id is not None
         assert job.job_id >= 1
 
-    def test_application_status_initialized_to_interested(self, session, user, position):
+    def test_application_status_initialized_to_interested(
+        self, session, user, position
+    ):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
         assert job.application_status == "Interested"
 

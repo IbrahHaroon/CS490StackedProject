@@ -22,7 +22,14 @@ if TYPE_CHECKING:
     from database.models.position import Position
     from database.models.user import User
 
-PIPELINE_STAGES = ["Interested", "Applied", "Interview", "Offer", "Rejected", "Archived"]
+PIPELINE_STAGES = [
+    "Interested",
+    "Applied",
+    "Interview",
+    "Offer",
+    "Rejected",
+    "Archived",
+]
 
 
 class AppliedJobs(Base):
