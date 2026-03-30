@@ -1,5 +1,6 @@
 from database.models.address import Address
 from database.models.applied_jobs import AppliedJobs
+from database.models.blacklisted_token import BlacklistedToken
 from database.models.company import Company
 from database.models.credentials import Credentials
 from database.models.documents import Documents
@@ -9,4 +10,3 @@ from database.models.password_reset import PasswordResetToken
 from database.models.position import Position
 from database.models.profile import Profile
 from database.models.user import User
-from database.models.blacklisted_token import BlacklistedToken

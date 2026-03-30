@@ -1,9 +1,8 @@
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
 from config import supabase
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 security = HTTPBearer(auto_error=False)
 

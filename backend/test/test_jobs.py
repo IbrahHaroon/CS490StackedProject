@@ -1,10 +1,11 @@
 from types import SimpleNamespace
+
+import dependencies.auth as auth_dep
 import pytest
 from fastapi.testclient import TestClient
-
 from main import app
-import dependencies.auth as auth_dep
-from routers.jobs import router as jobs_router, mock_jobs
+
+from routers.jobs import mock_jobs
 
 client = TestClient(app)
 
@@ -29,7 +30,6 @@ class MockSupabase:
 @pytest.fixture(autouse=True)
 def reset_mock_jobs():
     """Reset mock jobs before each test."""
-    from routers.jobs import mock_jobs
     mock_jobs.clear()
     mock_jobs.extend([
         {"id": 1, "title": "Job 1", "description": "Desc 1", "user_id": "user-1"},

@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from database.models.blacklisted_token import BlacklistedToken
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ from database.auth import (
     oauth2_scheme,
     verify_password,
 )
+from database.models.blacklisted_token import BlacklistedToken
 from database.models.credentials import Credentials
 from database.models.password_reset import PasswordResetToken
 from database.models.user import User

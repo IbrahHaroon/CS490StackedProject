@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 # --------------------------------------------------------------------------- #
