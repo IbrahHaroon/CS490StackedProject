@@ -1,6 +1,7 @@
+from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
-
+from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 # --------------------------------------------------------------------------- #
@@ -75,16 +76,16 @@ class ProfileCreate(BaseModel):
     last_name: str
     dob: date
     address: AddressCreate
-    phone_number: str | None = None
-    summary: str | None = None
+    phone_number: Optional[str] = None
+    summary: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    dob: date | None = None
-    phone_number: str | None = None
-    summary: str | None = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    dob: Optional[date] = None
+    phone_number: Optional[str] = None
+    summary: Optional[str] = None
 
 
 class ProfileResponse(BaseModel):
@@ -95,8 +96,8 @@ class ProfileResponse(BaseModel):
     first_name: str
     last_name: str
     dob: date
-    phone_number: str | None
-    summary: str | None
+    phone_number: Optional[str]
+    summary: Optional[str]
 
 
 # --------------------------------------------------------------------------- #
@@ -168,10 +169,10 @@ class PositionCreate(BaseModel):
     company_id: int
     title: str
     listing_date: date
-    salary: Decimal | None = None
-    education_req: str | None = None
-    experience_req: str | None = None
-    description: str | None = None
+    salary: Optional[Decimal] = None
+    education_req: Optional[str] = None
+    experience_req: Optional[str] = None
+    description: Optional[str] = None
 
 
 class PositionResponse(BaseModel):
@@ -181,10 +182,10 @@ class PositionResponse(BaseModel):
     company_id: int
     title: str
     listing_date: date
-    salary: Decimal | None
-    education_req: str | None
-    experience_req: str | None
-    description: str | None
+    salary: Optional[Decimal]
+    education_req: Optional[str]
+    experience_req: Optional[str]
+    description: Optional[str]
 
 
 # --------------------------------------------------------------------------- #
@@ -199,8 +200,8 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationUpdate(BaseModel):
-    application_status: str | None = None
-    years_of_experience: int | None = None
+    application_status: Optional[str] = None
+    years_of_experience: Optional[int] = None
 
 
 class ApplicationResponse(BaseModel):
@@ -212,7 +213,7 @@ class ApplicationResponse(BaseModel):
     years_of_experience: int
     application_date: date
     application_status: str
-    stage_changed_at: datetime | None = None
+    stage_changed_at: Optional[datetime] = None
 
 
 class JobActivityResponse(BaseModel):

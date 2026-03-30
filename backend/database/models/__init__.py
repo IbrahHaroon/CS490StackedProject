@@ -9,3 +9,4 @@ from database.models.password_reset import PasswordResetToken
 from database.models.position import Position
 from database.models.profile import Profile
 from database.models.user import User
+from database.models.blacklisted_token import BlacklistedToken

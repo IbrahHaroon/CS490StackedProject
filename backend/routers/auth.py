@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-
+from database.models.blacklisted_token import BlacklistedToken
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -10,8 +10,10 @@ from utils.email import send_password_reset_email
 from database import get_db
 from database.auth import (
     create_access_token,
+    decode_access_token,
     get_current_user,
     get_password_hash,
+    oauth2_scheme,
     verify_password,
 )
 from database.models.credentials import Credentials
@@ -34,7 +36,12 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout")
-def logout(_: User = Depends(get_current_user)):
+def logout(token: str = Depends(oauth2_scheme), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    db.add(BlacklistedToken(token_hash=token_hash, expires_at=expires_at))
+    db.commit()
     return {"message": "Logged out successfully"}
 
 
