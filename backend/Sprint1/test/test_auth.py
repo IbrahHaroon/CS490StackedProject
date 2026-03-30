@@ -1,9 +1,8 @@
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
-
-from main import app
 import dependencies.auth as auth_dep
+from fastapi.testclient import TestClient
+from main import app
 
 client = TestClient(app)
 
@@ -29,7 +28,9 @@ def test_missing_token():
 
 
 def test_invalid_token(monkeypatch):
-    monkeypatch.setattr(auth_dep, "supabase", MockSupabase(SimpleNamespace(id="user-1")))
+    monkeypatch.setattr(
+        auth_dep, "supabase", MockSupabase(SimpleNamespace(id="user-1"))
+    )
 
     response = client.get(
         "/api/jobs",
@@ -40,7 +41,9 @@ def test_invalid_token(monkeypatch):
 
 
 def test_valid_token(monkeypatch):
-    monkeypatch.setattr(auth_dep, "supabase", MockSupabase(SimpleNamespace(id="user-1")))
+    monkeypatch.setattr(
+        auth_dep, "supabase", MockSupabase(SimpleNamespace(id="user-1"))
+    )
 
     response = client.get(
         "/api/jobs",

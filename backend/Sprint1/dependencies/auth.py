@@ -1,9 +1,8 @@
 from typing import Any
 
+from config import supabase
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from config import supabase
 
 security = HTTPBearer(auto_error=False)
 
@@ -45,7 +44,9 @@ async def get_current_user(
         user = result.user
     elif hasattr(result, "data"):
         data = result.data
-        user = data.get("user") if isinstance(data, dict) else getattr(data, "user", None)
+        user = (
+            data.get("user") if isinstance(data, dict) else getattr(data, "user", None)
+        )
 
     if not user or not getattr(user, "id", None):
         raise HTTPException(

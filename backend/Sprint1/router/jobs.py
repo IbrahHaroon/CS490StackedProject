@@ -1,9 +1,8 @@
 from typing import Any, Dict, List
 
+from dependencies.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-
-from dependencies.auth import get_current_user
 from services.authorization import authorize_resource_owner
 
 router = APIRouter()
@@ -42,7 +41,9 @@ async def get_job(job_id: int, current_user: Any = Depends(get_current_user)):
 
 
 @router.post("/jobs")
-async def create_job(job_data: JobCreate, current_user: Any = Depends(get_current_user)):
+async def create_job(
+    job_data: JobCreate, current_user: Any = Depends(get_current_user)
+):
     new_id = max(j["id"] for j in mock_jobs) + 1 if mock_jobs else 1
 
     new_job = {
@@ -57,7 +58,9 @@ async def create_job(job_data: JobCreate, current_user: Any = Depends(get_curren
 
 
 @router.put("/jobs/{job_id}")
-async def update_job(job_id: int, job_data: JobUpdate, current_user: Any = Depends(get_current_user)):
+async def update_job(
+    job_id: int, job_data: JobUpdate, current_user: Any = Depends(get_current_user)
+):
     job = next((j for j in mock_jobs if j["id"] == job_id), None)
 
     if not job:
