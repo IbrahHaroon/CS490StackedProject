@@ -3,7 +3,7 @@ import "./Applications.css";
 
 const API = "http://localhost:8000";
 
-const STAGES = ["Interested", "Applied", "Interview", "Offer", "Rejected", "Archived"];
+const STAGES = ["Interested", "Applied", "Interview", "Offer", "Rejected", "Archived", "Withdrawn"];
 
 const STATUS_COLOR = {
   Interested:  "#4f8ef7",
@@ -12,6 +12,7 @@ const STATUS_COLOR = {
   Offer:       "#22c55e",
   Rejected:    "#ef4444",
   Archived:    "#6b7280",
+  Withdrawn:   "#374151",
 };
 
 function Pipeline({ current }) {
@@ -48,9 +49,10 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({ app, position }) {
+function ApplicationCard({ app, position, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [removing, setRemoving] = useState(false);
   const token = localStorage.getItem("token");
 
   const loadActivity = async () => {
@@ -81,6 +83,21 @@ function ApplicationCard({ app, position }) {
           </span>
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
+          </button>
+          <button
+            className="app-remove-btn"
+            disabled={removing}
+            onClick={async () => {
+              if (!window.confirm("Remove this application?")) return;
+              setRemoving(true);
+              await fetch(`${API}/jobs/applications/${app.job_id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              onRemove(app.job_id);
+            }}
+          >
+            {removing ? "Removing…" : "Remove"}
           </button>
         </div>
       </div>
@@ -146,7 +163,7 @@ function Applications() {
   }, []);
 
   const filtered = filter === "All"
-    ? applications
+    ? applications.filter((a) => a.application_status !== "Withdrawn")
     : applications.filter((a) => a.application_status === filter);
 
   return (
@@ -185,6 +202,7 @@ function Applications() {
                   key={app.job_id}
                   app={app}
                   position={positions[app.position_id]}
+                  onRemove={(id) => setApplications((prev) => prev.filter((a) => a.job_id !== id))}
                 />
               ))}
             </div>

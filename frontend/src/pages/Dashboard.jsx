@@ -1,15 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./Dashboard.css";
 
 const API = "http://localhost:8000";
 
 function ApplyModal({ job, onClose, onConfirm }) {
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleConfirm = async () => {
+    if (submitting) return;
     setError("");
+    setSubmitting(true);
     const err = await onConfirm(job.position_id);
+    setSubmitting(false);
     if (err) setError(err);
   };
 
@@ -21,8 +25,10 @@ function ApplyModal({ job, onClose, onConfirm }) {
         <p className="apply-modal-company">Are you sure you want to apply?</p>
         {error && <p className="apply-modal-error">{error}</p>}
         <div className="apply-modal-actions">
-          <button className="apply-modal-cancel" onClick={onClose}>Cancel</button>
-          <button className="apply-modal-confirm" onClick={handleConfirm}>Confirm Apply</button>
+          <button className="apply-modal-cancel" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="apply-modal-confirm" onClick={handleConfirm} disabled={submitting}>
+            {submitting ? "Applying…" : "Confirm Apply"}
+          </button>
         </div>
       </div>
     </div>
@@ -39,6 +45,7 @@ function Dashboard() {
   const [applySuccess, setApplySuccess] = useState("");
   const jobBoardRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -64,7 +71,7 @@ function Dashboard() {
       setLoading(false);
     };
     fetchAll();
-  }, []);
+  }, [location.pathname]);
 
   const handleApply = async (position_id) => {
     const meRes = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
@@ -227,12 +234,9 @@ function Dashboard() {
                   </div>
                 )}
                 {token && (
-                  <button
-                    className="apply-btn"
-                    onClick={() => setApplyTarget(selectedJob)}
-                  >
-                    Apply Now
-                  </button>
+                  applications.some(a => a.position_id === selectedJob.position_id && a.application_status !== "Withdrawn")
+                    ? <button className="apply-btn apply-btn-applied" disabled>Already Applied</button>
+                    : <button className="apply-btn" onClick={() => setApplyTarget(selectedJob)}>Apply Now</button>
                 )}
               </div>
             )}

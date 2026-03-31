@@ -29,6 +29,7 @@ PIPELINE_STAGES = [
     "Offer",
     "Rejected",
     "Archived",
+    "Withdrawn",
 ]
 
 
@@ -111,6 +112,25 @@ def update_applied_job(
     session.commit()
     session.refresh(job)
     return job
+
+
+def delete_applied_job(session: Session, job_id: int) -> bool:
+    """Delete an application by primary key. Returns True if deleted.
+
+    Deletes associated job_activity rows first to satisfy the FK constraint
+    (job_activity.job_id has NO ACTION on delete).
+    """
+    from database.models.job_activity import JobActivity
+
+    job = get_applied_jobs(session, job_id)
+    if job is None:
+        return False
+    session.execute(
+        JobActivity.__table__.delete().where(JobActivity.job_id == job_id)
+    )
+    session.delete(job)
+    session.commit()
+    return True
 
 
 def lookup_applied_jobs(session: Session, user_id: int) -> int:

@@ -25,6 +25,69 @@ function Field({ label, value }) {
   );
 }
 
+function ChangePasswordModal({ onCancel }) {
+  const [current, setCurrent]   = useState("");
+  const [newPw, setNewPw]       = useState("");
+  const [confirm, setConfirm]   = useState("");
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState("");
+  const token = localStorage.getItem("token");
+
+  const handleSave = async () => {
+    setError("");
+    setSuccess("");
+    if (!current)              return setError("Current password is required.");
+    if (newPw.length < 6)     return setError("New password must be at least 6 characters.");
+    if (newPw !== confirm)    return setError("Passwords do not match.");
+
+    // Verify current password by attempting login
+    const meRes = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    const me = await meRes.json();
+
+    const checkRes = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username: me.email, password: current }).toString(),
+    });
+    if (!checkRes.ok) return setError("Current password is incorrect.");
+
+    const forgotRes = await fetch(`${API}/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: me.email }),
+    });
+
+    if (!forgotRes.ok) return setError("Failed to initiate password change.");
+    setSuccess("A password reset email has been sent. Please check your inbox.");
+  };
+
+  return (
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <h3 style={styles.modalTitle}>Change Password</h3>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>Current Password</label>
+          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} style={styles.modalInput} placeholder="••••••••" />
+        </div>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>New Password</label>
+          <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} style={styles.modalInput} placeholder="••••••••" />
+        </div>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>Confirm New Password</label>
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} style={styles.modalInput} placeholder="••••••••" />
+        </div>
+        {error   && <p style={{ color: "red",    fontSize: "13px" }}>{error}</p>}
+        {success && <p style={{ color: "green",  fontSize: "13px" }}>{success}</p>}
+        <div style={styles.modalActions}>
+          <button style={styles.cancelBtn} onClick={onCancel}>Cancel</button>
+          {!success && <button style={styles.saveBtn} onClick={handleSave}>Update Password</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditModal({ title, fields, onSave, onCancel }) {
   const [values, setValues] = useState(() =>
     Object.fromEntries(fields.map((f) => [f.name, f.value]))
@@ -73,7 +136,7 @@ function EditModal({ title, fields, onSave, onCancel }) {
 function Settings() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
-  const [modal, setModal] = useState(null); // null | "name" | "contact"
+  const [modal, setModal] = useState(null); // null | "name" | "contact" | "password"
   const [statusMessage, setStatusMessage] = useState("");
 
   const token = localStorage.getItem("token");
@@ -144,12 +207,16 @@ function Settings() {
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>Security</h2>
           </div>
-          <button type="button" style={styles.secondaryButton}>
+          <button type="button" style={styles.secondaryButton} onClick={() => setModal("password")}>
             Change Password
           </button>
         </div>
 
       </div>
+
+      {modal === "password" && (
+        <ChangePasswordModal onCancel={() => setModal(null)} />
+      )}
 
       {/* Name edit modal */}
       {modal === "name" && (

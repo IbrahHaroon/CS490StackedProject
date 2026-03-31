@@ -6,6 +6,7 @@ from database.auth import get_current_user
 from database.models.applied_jobs import (
     PIPELINE_STAGES,
     create_applied_jobs,
+    delete_applied_job,
     get_all_applied_jobs,
     get_applied_jobs,
     update_applied_job,
@@ -141,6 +142,23 @@ def update_application(
         years_of_experience=body.years_of_experience,
     )
     return updated
+
+
+@router.delete("/applications/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_application(
+    job_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = get_applied_jobs(session, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    if job.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    # Record withdrawal in history before deleting (delete_applied_job will
+    # then purge job_activity rows to satisfy the FK constraint)
+    create_job_activity(session, job_id, "Withdrawn")
+    delete_applied_job(session, job_id)
 
 
 @router.get("/applications/{job_id}/activity", response_model=list[JobActivityResponse])

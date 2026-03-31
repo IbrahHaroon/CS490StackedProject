@@ -195,8 +195,15 @@
   width: 100%;
 }
 
-.apply-btn:hover {
+.apply-btn:hover:not(:disabled) {
   background-color: #3a7be0;
+}
+
+.apply-btn-applied {
+  background-color: #2a2a3e;
+  color: #666;
+  cursor: not-allowed;
+  border: 1px solid #333;
 }
 
 .apply-success-msg {

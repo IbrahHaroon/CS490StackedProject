@@ -40,3 +40,6 @@ build/
 
 # Logs
 *.log
+
+# Uploaded files
+backend/uploads/
