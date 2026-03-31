@@ -105,14 +105,15 @@ function JobForm() {
         return;
       }
 
-      const url = isEditMode
-        ? `${API}/jobs/positions/${id}`
-        : `${API}/jobs/positions/`;
+      const url = isEditMode ? `${API}/jobs/positions/${id}` : `${API}/jobs/positions/`;
       const method = isEditMode ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           company_id,
           title: formData.title,
@@ -126,11 +127,16 @@ function JobForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setMessage(err.detail || (isEditMode ? "Failed to update posting." : "Failed to create posting."));
+        setMessage(
+          err.detail ||
+            (isEditMode ? "Failed to update posting." : "Failed to create posting.")
+        );
         return;
       }
 
-      setMessage(isEditMode ? "Posting updated successfully." : "Posting created successfully.");
+      setMessage(
+        isEditMode ? "Posting updated successfully." : "Posting created successfully."
+      );
       setTimeout(() => navigate("/"), 1500);
     } catch (err) {
       setMessage("Network error. Please check that the server is running.");
