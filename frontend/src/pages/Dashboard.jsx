@@ -265,23 +265,33 @@ function Dashboard() {
                     <p>{selectedJob.experience_req}</p>
                   </div>
                 )}
-                {token &&
-                  (applications.some(
-                    (a) =>
-                      a.position_id === selectedJob.position_id &&
-                      a.application_status !== "Withdrawn"
-                  ) ? (
-                    <button className="apply-btn apply-btn-applied" disabled>
-                      Already Applied
-                    </button>
-                  ) : (
+                {token && (
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    {applications.some(
+                      (a) =>
+                        a.position_id === selectedJob.position_id &&
+                        a.application_status !== "Withdrawn"
+                    ) ? (
+                      <button className="apply-btn apply-btn-applied" disabled>
+                        Already Applied
+                      </button>
+                    ) : (
+                      <button
+                        className="apply-btn"
+                        onClick={() => setApplyTarget(selectedJob)}
+                      >
+                        Apply Now
+                      </button>
+                    )}
                     <button
                       className="apply-btn"
-                      onClick={() => setApplyTarget(selectedJob)}
+                      style={{ backgroundColor: "#6c757d" }}
+                      onClick={() => navigate(`/jobs/edit/${selectedJob.position_id}`)}
                     >
-                      Apply Now
+                      Edit Posting
                     </button>
-                  ))}
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -34,6 +34,14 @@ function App() {
             }
           />
           <Route
+            path="/jobs/edit/:id"
+            element={
+              <ProtectedRoute>
+                <JobForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/profile"
             element={
               <ProtectedRoute>

@@ -401,7 +401,7 @@ const styles = {
     alignItems: "center",
     marginBottom: "12px",
   },
-  sectionTitle: { fontSize: "18px", margin: 0 },
+  sectionTitle: { fontSize: "18px", margin: 0, color: "#444" },
   editBtn: {
     padding: "4px 14px",
     border: "1px solid #ccc",
@@ -409,6 +409,7 @@ const styles = {
     background: "none",
     cursor: "pointer",
     fontSize: "14px",
+    color: "#333",
   },
   field: {
     display: "flex",
@@ -416,7 +417,7 @@ const styles = {
     padding: "6px 0",
     fontSize: "15px",
   },
-  fieldLabel: { color: "#888", width: "140px", flexShrink: 0 },
+  fieldLabel: { color: "#555", width: "140px", flexShrink: 0 },
   fieldValue: { color: "#222" },
   divider: { border: "none", borderTop: "1px solid #eee", margin: 0 },
   secondaryButton: {
@@ -425,6 +426,7 @@ const styles = {
     border: "1px solid #ccc",
     cursor: "pointer",
     fontSize: "14px",
+    color: "#333",
   },
   status: { color: "green", fontSize: "14px", marginBottom: "12px" },
   // Modal

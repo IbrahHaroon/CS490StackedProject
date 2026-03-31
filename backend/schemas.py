@@ -174,6 +174,16 @@ class PositionCreate(BaseModel):
     description: str | None = None
 
 
+class PositionUpdate(BaseModel):
+    company_id: int | None = None
+    title: str | None = None
+    listing_date: date | None = None
+    salary: Decimal | None = None
+    education_req: str | None = None
+    experience_req: str | None = None
+    description: str | None = None
+
+
 class PositionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

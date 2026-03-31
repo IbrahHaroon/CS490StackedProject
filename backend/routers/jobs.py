@@ -12,7 +12,12 @@ from database.models.applied_jobs import (
     update_applied_job,
 )
 from database.models.job_activity import create_job_activity, get_job_activities
-from database.models.position import create_position, get_all_positions, get_position
+from database.models.position import (
+    create_position,
+    get_all_positions,
+    get_position,
+    update_position,
+)
 from database.models.user import User
 from schemas import (
     ApplicationCreate,
@@ -21,6 +26,7 @@ from schemas import (
     JobActivityResponse,
     PositionCreate,
     PositionResponse,
+    PositionUpdate,
     PositionWithCompanyResponse,
 )
 
@@ -77,6 +83,39 @@ def read_position(position_id: int, session: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Position not found"
         )
     return position
+
+
+@router.put("/positions/{position_id}", response_model=PositionResponse)
+def update_position_endpoint(
+    position_id: int,
+    body: PositionUpdate,
+    session: Session = Depends(get_db),
+):
+    position = get_position(session, position_id)
+    if not position:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Position not found"
+        )
+    if body.company_id is not None:
+        position.company_id = body.company_id
+    if body.title is not None:
+        position.title = body.title
+    if body.listing_date is not None:
+        position.listing_date = body.listing_date
+    if body.salary is not None:
+        position.salary = body.salary
+    if body.education_req is not None:
+        position.education_req = body.education_req
+    if body.experience_req is not None:
+        position.experience_req = body.experience_req
+    if body.description is not None:
+        position.description = body.description
+    if not update_position(session, position):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update position",
+        )
+    return get_position(session, position_id)
 
 
 # --------------------------------------------------------------------------- #
