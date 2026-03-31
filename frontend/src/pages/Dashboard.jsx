@@ -265,7 +265,7 @@ function Dashboard() {
                     <p>{selectedJob.experience_req}</p>
                   </div>
                 )}
-                {token && (
+                {token ? (
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                     {applications.some(
                       (a) =>
@@ -291,6 +291,13 @@ function Dashboard() {
                       Edit Posting
                     </button>
                   </div>
+                ) : (
+                  <button
+                    className="apply-btn"
+                    onClick={() => navigate("/signin")}
+                  >
+                    Sign In to Apply
+                  </button>
                 )}
               </div>
             )}

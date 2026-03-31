@@ -7,7 +7,7 @@ export function MyAppNav() {
 
   const handleSignOut = () => {
     localStorage.removeItem("token");
-    navigate("/signin");
+    navigate("/");
   };
 
   return (
