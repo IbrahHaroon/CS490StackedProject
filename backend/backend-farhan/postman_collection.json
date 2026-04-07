@@ -1,0 +1,423 @@
+{
+  "info": {
+    "name": "ATS Backend-Farhan Features",
+    "description": "Postman collection for all new backend-farhan features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Feature 1: Job Sorting",
+      "item": [
+        {
+          "name": "Get Sorted Dashboard - By Company (ASC)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/sorted?sort_by=company&order=asc",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "sorted"],
+              "query": [
+                {
+                  "key": "sort_by",
+                  "value": "company"
+                },
+                {
+                  "key": "order",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Sorted Dashboard - By Last Activity (DESC)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/sorted?sort_by=last_activity&order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "sorted"],
+              "query": [
+                {
+                  "key": "sort_by",
+                  "value": "last_activity"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Sorted Dashboard - By Deadline (ASC)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/sorted?sort_by=deadline&order=asc",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "sorted"],
+              "query": [
+                {
+                  "key": "sort_by",
+                  "value": "deadline"
+                },
+                {
+                  "key": "order",
+                  "value": "asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Sorted Dashboard - By Created At (DESC)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/sorted?sort_by=created_at&order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "sorted"],
+              "query": [
+                {
+                  "key": "sort_by",
+                  "value": "created_at"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Feature 2: Interview Tracking",
+      "item": [
+        {
+          "name": "Create Interview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": 1,\n  \"round_type\": \"Phone Screen\",\n  \"date_time\": \"2024-03-20T14:00:00\",\n  \"notes\": \"Initial screening with recruiter\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/jobs/1/interviews",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "interviews"]
+            }
+          }
+        },
+        {
+          "name": "List Interviews for Job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/jobs/1/interviews",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "interviews"]
+            }
+          }
+        },
+        {
+          "name": "Update Interview",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"round_type\": \"Phone Screen - Rescheduled\",\n  \"date_time\": \"2024-03-21T14:00:00\",\n  \"notes\": \"Rescheduled due to conflict\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/interviews/1",
+              "host": ["{{base_url}}"],
+              "path": ["interviews", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Interview",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interviews/1",
+              "host": ["{{base_url}}"],
+              "path": ["interviews", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Feature 3: Outcome Tracking",
+      "item": [
+        {
+          "name": "Create Outcome",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": 1,\n  \"outcome_state\": \"Offer\",\n  \"outcome_notes\": \"Excellent candidate, negotiating start date\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/jobs/1/outcome",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "outcome"]
+            }
+          }
+        },
+        {
+          "name": "Get Outcome",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/jobs/1/outcome",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "outcome"]
+            }
+          }
+        },
+        {
+          "name": "Update Outcome",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"outcome_state\": \"Accepted\",\n  \"outcome_notes\": \"Accepted with start date of April 1, 2024\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/outcome/1",
+              "host": ["{{base_url}}"],
+              "path": ["outcome", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Outcome",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/outcome/1",
+              "host": ["{{base_url}}"],
+              "path": ["outcome", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Feature 4: Document Save from Job Context",
+      "item": [
+        {
+          "name": "Create Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": 1,\n  \"title\": \"Cover Letter - Draft v3\",\n  \"content\": \"Dear Hiring Manager,\\n\\nI am writing to express my strong interest in the Senior Engineer role at your organization.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/jobs/1/documents",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "documents"]
+            }
+          }
+        },
+        {
+          "name": "List Documents for Job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/jobs/1/documents",
+              "host": ["{{base_url}}"],
+              "path": ["jobs", "1", "documents"]
+            }
+          }
+        },
+        {
+          "name": "Update Document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Cover Letter - Final\",\n  \"content\": \"Updated and proofread version of the cover letter.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/documents/1",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/documents/1",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "1"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ]
+}
