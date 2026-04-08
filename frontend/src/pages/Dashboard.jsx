@@ -85,7 +85,7 @@ function Dashboard() {
       setLoading(false);
     };
     fetchAll();
-  }, [location.pathname]);
+  }, [location.pathname, token]);
 
   const handleApply = async (position_id) => {
     const meRes = await fetch(`${API}/auth/me`, {
