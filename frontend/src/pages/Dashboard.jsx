@@ -96,7 +96,10 @@ function Dashboard() {
 
     const res = await fetch(`${API}/jobs/applications/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         user_id: me.user_id,
         position_id,
