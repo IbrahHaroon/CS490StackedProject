@@ -220,7 +220,11 @@ function Dashboard() {
               {jobs.map((job) => (
                 <div
                   key={job.position_id}
-                  className={`job-card ${selectedJob?.position_id === job.position_id ? "job-card-selected" : ""}`}
+                  className={`job-card ${
+                    selectedJob?.position_id === job.position_id
+                      ? "job-card-selected"
+                      : ""
+                  }`}
                   onClick={() => setSelectedJob(job)}
                 >
                   <span className="job-card-company">{job.company_name}</span>
