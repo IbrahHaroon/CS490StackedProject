@@ -109,7 +109,9 @@ function JobForm() {
         return;
       }
 
-      const url = isEditMode ? `${API}/jobs/positions/${id}` : `${API}/jobs/positions/`;
+      const url = isEditMode
+        ? `${API}/jobs/positions/${id}`
+        : `${API}/jobs/positions/`;
       const method = isEditMode ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -133,13 +135,17 @@ function JobForm() {
         const err = await res.json().catch(() => ({}));
         setMessage(
           err.detail ||
-            (isEditMode ? "Failed to update posting." : "Failed to create posting.")
+            (isEditMode
+              ? "Failed to update posting."
+              : "Failed to create posting.")
         );
         return;
       }
 
       setMessage(
-        isEditMode ? "Posting updated successfully." : "Posting created successfully."
+        isEditMode
+          ? "Posting updated successfully."
+          : "Posting created successfully."
       );
       setTimeout(() => navigate("/"), 1500);
     } catch (err) {
@@ -186,7 +192,9 @@ function JobForm() {
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>{isEditMode ? "Edit Posting" : "Add Posting"}</h1>
+      <h1 style={styles.title}>
+        {isEditMode ? "Edit Posting" : "Add Posting"}
+      </h1>
       <form onSubmit={handleSubmit} style={styles.card}>
         <label style={styles.label}>Company Name</label>
         <input
@@ -264,7 +272,11 @@ function JobForm() {
         />
 
         <button type="submit" style={styles.button} disabled={isSaving}>
-          {isSaving ? "Saving…" : isEditMode ? "Save Changes" : "Create Posting"}
+          {isSaving
+            ? "Saving…"
+            : isEditMode
+              ? "Save Changes"
+              : "Create Posting"}
         </button>
 
         {message && (

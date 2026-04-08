@@ -303,12 +303,14 @@ function Dashboard() {
                     <button
                       className="apply-btn"
                       style={{ backgroundColor: "#6c757d" }}
-                      onClick={() => navigate(`/jobs/edit/${selectedJob.position_id}`)}
+                      onClick={() =>
+                        navigate(`/jobs/edit/${selectedJob.position_id}`)
+                      }
                     >
                       Edit Posting
                     </button>
-                  </div>
-                ) : (
+                  ))}
+                {!token && (
                   <button
                     className="apply-btn"
                     onClick={() => navigate("/signin")}
