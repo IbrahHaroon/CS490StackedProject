@@ -1,13 +1,12 @@
 from enum import Enum
-from typing import Literal
 
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session
 
 from database.models.applied_jobs import AppliedJobs
+from database.models.company import Company
 from database.models.job_activity import JobActivity
 from database.models.position import Position
-from database.models.company import Company
 
 
 class SortField(str, Enum):
@@ -65,10 +64,9 @@ def get_sorted_jobs(
         sort_column = Position.listing_date
     elif sort_by == SortField.COMPANY:
         # Sort by company name, requiring joins
-        query = (
-            query.join(Position, AppliedJobs.position_id == Position.position_id)
-            .join(Company, Position.company_id == Company.company_id)
-        )
+        query = query.join(
+            Position, AppliedJobs.position_id == Position.position_id
+        ).join(Company, Position.company_id == Company.company_id)
         sort_column = Company.name
     else:  # created_at (application_date)
         sort_column = AppliedJobs.application_date

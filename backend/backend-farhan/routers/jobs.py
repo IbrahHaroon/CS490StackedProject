@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
-from database.models.applied_jobs import get_applied_jobs
 from database.models.user import User
 from database.services.job_sorter import (
     SortField,
@@ -47,7 +46,5 @@ def get_sorted_dashboard(
             detail=f"Invalid order. Must be one of: {', '.join([e.value for e in SortOrder])}",
         )
 
-    jobs = get_sorted_jobs(
-        session, current_user.user_id, sort_field, sort_order
-    )
+    jobs = get_sorted_jobs(session, current_user.user_id, sort_field, sort_order)
     return list(jobs)
