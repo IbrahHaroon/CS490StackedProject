@@ -206,7 +206,9 @@ function SignIn() {
           </button>
         </form>
         <p className="signin-switch">
-          {mode === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
+          {mode === "signin"
+            ? "Don't have an account?"
+            : "Already have an account?"}{" "}
           <button className="signin-switch-btn" onClick={switchMode}>
             {mode === "signin" ? "Sign Up" : "Sign In"}
           </button>

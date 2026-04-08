@@ -35,7 +35,11 @@ function EditModal({ title, fields, onSave, onCancel }) {
                 name={f.name}
                 value={values[f.name]}
                 onChange={handleChange}
-                style={{ ...styles.modalInput, height: "100px", resize: "vertical" }}
+                style={{
+                  ...styles.modalInput,
+                  height: "100px",
+                  resize: "vertical",
+                }}
                 placeholder={f.placeholder || ""}
               />
             ) : (
@@ -81,9 +85,9 @@ function Profile() {
     }
 
     Promise.all([
-      fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(
-        (r) => r.json()
-      ),
+      fetch(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => r.json()),
       fetch(`${API}/profile/me`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => (r.ok ? r.json() : null)),
@@ -143,7 +147,9 @@ function Profile() {
     return null;
   };
 
-  const hasResume = documents.some((d) => d.document_type.toLowerCase() === "resume");
+  const hasResume = documents.some(
+    (d) => d.document_type.toLowerCase() === "resume"
+  );
 
   const completionFields = [
     { label: "First Name", done: !!profile?.first_name },
@@ -156,7 +162,9 @@ function Profile() {
   ];
 
   const completedCount = completionFields.filter((f) => f.done).length;
-  const completionPct = Math.round((completedCount / completionFields.length) * 100);
+  const completionPct = Math.round(
+    (completedCount / completionFields.length) * 100
+  );
   const missingFields = completionFields.filter((f) => !f.done);
 
   if (loading)
@@ -199,7 +207,10 @@ function Profile() {
           <InfoRow label="Email" value={email} />
           <InfoRow label="Phone" value={profile?.phone_number} />
           <InfoRow label="Date of Birth" value={profile?.dob} />
-          <InfoRow label="Resume" value={hasResume ? "Uploaded" : "Not uploaded"} />
+          <InfoRow
+            label="Resume"
+            value={hasResume ? "Uploaded" : "Not uploaded"}
+          />
         </div>
       </div>
 
@@ -214,7 +225,9 @@ function Profile() {
         {profile?.summary ? (
           <p style={styles.summaryText}>{profile.summary}</p>
         ) : (
-          <p style={{ color: "#aaa", fontSize: "14px" }}>No summary added yet.</p>
+          <p style={{ color: "#aaa", fontSize: "14px" }}>
+            No summary added yet.
+          </p>
         )}
       </div>
 
@@ -247,7 +260,11 @@ function Profile() {
               label: "First Name",
               value: profile?.first_name || "",
             },
-            { name: "last_name", label: "Last Name", value: profile?.last_name || "" },
+            {
+              name: "last_name",
+              label: "Last Name",
+              value: profile?.last_name || "",
+            },
             {
               name: "phone_number",
               label: "Phone Number",

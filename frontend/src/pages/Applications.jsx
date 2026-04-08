@@ -35,7 +35,9 @@ function Pipeline({ current }) {
         <div key={stage} className="pipeline-step">
           <div
             className={`pipeline-dot ${i <= currentIdx ? "pipeline-dot-active" : ""}`}
-            style={i === currentIdx ? { backgroundColor: STATUS_COLOR[current] } : {}}
+            style={
+              i === currentIdx ? { backgroundColor: STATUS_COLOR[current] } : {}
+            }
           />
           <span
             className={`pipeline-label ${i === currentIdx ? "pipeline-label-active" : ""}`}
@@ -55,7 +57,9 @@ function Pipeline({ current }) {
             className="pipeline-dot pipeline-dot-active"
             style={{ backgroundColor: STATUS_COLOR[current] }}
           />
-          <span className="pipeline-label pipeline-label-active">{current}</span>
+          <span className="pipeline-label pipeline-label-active">
+            {current}
+          </span>
         </div>
       )}
     </div>
@@ -89,8 +93,8 @@ function ApplicationCard({ app, position, onRemove }) {
           <h3 className="app-card-title">{title}</h3>
           <span className="app-card-meta">Applied {app.application_date}</span>
           <span className="app-card-meta">
-            {app.years_of_experience} yr{app.years_of_experience !== 1 ? "s" : ""}{" "}
-            experience
+            {app.years_of_experience} yr
+            {app.years_of_experience !== 1 ? "s" : ""} experience
           </span>
         </div>
         <div className="app-card-right">
@@ -208,7 +212,10 @@ function Applications() {
                 {s}
                 {s !== "All" && (
                   <span className="app-filter-count">
-                    {applications.filter((a) => a.application_status === s).length}
+                    {
+                      applications.filter((a) => a.application_status === s)
+                        .length
+                    }
                   </span>
                 )}
               </button>
@@ -229,7 +236,9 @@ function Applications() {
                   app={app}
                   position={positions[app.position_id]}
                   onRemove={(id) =>
-                    setApplications((prev) => prev.filter((a) => a.job_id !== id))
+                    setApplications((prev) =>
+                      prev.filter((a) => a.job_id !== id)
+                    )
                   }
                 />
               ))}
