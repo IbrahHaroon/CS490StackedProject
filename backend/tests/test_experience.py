@@ -53,7 +53,11 @@ class TestCreateExperience:
     def test_default_sort_order_is_zero(self, session):
         user = create_user(session, "c@test.com")
         exp = create_experience(
-            session, user_id=user.user_id, company="X", title="Y", start_date=date(2020, 1, 1)
+            session,
+            user_id=user.user_id,
+            company="X",
+            title="Y",
+            start_date=date(2020, 1, 1),
         )
         assert exp.sort_order == 0
 
@@ -67,7 +71,11 @@ class TestGetExperience:
     def test_returns_by_id(self, session):
         user = create_user(session, "d@test.com")
         created = create_experience(
-            session, user_id=user.user_id, company="C", title="T", start_date=date(2022, 1, 1)
+            session,
+            user_id=user.user_id,
+            company="C",
+            title="T",
+            start_date=date(2022, 1, 1),
         )
         fetched = get_experience(session, created.experience_id)
         assert fetched is not None
@@ -85,15 +93,35 @@ class TestGetExperience:
 class TestGetExperiencesByUser:
     def test_returns_all_for_user(self, session):
         user = create_user(session, "e@test.com")
-        create_experience(session, user_id=user.user_id, company="A", title="T1", start_date=date(2020, 1, 1), sort_order=0)
-        create_experience(session, user_id=user.user_id, company="B", title="T2", start_date=date(2022, 1, 1), sort_order=1)
+        create_experience(
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="T1",
+            start_date=date(2020, 1, 1),
+            sort_order=0,
+        )
+        create_experience(
+            session,
+            user_id=user.user_id,
+            company="B",
+            title="T2",
+            start_date=date(2022, 1, 1),
+            sort_order=1,
+        )
         results = get_experiences_by_user(session, user.user_id)
         assert len(results) == 2
 
     def test_isolation_across_users(self, session):
         user_a = create_user(session, "f@test.com")
         user_b = create_user(session, "g@test.com")
-        create_experience(session, user_id=user_a.user_id, company="A", title="T", start_date=date(2020, 1, 1))
+        create_experience(
+            session,
+            user_id=user_a.user_id,
+            company="A",
+            title="T",
+            start_date=date(2020, 1, 1),
+        )
         assert get_experiences_by_user(session, user_b.user_id) == []
 
     def test_returns_empty_list_for_user_with_none(self, session):
@@ -109,21 +137,37 @@ class TestGetExperiencesByUser:
 class TestUpdateExperience:
     def test_updates_title(self, session):
         user = create_user(session, "i@test.com")
-        exp = create_experience(session, user_id=user.user_id, company="A", title="Old", start_date=date(2020, 1, 1))
+        exp = create_experience(
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="Old",
+            start_date=date(2020, 1, 1),
+        )
         updated = update_experience(session, exp.experience_id, title="New")
         assert updated.title == "New"
 
     def test_updates_sort_order(self, session):
         user = create_user(session, "j@test.com")
-        exp = create_experience(session, user_id=user.user_id, company="A", title="T", start_date=date(2020, 1, 1))
+        exp = create_experience(
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="T",
+            start_date=date(2020, 1, 1),
+        )
         updated = update_experience(session, exp.experience_id, sort_order=5)
         assert updated.sort_order == 5
 
     def test_clears_end_date_to_null(self, session):
         user = create_user(session, "k@test.com")
         exp = create_experience(
-            session, user_id=user.user_id, company="A", title="T",
-            start_date=date(2020, 1, 1), end_date=date(2023, 1, 1)
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="T",
+            start_date=date(2020, 1, 1),
+            end_date=date(2023, 1, 1),
         )
         assert exp.end_date is not None
         updated = update_experience(session, exp.experience_id, clear_end_date=True)
@@ -141,7 +185,13 @@ class TestUpdateExperience:
 class TestDeleteExperience:
     def test_deletes_existing(self, session):
         user = create_user(session, "l@test.com")
-        exp = create_experience(session, user_id=user.user_id, company="A", title="T", start_date=date(2020, 1, 1))
+        exp = create_experience(
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="T",
+            start_date=date(2020, 1, 1),
+        )
         assert delete_experience(session, exp.experience_id) is True
         assert get_experience(session, exp.experience_id) is None
 
@@ -150,7 +200,14 @@ class TestDeleteExperience:
 
     def test_user_still_exists_after_delete(self, session):
         from database.models.user import get_user
+
         user = create_user(session, "m@test.com")
-        exp = create_experience(session, user_id=user.user_id, company="A", title="T", start_date=date(2020, 1, 1))
+        exp = create_experience(
+            session,
+            user_id=user.user_id,
+            company="A",
+            title="T",
+            start_date=date(2020, 1, 1),
+        )
         delete_experience(session, exp.experience_id)
         assert get_user(session, user.user_id) is not None

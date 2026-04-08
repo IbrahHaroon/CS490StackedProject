@@ -14,7 +14,9 @@ from schemas import ExperienceCreate, ExperienceResponse, ExperienceUpdate
 router = APIRouter()
 
 
-@router.post("/", response_model=ExperienceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=ExperienceResponse, status_code=status.HTTP_201_CREATED
+)
 def create_experience_endpoint(
     body: ExperienceCreate, session: Session = Depends(get_db)
 ):
@@ -66,8 +68,6 @@ def update_experience_endpoint(
 
 
 @router.delete("/{experience_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_experience_endpoint(
-    experience_id: int, session: Session = Depends(get_db)
-):
+def delete_experience_endpoint(experience_id: int, session: Session = Depends(get_db)):
     if not delete_experience(session, experience_id):
         raise HTTPException(status_code=404, detail="Experience not found")

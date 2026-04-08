@@ -181,7 +181,14 @@ class TestEducationNewFields:
 
     def test_create_education_with_all_new_fields(self, session, user):
         edu = create_education(
-            session, user.user_id, "Master's", "AI", "Tech U", "2 Ave", "NY", 10001,
+            session,
+            user.user_id,
+            "Master's",
+            "AI",
+            "Tech U",
+            "2 Ave",
+            "NY",
+            10001,
             field_of_study="Machine Learning",
             start_date=_date(2022, 9, 1),
             end_date=_date(2024, 5, 31),
@@ -194,7 +201,14 @@ class TestEducationNewFields:
 
     def test_gpa_stored_as_string_format(self, session, user):
         edu = create_education(
-            session, user.user_id, "Bachelor's", "Math", "City U", "3 Rd", "CA", 90210,
+            session,
+            user.user_id,
+            "Bachelor's",
+            "Math",
+            "City U",
+            "3 Rd",
+            "CA",
+            90210,
             gpa="3.75/4.0",
         )
         assert edu.gpa == "3.75/4.0"
@@ -209,7 +223,14 @@ class TestEducationNewFields:
 class TestRegression:
     def test_original_create_still_works_without_new_fields(self, session, user):
         edu = create_education(
-            session, user.user_id, "Bachelor's", "CS", "State U", "1 Campus Dr", "NJ", 8901
+            session,
+            user.user_id,
+            "Bachelor's",
+            "CS",
+            "State U",
+            "1 Campus Dr",
+            "NJ",
+            8901,
         )
         assert edu.education_id is not None
         assert edu.degree == "CS"
@@ -217,7 +238,14 @@ class TestRegression:
 
     def test_original_get_still_works(self, session, user):
         edu = create_education(
-            session, user.user_id, "PhD", "Physics", "Research U", "4 Lab Blvd", "MA", 2101
+            session,
+            user.user_id,
+            "PhD",
+            "Physics",
+            "Research U",
+            "4 Lab Blvd",
+            "MA",
+            2101,
         )
         fetched = get_education(session, edu.education_id)
         assert fetched is not None

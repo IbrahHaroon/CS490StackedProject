@@ -103,11 +103,15 @@ class TestJobActivityNewFields:
         assert activity.event_type == "stage_change"
 
     def test_create_activity_with_custom_event_type(self, session, job):
-        activity = create_job_activity(session, job.job_id, "Interview", event_type="interview")
+        activity = create_job_activity(
+            session, job.job_id, "Interview", event_type="interview"
+        )
         assert activity.event_type == "interview"
 
     def test_create_activity_with_notes(self, session, job):
-        activity = create_job_activity(session, job.job_id, "Applied", notes="Submitted via LinkedIn")
+        activity = create_job_activity(
+            session, job.job_id, "Applied", notes="Submitted via LinkedIn"
+        )
         assert activity.notes == "Submitted via LinkedIn"
 
     def test_notes_defaults_null(self, session, job):

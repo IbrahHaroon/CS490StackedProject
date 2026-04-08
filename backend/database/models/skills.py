@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 class Skills(Base):
     __tablename__ = "skills"
 
-    skill_id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )
+    skill_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -63,9 +61,7 @@ def get_skills_by_user(session: Session, user_id: int) -> list["Skills"]:
     """Return all skills for a user ordered by sort_order."""
     rows = (
         session.execute(
-            select(Skills)
-            .where(Skills.user_id == user_id)
-            .order_by(Skills.sort_order)
+            select(Skills).where(Skills.user_id == user_id).order_by(Skills.sort_order)
         )
         .scalars()
         .all()

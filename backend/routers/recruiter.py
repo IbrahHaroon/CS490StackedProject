@@ -241,9 +241,7 @@ def list_position_applications(
     return list(rows)
 
 
-@router.put(
-    "/applications/{job_id}/status", response_model=ApplicationResponse
-)
+@router.put("/applications/{job_id}/status", response_model=ApplicationResponse)
 def update_application_status(
     job_id: int,
     body: RecruiterApplicationStatusUpdate,
@@ -275,7 +273,8 @@ def update_application_status(
 
 
 @router.post(
-    "/applications/{job_id}/activity", response_model=JobActivityResponse,
+    "/applications/{job_id}/activity",
+    response_model=JobActivityResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_application_activity(

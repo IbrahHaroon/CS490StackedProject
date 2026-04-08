@@ -227,19 +227,24 @@ class TestAppliedJobsNewFields:
 
     def test_update_job_sets_recruiter_notes(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 2)
-        updated = update_applied_job(session, job.job_id, recruiter_notes="Contact: Jane")
+        updated = update_applied_job(
+            session, job.job_id, recruiter_notes="Contact: Jane"
+        )
         assert updated.recruiter_notes == "Contact: Jane"
 
     def test_update_job_sets_outcome_notes(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 2)
-        updated = update_applied_job(session, job.job_id, outcome_notes="Offer declined")
+        updated = update_applied_job(
+            session, job.job_id, outcome_notes="Offer declined"
+        )
         assert updated.outcome_notes == "Offer declined"
 
     def test_update_job_all_new_fields_at_once(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 2)
         dl = _date(2026, 7, 1)
         updated = update_applied_job(
-            session, job.job_id,
+            session,
+            job.job_id,
             deadline=dl,
             recruiter_notes="John at HR",
             outcome_notes="Accepted offer",
@@ -248,7 +253,9 @@ class TestAppliedJobsNewFields:
         assert updated.recruiter_notes == "John at HR"
         assert updated.outcome_notes == "Accepted offer"
 
-    def test_new_fields_do_not_affect_existing_status_update(self, session, user, position):
+    def test_new_fields_do_not_affect_existing_status_update(
+        self, session, user, position
+    ):
         job = create_applied_jobs(session, user.user_id, position.position_id, 2)
         updated = update_applied_job(session, job.job_id, application_status="Applied")
         assert updated.application_status == "Applied"
@@ -262,7 +269,9 @@ class TestAppliedJobsNewFields:
 
 
 class TestRegression:
-    def test_original_create_still_works_without_new_fields(self, session, user, position):
+    def test_original_create_still_works_without_new_fields(
+        self, session, user, position
+    ):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
         assert job.job_id is not None
         assert job.application_status == "Interested"
@@ -270,12 +279,15 @@ class TestRegression:
 
     def test_original_update_still_works(self, session, user, position):
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
-        updated = update_applied_job(session, job.job_id, application_status="Applied", years_of_experience=5)
+        updated = update_applied_job(
+            session, job.job_id, application_status="Applied", years_of_experience=5
+        )
         assert updated.application_status == "Applied"
         assert updated.years_of_experience == 5
 
     def test_original_delete_still_works(self, session, user, position):
         from database.models.applied_jobs import delete_applied_job
+
         job = create_applied_jobs(session, user.user_id, position.position_id, 3)
         assert delete_applied_job(session, job.job_id) is True
         assert get_applied_jobs(session, job.job_id) is None

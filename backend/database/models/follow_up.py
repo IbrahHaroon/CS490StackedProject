@@ -61,9 +61,7 @@ def get_follow_up(session: Session, followup_id: int) -> "FollowUp | None":
 def get_follow_ups_by_job(session: Session, job_id: int) -> list["FollowUp"]:
     """Return all follow-ups for a job."""
     rows = (
-        session.execute(
-            select(FollowUp).where(FollowUp.job_id == job_id)
-        )
+        session.execute(select(FollowUp).where(FollowUp.job_id == job_id))
         .scalars()
         .all()
     )

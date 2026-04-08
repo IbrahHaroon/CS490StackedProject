@@ -37,7 +37,12 @@ def _create_job(session, user_id: int) -> int:
         None,
         date.today(),
     )
-    job = create_applied_jobs(session, user_id=user_id, position_id=position.position_id, years_of_experience=2)
+    job = create_applied_jobs(
+        session,
+        user_id=user_id,
+        position_id=position.position_id,
+        years_of_experience=2,
+    )
     return job.job_id
 
 
@@ -50,7 +55,9 @@ class TestCreateFollowUp:
     def test_creates_with_required_fields(self, session):
         user = create_user(session, "a@test.com")
         job_id = _create_job(session, user.user_id)
-        fu = create_follow_up(session, job_id=job_id, description="Send thank-you email")
+        fu = create_follow_up(
+            session, job_id=job_id, description="Send thank-you email"
+        )
         assert fu.followup_id is not None
         assert fu.job_id == job_id
         assert fu.description == "Send thank-you email"
@@ -66,7 +73,9 @@ class TestCreateFollowUp:
         user = create_user(session, "c@test.com")
         job_id = _create_job(session, user.user_id)
         due = date(2026, 5, 15)
-        fu = create_follow_up(session, job_id=job_id, description="Check in", due_date=due)
+        fu = create_follow_up(
+            session, job_id=job_id, description="Check in", due_date=due
+        )
         assert fu.due_date == due
 
     def test_invalid_job_id_raises_error(self, session):

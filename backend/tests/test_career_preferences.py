@@ -48,7 +48,9 @@ class TestCreateCareerPreferences:
         user = create_user(session, "c@test.com")
         create_career_preferences(session, user_id=user.user_id, work_mode="Remote")
         with pytest.raises((IntegrityError, Exception)):
-            create_career_preferences(session, user_id=user.user_id, work_mode="On-site")
+            create_career_preferences(
+                session, user_id=user.user_id, work_mode="On-site"
+            )
             session.flush()
 
 
@@ -79,32 +81,49 @@ class TestUpdateCareerPreferences:
     def test_updates_work_mode(self, session):
         user = create_user(session, "f@test.com")
         create_career_preferences(session, user_id=user.user_id, work_mode="On-site")
-        updated = update_career_preferences(session, user_id=user.user_id, work_mode="Remote")
+        updated = update_career_preferences(
+            session, user_id=user.user_id, work_mode="Remote"
+        )
         assert updated.work_mode == "Remote"
 
     def test_updates_salary_preference(self, session):
         user = create_user(session, "g@test.com")
-        create_career_preferences(session, user_id=user.user_id, salary_preference="80k")
-        updated = update_career_preferences(session, user_id=user.user_id, salary_preference="100k+")
+        create_career_preferences(
+            session, user_id=user.user_id, salary_preference="80k"
+        )
+        updated = update_career_preferences(
+            session, user_id=user.user_id, salary_preference="100k+"
+        )
         assert updated.salary_preference == "100k+"
 
     def test_upsert_creates_when_none_exists(self, session):
         user = create_user(session, "h@test.com")
         assert get_career_preferences_by_user(session, user.user_id) is None
-        result = update_career_preferences(session, user_id=user.user_id, work_mode="Remote")
+        result = update_career_preferences(
+            session, user_id=user.user_id, work_mode="Remote"
+        )
         assert result is not None
         assert result.work_mode == "Remote"
 
     def test_upsert_updates_when_already_exists(self, session):
         user = create_user(session, "i@test.com")
         create_career_preferences(session, user_id=user.user_id, work_mode="On-site")
-        result = update_career_preferences(session, user_id=user.user_id, work_mode="Hybrid")
+        result = update_career_preferences(
+            session, user_id=user.user_id, work_mode="Hybrid"
+        )
         assert result.work_mode == "Hybrid"
         # Should still be one record, not two
         from sqlalchemy import select
 
         from database.models.career_preferences import CareerPreferences
-        count = session.execute(
-            select(CareerPreferences).where(CareerPreferences.user_id == user.user_id)
-        ).scalars().all()
+
+        count = (
+            session.execute(
+                select(CareerPreferences).where(
+                    CareerPreferences.user_id == user.user_id
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(count) == 1

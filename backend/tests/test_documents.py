@@ -190,7 +190,12 @@ def _create_job(session, user_id: int) -> int:
     position = create_position(
         session, company.company_id, "Engineer", None, None, None, None, _date.today()
     )
-    job = create_applied_jobs(session, user_id=user_id, position_id=position.position_id, years_of_experience=2)
+    job = create_applied_jobs(
+        session,
+        user_id=user_id,
+        position_id=position.position_id,
+        years_of_experience=2,
+    )
     return job.job_id
 
 
@@ -205,12 +210,15 @@ class TestDocumentJobLink:
         assert doc.job_id == job_id
 
     def test_document_job_id_accepts_null(self, session, user):
-        doc = create_document(session, user.user_id, "Cover Letter", "/c.pdf", job_id=None)
+        doc = create_document(
+            session, user.user_id, "Cover Letter", "/c.pdf", job_id=None
+        )
         assert doc.job_id is None
 
     def test_invalid_job_id_raises_integrity_error(self, session, user):
         import pytest
         from sqlalchemy.exc import IntegrityError
+
         with pytest.raises((IntegrityError, Exception)):
             create_document(session, user.user_id, "Resume", "/r.pdf", job_id=99999)
             session.flush()

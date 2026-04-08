@@ -20,7 +20,9 @@ POSITION_PAYLOAD_BASE = {
 
 
 def _register_and_login(client, email, password="testpass123"):
-    reg = client.post(f"{AUTH_URL}/register", json={"email": email, "password": password})
+    reg = client.post(
+        f"{AUTH_URL}/register", json={"email": email, "password": password}
+    )
     user_id = reg.json()["user_id"]
     login = client.post(
         f"{AUTH_URL}/login", data={"username": email, "password": password}
@@ -115,9 +117,7 @@ class TestCreateRecruiterProfile:
         rec_id, company_id, headers = _create_recruiter_with_auth(
             client, "dup@example.com"
         )
-        user_id = client.get(
-            f"{AUTH_URL}/me", headers=headers
-        ).json()["user_id"]
+        user_id = client.get(f"{AUTH_URL}/me", headers=headers).json()["user_id"]
         res = client.post(
             f"{RECRUITER_URL}/",
             json={
@@ -341,7 +341,13 @@ class TestRecruiterApplications:
             f"{RECRUITER_URL}/positions/{pos['position_id']}/applications",
             headers=rec_headers,
         ).json()
-        return apps[0]["job_id"], pos["position_id"], rec_headers, company_id, seeker_headers
+        return (
+            apps[0]["job_id"],
+            pos["position_id"],
+            rec_headers,
+            company_id,
+            seeker_headers,
+        )
 
     def test_view_applications_returns_200(self, client):
         job_id, position_id, rec_headers, _, _ = self._setup_application(client)
@@ -417,9 +423,7 @@ class TestRecruiterApplications:
 
 class TestRecruiterActivity:
     def _setup_application(self, client, rec_email, seeker_email):
-        rec_id, company_id, rec_headers = _create_recruiter_with_auth(
-            client, rec_email
-        )
+        rec_id, company_id, rec_headers = _create_recruiter_with_auth(client, rec_email)
         pos = _create_position(client, company_id, rec_headers)
         seeker_id, seeker_headers = _register_and_login(client, seeker_email)
         client.post(

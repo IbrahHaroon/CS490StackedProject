@@ -38,7 +38,12 @@ def _create_job(session, user_id: int) -> int:
         None,
         date.today(),
     )
-    job = create_applied_jobs(session, user_id=user_id, position_id=position.position_id, years_of_experience=2)
+    job = create_applied_jobs(
+        session,
+        user_id=user_id,
+        position_id=position.position_id,
+        years_of_experience=2,
+    )
     return job.job_id
 
 
@@ -54,7 +59,9 @@ class TestCreateInterview:
     def test_creates_with_required_fields_only(self, session):
         user = create_user(session, "a@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Phone Screen", scheduled_at=_SCHEDULED)
+        interview = create_interview(
+            session, job_id=job_id, round_type="Phone Screen", scheduled_at=_SCHEDULED
+        )
         assert interview.interview_id is not None
         assert interview.job_id == job_id
         assert interview.round_type == "Phone Screen"
@@ -64,12 +71,20 @@ class TestCreateInterview:
     def test_creates_with_notes(self, session):
         user = create_user(session, "b@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Technical", scheduled_at=_SCHEDULED, notes="Focus on system design")
+        interview = create_interview(
+            session,
+            job_id=job_id,
+            round_type="Technical",
+            scheduled_at=_SCHEDULED,
+            notes="Focus on system design",
+        )
         assert interview.notes == "Focus on system design"
 
     def test_invalid_job_id_raises_integrity_error(self, session):
         with pytest.raises((IntegrityError, Exception)):
-            create_interview(session, job_id=99999, round_type="Technical", scheduled_at=_SCHEDULED)
+            create_interview(
+                session, job_id=99999, round_type="Technical", scheduled_at=_SCHEDULED
+            )
             session.flush()
 
 
@@ -82,7 +97,9 @@ class TestGetInterview:
     def test_returns_interview_by_id(self, session):
         user = create_user(session, "c@test.com")
         job_id = _create_job(session, user.user_id)
-        created = create_interview(session, job_id=job_id, round_type="Final", scheduled_at=_SCHEDULED)
+        created = create_interview(
+            session, job_id=job_id, round_type="Final", scheduled_at=_SCHEDULED
+        )
         fetched = get_interview(session, created.interview_id)
         assert fetched is not None
         assert fetched.interview_id == created.interview_id
@@ -100,8 +117,18 @@ class TestGetInterviewsByJob:
     def test_returns_all_interviews_for_job(self, session):
         user = create_user(session, "d@test.com")
         job_id = _create_job(session, user.user_id)
-        create_interview(session, job_id=job_id, round_type="Phone", scheduled_at=datetime(2026, 5, 1))
-        create_interview(session, job_id=job_id, round_type="Technical", scheduled_at=datetime(2026, 5, 8))
+        create_interview(
+            session,
+            job_id=job_id,
+            round_type="Phone",
+            scheduled_at=datetime(2026, 5, 1),
+        )
+        create_interview(
+            session,
+            job_id=job_id,
+            round_type="Technical",
+            scheduled_at=datetime(2026, 5, 8),
+        )
         results = get_interviews_by_job(session, job_id)
         assert len(results) == 2
 
@@ -114,7 +141,9 @@ class TestGetInterviewsByJob:
         user = create_user(session, "f@test.com")
         job_id_a = _create_job(session, user.user_id)
         job_id_b = _create_job(session, user.user_id)
-        create_interview(session, job_id=job_id_a, round_type="Phone", scheduled_at=_SCHEDULED)
+        create_interview(
+            session, job_id=job_id_a, round_type="Phone", scheduled_at=_SCHEDULED
+        )
         results = get_interviews_by_job(session, job_id_b)
         assert len(results) == 0
 
@@ -128,15 +157,21 @@ class TestUpdateInterview:
     def test_updates_round_type(self, session):
         user = create_user(session, "g@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED)
+        interview = create_interview(
+            session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED
+        )
         updated = update_interview(session, interview.interview_id, round_type="Final")
         assert updated.round_type == "Final"
 
     def test_updates_notes(self, session):
         user = create_user(session, "h@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED)
-        updated = update_interview(session, interview.interview_id, notes="Bring portfolio")
+        interview = create_interview(
+            session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED
+        )
+        updated = update_interview(
+            session, interview.interview_id, notes="Bring portfolio"
+        )
         assert updated.notes == "Bring portfolio"
 
     def test_returns_none_for_missing_id(self, session):
@@ -152,7 +187,9 @@ class TestDeleteInterview:
     def test_deletes_existing_interview(self, session):
         user = create_user(session, "i@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED)
+        interview = create_interview(
+            session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED
+        )
         assert delete_interview(session, interview.interview_id) is True
         assert get_interview(session, interview.interview_id) is None
 
@@ -161,8 +198,11 @@ class TestDeleteInterview:
 
     def test_job_still_exists_after_interview_deleted(self, session):
         from database.models.applied_jobs import get_applied_jobs
+
         user = create_user(session, "j@test.com")
         job_id = _create_job(session, user.user_id)
-        interview = create_interview(session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED)
+        interview = create_interview(
+            session, job_id=job_id, round_type="Phone", scheduled_at=_SCHEDULED
+        )
         delete_interview(session, interview.interview_id)
         assert get_applied_jobs(session, job_id) is not None
