@@ -9,12 +9,6 @@ from database.models.applied_jobs import (
     get_applied_jobs,
     update_applied_job,
 )
-from database.models.recruiter import (
-    Recruiter,
-    create_recruiter,
-    get_recruiter_by_user_id,
-    update_recruiter,
-)
 from database.models.job_activity import create_job_activity
 from database.models.position import (
     LOCATION_TYPES,
@@ -24,18 +18,24 @@ from database.models.position import (
     get_position,
     update_position,
 )
+from database.models.recruiter import (
+    Recruiter,
+    create_recruiter,
+    get_recruiter_by_user_id,
+    update_recruiter,
+)
 from database.models.user import User
 from schemas import (
     ApplicationResponse,
+    JobActivityResponse,
+    PositionCreate,
+    PositionResponse,
+    PositionUpdate,
     RecruiterActivityCreate,
     RecruiterApplicationStatusUpdate,
     RecruiterCreate,
     RecruiterResponse,
     RecruiterUpdate,
-    JobActivityResponse,
-    PositionCreate,
-    PositionResponse,
-    PositionUpdate,
 )
 
 router = APIRouter()

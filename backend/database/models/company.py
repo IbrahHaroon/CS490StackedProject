@@ -10,8 +10,8 @@ from database.models.address import create_address
 
 if TYPE_CHECKING:
     from database.models.address import Address
-    from database.models.recruiter import Recruiter
     from database.models.position import Position
+    from database.models.recruiter import Recruiter
 
 
 class Company(Base):

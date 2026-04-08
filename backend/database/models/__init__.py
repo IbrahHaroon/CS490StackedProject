@@ -5,7 +5,6 @@ from database.models.company import Company
 from database.models.credentials import Credentials
 from database.models.documents import Documents
 from database.models.education import Education
-from database.models.recruiter import Recruiter
 from database.models.experience import Experience
 from database.models.follow_up import FollowUp
 from database.models.interview import Interview
@@ -13,6 +12,7 @@ from database.models.job_activity import JobActivity
 from database.models.password_reset import PasswordResetToken
 from database.models.position import Position
 from database.models.profile import Profile
+from database.models.recruiter import Recruiter
 from database.models.skills import Skills
 from database.models.token_blacklist import TokenBlacklist
 from database.models.user import User

@@ -2,10 +2,6 @@
 
 from datetime import date
 
-import pytest
-
-from database.models.user import create_user
-
 RECRUITER_URL = "/recruiter"
 COMPANY_URL = "/company"
 JOBS_URL = "/jobs"

@@ -2,6 +2,7 @@
 lookup_applied_jobs, get_all_applied_jobs."""
 
 from datetime import date
+from datetime import date as _date
 from decimal import Decimal
 
 import pytest
@@ -11,6 +12,7 @@ from database.models.applied_jobs import (
     get_all_applied_jobs,
     get_applied_jobs,
     lookup_applied_jobs,
+    update_applied_job,
 )
 from database.models.company import create_company
 from database.models.position import create_position
@@ -202,10 +204,6 @@ class TestGetAllAppliedJobs:
 # ─────────────────────────────────────────────────────────────────────────────
 # TestAppliedJobsNewFields — S2-007, S2-013
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-from database.models.applied_jobs import update_applied_job
-from datetime import date as _date
 
 
 class TestAppliedJobsNewFields:

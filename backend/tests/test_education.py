@@ -1,5 +1,7 @@
 """Tests for education.py — create_education, get_education."""
 
+from datetime import date as _date
+
 import pytest
 
 from database.models.education import create_education, get_education
@@ -165,9 +167,6 @@ class TestGetEducation:
 # ─────────────────────────────────────────────────────────────────────────────
 # TestEducationNewFields — S2-017
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-from datetime import date as _date
 
 
 class TestEducationNewFields:

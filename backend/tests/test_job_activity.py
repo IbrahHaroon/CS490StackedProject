@@ -4,7 +4,6 @@ Covers S2-009 (Persist Stage Transition Timestamps) and S2-010 (Job Activity Tim
 """
 
 from datetime import date
-from decimal import Decimal
 
 import pytest
 
@@ -13,7 +12,6 @@ from database.models.company import create_company
 from database.models.job_activity import create_job_activity, get_job_activities
 from database.models.position import create_position
 from database.models.user import create_user
-
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures

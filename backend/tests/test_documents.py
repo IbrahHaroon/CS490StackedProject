@@ -1,13 +1,18 @@
 """Tests for documents.py — create_document, get_document, lookup_documents, get_all_documents."""
 
+from datetime import date as _date
+
 import pytest
 
+from database.models.applied_jobs import create_applied_jobs
+from database.models.company import create_company
 from database.models.documents import (
     create_document,
     get_all_documents,
     get_document,
     lookup_documents,
 )
+from database.models.position import create_position
 from database.models.user import create_user
 
 
@@ -180,14 +185,6 @@ class TestGetAllDocuments:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-from datetime import date as _date
-from decimal import Decimal
-
-from database.models.applied_jobs import create_applied_jobs
-from database.models.company import create_company
-from database.models.position import create_position
-
-
 def _create_job(session, user_id: int) -> int:
     company = create_company(session, "Acme", "1 Main St", "NY", 10001)
     position = create_position(
@@ -238,6 +235,6 @@ class TestRegression:
         assert fetched.doc_id == doc.doc_id
 
     def test_original_delete_still_works(self, session, user):
-        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        create_document(session, user.user_id, "Resume", "/r.pdf")
         result = get_all_documents(session, user.user_id)
         assert len(result) == 1

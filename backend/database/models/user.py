@@ -13,9 +13,9 @@ if TYPE_CHECKING:
     from database.models.credentials import Credentials
     from database.models.documents import Documents
     from database.models.education import Education
-    from database.models.recruiter import Recruiter
     from database.models.experience import Experience
     from database.models.profile import Profile
+    from database.models.recruiter import Recruiter
     from database.models.skills import Skills
 
 
