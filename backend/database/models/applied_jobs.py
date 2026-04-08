@@ -18,6 +18,9 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from database.base import Base
 
 if TYPE_CHECKING:
+    from database.models.documents import Documents
+    from database.models.follow_up import FollowUp
+    from database.models.interview import Interview
     from database.models.job_activity import JobActivity
     from database.models.position import Position
     from database.models.user import User
@@ -52,11 +55,17 @@ class AppliedJobs(Base):
         String(50), nullable=False, default="Interested"
     )
     stage_changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    recruiter_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    outcome_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="applied_jobs")
     position: Mapped["Position"] = relationship(back_populates="applied_jobs")
     activities: Mapped[list["JobActivity"]] = relationship(back_populates="job")
+    interviews: Mapped[list["Interview"]] = relationship(back_populates="job")
+    follow_ups: Mapped[list["FollowUp"]] = relationship(back_populates="job")
+    documents: Mapped[list["Documents"]] = relationship(back_populates="job")
 
 
 # --------------------------------------------------------------------------- #
@@ -99,6 +108,9 @@ def update_applied_job(
     job_id: int,
     application_status: str | None = None,
     years_of_experience: int | None = None,
+    deadline: date | None = None,
+    recruiter_notes: str | None = None,
+    outcome_notes: str | None = None,
 ) -> "AppliedJobs | None":
     """Update mutable fields on an existing application. Returns None if not found."""
     job = get_applied_jobs(session, job_id)
@@ -109,6 +121,12 @@ def update_applied_job(
         job.stage_changed_at = datetime.utcnow()
     if years_of_experience is not None:
         job.years_of_experience = years_of_experience
+    if deadline is not None:
+        job.deadline = deadline
+    if recruiter_notes is not None:
+        job.recruiter_notes = recruiter_notes
+    if outcome_notes is not None:
+        job.outcome_notes = outcome_notes
     session.commit()
     session.refresh(job)
     return job

@@ -292,10 +292,7 @@ function Dashboard() {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    className="apply-btn"
-                    onClick={() => navigate("/signin")}
-                  >
+                  <button className="apply-btn" onClick={() => navigate("/signin")}>
                     Sign In to Apply
                   </button>
                 )}

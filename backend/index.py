@@ -10,7 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import Base, engine
-from routers import auth, company, documents, education, jobs, profile, users
+from routers import (
+    auth,
+    company,
+    documents,
+    education,
+    experience,
+    jobs,
+    profile,
+    recruiter,
+    users,
+)
 
 
 @asynccontextmanager
@@ -39,6 +49,8 @@ app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(education.router, prefix="/education", tags=["Education"])
 app.include_router(documents.router, prefix="/documents", tags=["Documents"])
 app.include_router(company.router, prefix="/company", tags=["Company"])
+app.include_router(recruiter.router, prefix="/recruiter", tags=["Recruiter"])
+app.include_router(experience.router, prefix="/experience", tags=["Experience"])
 
 
 @app.get("/")

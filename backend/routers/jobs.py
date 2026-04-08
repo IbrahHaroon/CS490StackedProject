@@ -13,6 +13,7 @@ from database.models.applied_jobs import (
 )
 from database.models.job_activity import create_job_activity, get_job_activities
 from database.models.position import (
+    LOCATION_TYPES,
     create_position,
     get_all_positions,
     get_position,
@@ -39,8 +40,18 @@ router = APIRouter()
 
 
 @router.get("/positions/", response_model=list[PositionWithCompanyResponse])
-def read_all_positions(session: Session = Depends(get_db)):
+def read_all_positions(
+    location_type: str | None = None,
+    session: Session = Depends(get_db),
+):
+    if location_type is not None and location_type not in LOCATION_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid location_type. Must be one of: {LOCATION_TYPES}",
+        )
     positions = get_all_positions(session)
+    if location_type is not None:
+        positions = [p for p in positions if p.location_type == location_type]
     result = []
     for p in positions:
         result.append(
@@ -54,6 +65,8 @@ def read_all_positions(session: Session = Depends(get_db)):
                 education_req=p.education_req,
                 experience_req=p.experience_req,
                 description=p.description,
+                location_type=p.location_type,
+                location=p.location,
             )
         )
     return result
@@ -72,6 +85,8 @@ def create_position_endpoint(body: PositionCreate, session: Session = Depends(ge
         experience_req=body.experience_req,
         description=body.description,
         listing_date=body.listing_date,
+        location=body.location,
+        location_type=body.location_type,
     )
 
 
@@ -110,6 +125,10 @@ def update_position_endpoint(
         position.experience_req = body.experience_req
     if body.description is not None:
         position.description = body.description
+    if body.location_type is not None:
+        position.location_type = body.location_type
+    if body.location is not None:
+        position.location = body.location
     if not update_position(session, position):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -77,3 +77,18 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def get_current_recruiter(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from database.models.recruiter import get_recruiter_by_user_id
+
+    recruiter = get_recruiter_by_user_id(db, current_user.user_id)
+    if recruiter is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Recruiter profile not found",
+        )
+    return recruiter

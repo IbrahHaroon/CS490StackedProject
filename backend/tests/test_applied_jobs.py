@@ -2,6 +2,7 @@
 lookup_applied_jobs, get_all_applied_jobs."""
 
 from datetime import date
+from datetime import date as _date
 from decimal import Decimal
 
 import pytest
@@ -11,6 +12,7 @@ from database.models.applied_jobs import (
     get_all_applied_jobs,
     get_applied_jobs,
     lookup_applied_jobs,
+    update_applied_job,
 )
 from database.models.company import create_company
 from database.models.position import create_position
@@ -197,3 +199,95 @@ class TestGetAllAppliedJobs:
     def test_returns_empty_tuple_for_nonexistent_user(self, session):
         result = get_all_applied_jobs(session, 99999)
         assert result == ()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestAppliedJobsNewFields — S2-007, S2-013
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestAppliedJobsNewFields:
+    def test_create_job_deadline_defaults_null(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        assert job.deadline is None
+
+    def test_create_job_recruiter_notes_defaults_null(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        assert job.recruiter_notes is None
+
+    def test_create_job_outcome_notes_defaults_null(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        assert job.outcome_notes is None
+
+    def test_update_job_sets_deadline(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        dl = _date(2026, 6, 30)
+        updated = update_applied_job(session, job.job_id, deadline=dl)
+        assert updated.deadline == dl
+
+    def test_update_job_sets_recruiter_notes(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        updated = update_applied_job(
+            session, job.job_id, recruiter_notes="Contact: Jane"
+        )
+        assert updated.recruiter_notes == "Contact: Jane"
+
+    def test_update_job_sets_outcome_notes(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        updated = update_applied_job(
+            session, job.job_id, outcome_notes="Offer declined"
+        )
+        assert updated.outcome_notes == "Offer declined"
+
+    def test_update_job_all_new_fields_at_once(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        dl = _date(2026, 7, 1)
+        updated = update_applied_job(
+            session,
+            job.job_id,
+            deadline=dl,
+            recruiter_notes="John at HR",
+            outcome_notes="Accepted offer",
+        )
+        assert updated.deadline == dl
+        assert updated.recruiter_notes == "John at HR"
+        assert updated.outcome_notes == "Accepted offer"
+
+    def test_new_fields_do_not_affect_existing_status_update(
+        self, session, user, position
+    ):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 2)
+        updated = update_applied_job(session, job.job_id, application_status="Applied")
+        assert updated.application_status == "Applied"
+        assert updated.deadline is None
+        assert updated.recruiter_notes is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestRegression — existing behaviour unbroken after column additions
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestRegression:
+    def test_original_create_still_works_without_new_fields(
+        self, session, user, position
+    ):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 3)
+        assert job.job_id is not None
+        assert job.application_status == "Interested"
+        assert job.application_date == _date.today()
+
+    def test_original_update_still_works(self, session, user, position):
+        job = create_applied_jobs(session, user.user_id, position.position_id, 3)
+        updated = update_applied_job(
+            session, job.job_id, application_status="Applied", years_of_experience=5
+        )
+        assert updated.application_status == "Applied"
+        assert updated.years_of_experience == 5
+
+    def test_original_delete_still_works(self, session, user, position):
+        from database.models.applied_jobs import delete_applied_job
+
+        job = create_applied_jobs(session, user.user_id, position.position_id, 3)
+        assert delete_applied_job(session, job.job_id) is True
+        assert get_applied_jobs(session, job.job_id) is None

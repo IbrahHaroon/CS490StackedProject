@@ -9,10 +9,14 @@ from database.base import Base
 
 if TYPE_CHECKING:
     from database.models.applied_jobs import AppliedJobs
+    from database.models.career_preferences import CareerPreferences
     from database.models.credentials import Credentials
     from database.models.documents import Documents
     from database.models.education import Education
+    from database.models.experience import Experience
     from database.models.profile import Profile
+    from database.models.recruiter import Recruiter
+    from database.models.skills import Skills
 
 
 class User(Base):
@@ -29,6 +33,14 @@ class User(Base):
     educations: Mapped[list["Education"]] = relationship(back_populates="user")
     documents: Mapped[list["Documents"]] = relationship(back_populates="user")
     applied_jobs: Mapped[list["AppliedJobs"]] = relationship(back_populates="user")
+    experiences: Mapped[list["Experience"]] = relationship(back_populates="user")
+    skills: Mapped[list["Skills"]] = relationship(back_populates="user")
+    career_preferences: Mapped["CareerPreferences | None"] = relationship(
+        back_populates="user", uselist=False
+    )
+    recruiter: Mapped["Recruiter | None"] = relationship(
+        back_populates="user", uselist=False
+    )
 
 
 # --------------------------------------------------------------------------- #

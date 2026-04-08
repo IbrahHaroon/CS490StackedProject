@@ -1,5 +1,7 @@
 """Tests for education.py — create_education, get_education."""
 
+from datetime import date as _date
+
 import pytest
 
 from database.models.education import create_education, get_education
@@ -160,3 +162,91 @@ class TestGetEducation:
         )
         fetched = get_education(session, edu.education_id)
         assert fetched.school_or_college == "Art Institute"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestEducationNewFields — S2-017
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestEducationNewFields:
+    def test_create_education_new_fields_default_null(self, session, user):
+        edu = create_education(
+            session, user.user_id, "Bachelor's", "CS", "State U", "1 St", "NJ", 8901
+        )
+        assert edu.field_of_study is None
+        assert edu.start_date is None
+        assert edu.end_date is None
+        assert edu.gpa is None
+
+    def test_create_education_with_all_new_fields(self, session, user):
+        edu = create_education(
+            session,
+            user.user_id,
+            "Master's",
+            "AI",
+            "Tech U",
+            "2 Ave",
+            "NY",
+            10001,
+            field_of_study="Machine Learning",
+            start_date=_date(2022, 9, 1),
+            end_date=_date(2024, 5, 31),
+            gpa="3.9/4.0",
+        )
+        assert edu.field_of_study == "Machine Learning"
+        assert edu.start_date == _date(2022, 9, 1)
+        assert edu.end_date == _date(2024, 5, 31)
+        assert edu.gpa == "3.9/4.0"
+
+    def test_gpa_stored_as_string_format(self, session, user):
+        edu = create_education(
+            session,
+            user.user_id,
+            "Bachelor's",
+            "Math",
+            "City U",
+            "3 Rd",
+            "CA",
+            90210,
+            gpa="3.75/4.0",
+        )
+        assert edu.gpa == "3.75/4.0"
+        assert isinstance(edu.gpa, str)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestRegression — existing behaviour unbroken after column additions
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestRegression:
+    def test_original_create_still_works_without_new_fields(self, session, user):
+        edu = create_education(
+            session,
+            user.user_id,
+            "Bachelor's",
+            "CS",
+            "State U",
+            "1 Campus Dr",
+            "NJ",
+            8901,
+        )
+        assert edu.education_id is not None
+        assert edu.degree == "CS"
+        assert edu.school_or_college == "State U"
+
+    def test_original_get_still_works(self, session, user):
+        edu = create_education(
+            session,
+            user.user_id,
+            "PhD",
+            "Physics",
+            "Research U",
+            "4 Lab Blvd",
+            "MA",
+            2101,
+        )
+        fetched = get_education(session, edu.education_id)
+        assert fetched is not None
+        assert fetched.education_id == edu.education_id

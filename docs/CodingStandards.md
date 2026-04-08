@@ -48,9 +48,8 @@ Key capabilities include:
 ## 🚫 Out of Scope
 - To keep the project focused and realistic, the following features are not included:
 
-  -  Employer-side tools (no recruiter dashboard)
   -  Full job board integration (optional stretch)
-  -  Advanced AI models(Using simple APIs instead)
+  -  Advanced AI models (using simple APIs instead)
   -  Complex collaborations / too many team features
 
 ## 👥 Audience
@@ -102,14 +101,14 @@ function JobCard({ title, company }) {
 ```
 
 ### Backend (FastAPI)
-- Keep routes thin; move logic to `services/`
+- Keep routes thin; move business logic to `database/models/`
 - Use Pydantic models for validation
 - Always use type hints
 
 **Example:**
 ```python
 def create_application(data: ApplicationCreate) -> ApplicationResponse:
-    return service.create_application(data)
+    return create_applied_jobs(session, data.user_id, data.position_id)
 ```
 
 ### Functions
@@ -203,7 +202,7 @@ https://peps.python.org/pep-0008/
   Example: `application_router`, `auth_router`
 
 - **Database table names:** use snake_case  
-  Example: `users`, `job_applications`
+  Example: `user`, `applied_jobs`, `career_preferences`
 
 - **Boolean variables:** use descriptive names  
   Example: `is_active`, `has_resume`, `can_edit`
@@ -259,29 +258,28 @@ try {
 
 ## 🔌 API Response Conventions
 
-All API responses should follow a consistent JSON format.
+FastAPI returns Pydantic model instances directly — no wrapper object.
 
-**Success:**
+**Success (200/201):** the serialized Pydantic response model
 ```json
 {
-  "success": true,
-  "data": {}
+  "job_id": 1,
+  "user_id": 3,
+  "application_status": "Applied"
 }
 ```
 
-**Error:**
+**Error:** FastAPI's standard `HTTPException` shape
 ```json
 {
-  "success": false,
-  "error": "Bad Request",
-  "message": "Invalid input"
+  "detail": "Application not found"
 }
 ```
 
 **Rules:**
-- Always return JSON responses
-- Use consistent keys: `success`, `data`, `error`, `message`
-- Use proper HTTP status codes (`200`, `201`, `400`, `404`, `500`)
+- Always return JSON responses via Pydantic `response_model`
+- Use proper HTTP status codes (`200`, `201`, `204`, `400`, `401`, `403`, `404`, `422`, `500`)
+- Raise `HTTPException` for all error cases — never return error dicts manually
 
 ## 📁 Project Folder Structure
 
@@ -290,41 +288,33 @@ cs490-stacked-project/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/      # reusable UI components (buttons, cards, modals)
-│   │   ├── pages/           # page-level views (Dashboard, Login, Board)
-│   │   ├── layouts/         # layout wrappers (Navbar, Sidebar)
-│   │   ├── hooks/           # custom React hooks
-│   │   ├── services/        # API calls to backend
-│   │   ├── utils/           # helper functions
-│   │   ├── assets/          # images, icons, styles
-│   │   └── App.jsx          # root React component
+│   │   └── pages/           # page-level views (Dashboard, Login, Board)
 │   │
+│   ├── eslint.config.js
+│   ├── index.html
 │   ├── package.json
-│   └── vite.config.js (or similar)
+│   └── vite.config.js
 │
 ├── backend/
-│   ├── app/
-│   │   ├── routers/         # API routes/endpoints
-│   │   ├── models/          # SQLAlchemy database models
-│   │   ├── schemas/         # Pydantic request/response models
-│   │   ├── services/        # business logic
-│   │   ├── dependencies/    # shared dependencies (auth, validation)
-│   │   ├── db/              # database connection/config
-│   │   ├── utils/           # helper functions
-│   │   └── main.py          # FastAPI entry point
-│   │
+│   ├── database/            # database connection, config, and ORM models
+│   │   └── models/          # SQLAlchemy model definitions (one file per model)
+│   ├── routers/             # API route handlers (one file per resource)
+│   ├── schemas.py           # Pydantic request/response models
+│   ├── scripts/             # one-off utility scripts
+│   ├── tests/               # unit and integration tests
+│   ├── uploads/             # user-uploaded files
+│   ├── utils/               # shared helper functions
+│   ├── index.py             # FastAPI entry point
 │   └── requirements.txt
 │
-├── tests/                  # unit and integration tests
-├── .env                    # environment variables (not committed)
-├── .gitignore
-└── README.md
+└── .env                    # environment variables (not committed)
 ```
 
 ### 📌 Notes
 
 - Frontend and backend are separated for clarity and scalability  
 - Keep business logic out of UI components and API routes  
-- Use `services/` for logic and `utils/` for helpers  
+- Use `utils/` for shared helpers  
 - Follow this structure consistently across the team  
 
 ## 🧰 Tech Stack
@@ -344,8 +334,8 @@ cs490-stacked-project/
 - SQLAlchemy
 
 ### Deployment / Services
-- Vercel
-- Firebase
+- Vercel (frontend)
+- Supabase (PostgreSQL hosting)
 
 ### APIs
 - Gemini API

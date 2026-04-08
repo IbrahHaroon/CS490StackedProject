@@ -59,7 +59,13 @@ async def upload_document(
     with open(dest_path, "wb") as f:
         f.write(contents)
 
-    return create_document(session, current_user.user_id, document_type, dest_path)
+    return create_document(
+        session,
+        current_user.user_id,
+        document_type,
+        document_location=dest_path,
+        document_name=file.filename,
+    )
 
 
 @router.get("/me", response_model=list[DocumentResponse])
@@ -73,7 +79,13 @@ def read_my_documents(
 @router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 def create_document_endpoint(body: DocumentCreate, session: Session = Depends(get_db)):
     return create_document(
-        session, body.user_id, body.document_type, body.document_location
+        session,
+        body.user_id,
+        body.document_type,
+        document_location=body.document_location,
+        job_id=body.job_id,
+        document_name=body.document_name,
+        content=body.content,
     )
 
 
