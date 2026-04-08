@@ -23,21 +23,24 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
 # Patch httpx.Client to handle Starlette 0.36 TestClient compatibility issue
 import httpx
+
 _original_init = httpx.Client.__init__
+
 
 def _patched_init(self, *args, **kwargs):
     # Remove 'app' kwarg if present (from Starlette TestClient)
-    kwargs.pop('app', None)
+    kwargs.pop("app", None)
     _original_init(self, *args, **kwargs)
+
 
 httpx.Client.__init__ = _patched_init
 
 import pytest
-from starlette.testclient import TestClient
 from index import app
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+from starlette.testclient import TestClient
 
 import database.models  # noqa: F401 — registers all ORM classes with Base
 from database import get_db
