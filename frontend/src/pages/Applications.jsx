@@ -105,6 +105,9 @@ function Pipeline({ current }) {
 function ApplicationCard({ app, position, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const token = localStorage.getItem("token");
 
   const loadActivity = async () => {
@@ -126,6 +129,33 @@ function ApplicationCard({ app, position, onRemove }) {
     }
 
     setExpanded(true);
+  };
+
+  const generateCoverLetter = async () => {
+    try {
+      setIsGenerating(true);
+
+      const title = position?.title || "this role";
+      const company = position?.company_name || "your company";
+
+      const generated = `Dear Hiring Manager,
+
+I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
+
+Through my previous work and projects, I have developed relevant technical and problem-solving skills that align with the responsibilities of this role. I am especially interested in contributing to ${company} and continuing to grow in a position like ${title}.
+
+I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
+
+Sincerely,
+Amina`;
+
+      setCoverLetter(generated);
+      setShowCoverLetter(true);
+    } catch (err) {
+      console.error("Failed to generate cover letter:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const title = position?.title || `Position #${app.position_id}`;
@@ -158,10 +188,14 @@ function ApplicationCard({ app, position, onRemove }) {
             experience
           </span>
         </div>
+
         <div className="app-card-right">
           <StageBadge status={app.application_status} />
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
+          </button>
+          <button className="app-secondary-btn" onClick={generateCoverLetter}>
+            {isGenerating ? "Generating..." : "Generate Cover Letter"}
           </button>
           <button className="app-remove-btn" onClick={onRemove}>
             Remove
@@ -170,6 +204,26 @@ function ApplicationCard({ app, position, onRemove }) {
       </div>
 
       <Pipeline current={app.application_status} />
+
+      {showCoverLetter && (
+        <div className="cover-letter-box">
+          <div className="cover-letter-header">
+            <h4 className="cover-letter-title">Cover Letter Draft</h4>
+            <button
+              className="app-history-btn"
+              onClick={() => setShowCoverLetter((prev) => !prev)}
+            >
+              {showCoverLetter ? "Hide Draft" : "Show Draft"}
+            </button>
+          </div>
+
+          <textarea
+            className="cover-letter-textarea"
+            value={coverLetter}
+            onChange={(e) => setCoverLetter(e.target.value)}
+          />
+        </div>
+      )}
 
       {expanded && activity && (
         <div className="app-activity">
@@ -282,7 +336,9 @@ function Applications() {
     try {
       setIsDeleting(true);
 
-      setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
+      setApplications((prev) =>
+        prev.filter((a) => a.job_id !== deleteTarget.job_id)
+      );
 
       setDeleteTarget(null);
     } catch (err) {
