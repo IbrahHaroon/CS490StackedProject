@@ -285,8 +285,7 @@ function Applications() {
 
       {!loading && !error && (
         <>
-        <div className="app-filters">
-
+        <div className="app-controls">
   <div className="app-search-row">
     <input
       type="text"
@@ -298,7 +297,8 @@ function Applications() {
 
     <button
       type="button"
-      className="app-filter-btn"
+      className="app-clear-btn"
+      disabled={!search && filter === "All"}
       onClick={() => {
         setFilter("All");
         setSearch("");
@@ -307,21 +307,24 @@ function Applications() {
       Clear
     </button>
   </div>
-            {["All", ...STAGES].map((s) => (
-              <button
-                key={s}
-                className={`app-filter-btn ${filter === s ? "app-filter-btn-active" : ""}`}
-                onClick={() => setFilter(s)}
-              >
-                         {s}
-                {s !== "All" && (
-                  <span className="app-filter-count">
-                    {applications.filter((a) => a.application_status === s).length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+
+  <div className="app-filters">
+    {["All", ...STAGES].map((s) => (
+      <button
+        key={s}
+        className={`app-filter-btn ${filter === s ? "app-filter-btn-active" : ""}`}
+        onClick={() => setFilter(s)}
+      >
+        {s}
+        {s !== "All" && (
+          <span className="app-filter-count">
+            {applications.filter((a) => a.application_status === s).length}
+          </span>
+        )}
+      </button>
+    ))}
+  </div>
+</div>
 
           {filtered.length === 0 ? (
             <p className="applications-placeholder">
