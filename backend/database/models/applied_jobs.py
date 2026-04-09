@@ -66,6 +66,12 @@ class AppliedJobs(Base):
     position: Mapped["Position"] = relationship(back_populates="applied_jobs")
     activities: Mapped[list["JobActivity"]] = relationship(back_populates="job")
     interviews: Mapped[list["Interview"]] = relationship(back_populates="job")
+    outcome: Mapped["Outcome"] = relationship(
+        back_populates="job", uselist=False, cascade="all, delete-orphan"
+    )
+    job_documents: Mapped[list["JobDocument"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     follow_ups: Mapped[list["FollowUp"]] = relationship(back_populates="job")
     documents: Mapped[list["Documents"]] = relationship(back_populates="job")
 

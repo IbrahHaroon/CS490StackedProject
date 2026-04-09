@@ -169,6 +169,58 @@ class DocumentResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+#  Job Document                                                                #
+# --------------------------------------------------------------------------- #
+
+
+class JobDocumentCreate(BaseModel):
+    job_id: int
+    title: str
+    content: str
+
+
+class JobDocumentUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
+
+class JobDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    job_document_id: int
+    job_id: int
+    title: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+#  Outcome                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+class OutcomeCreate(BaseModel):
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
+
+
+class OutcomeUpdate(BaseModel):
+    outcome_state: str | None = None
+    outcome_notes: str | None = None
+
+
+class OutcomeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    outcome_id: int
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
+
+
+# --------------------------------------------------------------------------- #
 #  Company                                                                      #
 # --------------------------------------------------------------------------- #
 

@@ -8,7 +8,7 @@ from database.models.interview import (
     create_interview,
     delete_interview,
     get_interview,
-    get_interviews_for_job,
+    get_interviews_by_job,
     update_interview,
 )
 from database.models.user import User
@@ -65,7 +65,7 @@ def get_job_interviews(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
-    return get_interviews_for_job(session, job_id)
+    return get_interviews_by_job(session, job_id)
 
 
 @router.put("/interviews/{interview_id}", response_model=InterviewResponse)
