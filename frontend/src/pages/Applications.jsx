@@ -257,11 +257,14 @@ function Applications() {
     load();
   }, []);
 
-  const filtered =
+  const filtered = applications.filter((a) => {
+  const matchesStage =
     filter === "All"
-      ? applications.filter((a) => a.application_status !== "Withdrawn")
-      : applications.filter((a) => a.application_status === filter);
+      ? a.application_status !== "Withdrawn"
+      : a.application_status === filter;
 
+  return matchesStage;
+});
   return (
     <div className="applications-page">
       <h1>My Applications</h1>
