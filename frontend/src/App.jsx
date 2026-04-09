@@ -66,13 +66,13 @@ function App() {
             }
           />
           <Route
-  path="/applications"
-  element={
-    <ProtectedRoute>
-      <Applications />
-    </ProtectedRoute>
-  }
-/>
+            path="/applications"
+            element={
+              <ProtectedRoute>
+                <Applications />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
     </>
