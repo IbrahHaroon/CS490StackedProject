@@ -146,8 +146,7 @@ Through my previous work and projects, I have developed relevant technical and p
 
 I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
 
-Sincerely,
-Amina`;
+`;
 
       setCoverLetter(generated);
       setShowCoverLetter(true);
@@ -336,7 +335,9 @@ function Applications() {
     try {
       setIsDeleting(true);
 
-      setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
+      setApplications((prev) =>
+        prev.filter((a) => a.job_id !== deleteTarget.job_id)
+      );
 
       setDeleteTarget(null);
     } catch (err) {
