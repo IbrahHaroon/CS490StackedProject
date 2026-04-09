@@ -16,7 +16,7 @@ from routers import auth, company, documents, education, jobs, profile, users
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Create tables if they don't exist
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
     yield
     # Shutdown logic goes here if needed
 
