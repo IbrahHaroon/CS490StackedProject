@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
-import StageBadge from "../components/StageBadge";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 const API = "http://localhost:8000";
@@ -102,10 +101,31 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({ app, position, onRemove }) {
+function ApplicationCard({ app, position, onRemove, onStageChange }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [updatingStage, setUpdatingStage] = useState(false);
   const token = localStorage.getItem("token");
+
+  const handleStageChange = async (newStage) => {
+    if (newStage === app.application_status || updatingStage) return;
+    const previousStage = app.application_status;
+    setUpdatingStage(true);
+    onStageChange(app.job_id, newStage);
+    const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ application_status: newStage }),
+    });
+    if (!res.ok) {
+      onStageChange(app.job_id, previousStage);
+    }
+    setActivity(null);
+    setUpdatingStage(false);
+  };
 
   const loadActivity = async () => {
     if (activity) {
@@ -159,7 +179,22 @@ function ApplicationCard({ app, position, onRemove }) {
           </span>
         </div>
         <div className="app-card-right">
-          <StageBadge status={app.application_status} />
+          <select
+            className="app-stage-select"
+            value={app.application_status}
+            disabled={updatingStage}
+            onChange={(e) => handleStageChange(e.target.value)}
+            style={{
+              borderColor: STATUS_COLOR[app.application_status],
+              color: STATUS_COLOR[app.application_status],
+            }}
+          >
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
@@ -370,6 +405,13 @@ function Applications() {
                   app={app}
                   position={positions[app.position_id]}
                   onRemove={() => setDeleteTarget(app)}
+                  onStageChange={(id, newStage) =>
+                    setApplications((prev) =>
+                      prev.map((a) =>
+                        a.job_id === id ? { ...a, application_status: newStage } : a
+                      )
+                    )
+                  }
                 />
               ))}
             </div>
