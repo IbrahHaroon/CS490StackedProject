@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
+import StageBadge from "../components/StageBadge";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 const API = "http://localhost:8000";
@@ -65,7 +66,6 @@ const MOCK_POSITIONS = {
 function Pipeline({ current }) {
   const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
-
   const currentIdx = active.indexOf(current);
 
   return (
@@ -101,31 +101,13 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({ app, position, onRemove, onStageChange }) {
+function ApplicationCard({ app, position, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
-  const [updatingStage, setUpdatingStage] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const token = localStorage.getItem("token");
-
-  const handleStageChange = async (newStage) => {
-    if (newStage === app.application_status || updatingStage) return;
-    const previousStage = app.application_status;
-    setUpdatingStage(true);
-    onStageChange(app.job_id, newStage);
-    const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ application_status: newStage }),
-    });
-    if (!res.ok) {
-      onStageChange(app.job_id, previousStage);
-    }
-    setActivity(null);
-    setUpdatingStage(false);
-  };
 
   const loadActivity = async () => {
     if (activity) {
@@ -146,6 +128,32 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
     }
 
     setExpanded(true);
+  };
+
+  const generateCoverLetter = async () => {
+    try {
+      setIsGenerating(true);
+
+      const title = position?.title || "this role";
+      const company = position?.company_name || "your company";
+
+      const generated = `Dear Hiring Manager,
+
+I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
+
+Through my previous work and projects, I have developed relevant technical and problem-solving skills that align with the responsibilities of this role. I am especially interested in contributing to ${company} and continuing to grow in a position like ${title}.
+
+I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
+
+`;
+
+      setCoverLetter(generated);
+      setShowCoverLetter(true);
+    } catch (err) {
+      console.error("Failed to generate cover letter:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const title = position?.title || `Position #${app.position_id}`;
@@ -178,25 +186,14 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
             experience
           </span>
         </div>
+
         <div className="app-card-right">
-          <select
-            className="app-stage-select"
-            value={app.application_status}
-            disabled={updatingStage}
-            onChange={(e) => handleStageChange(e.target.value)}
-            style={{
-              borderColor: STATUS_COLOR[app.application_status],
-              color: STATUS_COLOR[app.application_status],
-            }}
-          >
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <StageBadge status={app.application_status} />
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
+          </button>
+          <button className="app-secondary-btn" onClick={generateCoverLetter}>
+            {isGenerating ? "Generating..." : "Generate Cover Letter"}
           </button>
           <button className="app-remove-btn" onClick={onRemove}>
             Remove
@@ -205,6 +202,26 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
       </div>
 
       <Pipeline current={app.application_status} />
+
+      {showCoverLetter && (
+        <div className="cover-letter-box">
+          <div className="cover-letter-header">
+            <h4 className="cover-letter-title">Cover Letter Draft</h4>
+            <button
+              className="app-history-btn"
+              onClick={() => setShowCoverLetter((prev) => !prev)}
+            >
+              {showCoverLetter ? "Hide Draft" : "Show Draft"}
+            </button>
+          </div>
+
+          <textarea
+            className="cover-letter-textarea"
+            value={coverLetter}
+            onChange={(e) => setCoverLetter(e.target.value)}
+          />
+        </div>
+      )}
 
       {expanded && activity && (
         <div className="app-activity">
@@ -300,7 +317,6 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-
     const query = search.toLowerCase().trim();
 
     const matchesSearch =
@@ -316,9 +332,7 @@ function Applications() {
 
     try {
       setIsDeleting(true);
-
       setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
-
       setDeleteTarget(null);
     } catch (err) {
       console.error("Failed to delete application:", err);
@@ -405,13 +419,6 @@ function Applications() {
                   app={app}
                   position={positions[app.position_id]}
                   onRemove={() => setDeleteTarget(app)}
-                  onStageChange={(id, newStage) =>
-                    setApplications((prev) =>
-                      prev.map((a) =>
-                        a.job_id === id ? { ...a, application_status: newStage } : a
-                      )
-                    )
-                  }
                 />
               ))}
             </div>
