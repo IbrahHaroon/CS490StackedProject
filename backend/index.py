@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # `schemas` are always importable regardless of where the process is launched from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database import Base, engine
+# from database import Base, engine
 from routers import (
     auth,
     company,
@@ -26,7 +26,7 @@ from routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Create tables if they don't exist
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
     yield
     # Shutdown logic goes here if needed
 
