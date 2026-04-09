@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
 import StageBadge from "../components/StageBadge";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 const API = "http://localhost:8000";
 
@@ -104,7 +105,6 @@ function Pipeline({ current }) {
 function ApplicationCard({ app, position, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
-  const [removing, setRemoving] = useState(false);
   const token = localStorage.getItem("token");
 
   const loadActivity = async () => {
@@ -112,10 +112,19 @@ function ApplicationCard({ app, position, onRemove }) {
       setExpanded(!expanded);
       return;
     }
-    const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) setActivity(await res.json());
+
+    try {
+      const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        setActivity(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to load activity:", err);
+    }
+
     setExpanded(true);
   };
 
@@ -154,20 +163,8 @@ function ApplicationCard({ app, position, onRemove }) {
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
-          <button
-            className="app-remove-btn"
-            disabled={removing}
-            onClick={async () => {
-              if (!window.confirm("Remove this application?")) return;
-              setRemoving(true);
-              await fetch(`${API}/jobs/applications/${app.job_id}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              onRemove(app.job_id);
-            }}
-          >
-            {removing ? "Removing…" : "Remove"}
+          <button className="app-remove-btn" onClick={onRemove}>
+            Remove
           </button>
         </div>
       </div>
@@ -204,6 +201,8 @@ function Applications() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -256,7 +255,7 @@ function Applications() {
     };
 
     load();
-  }, []);
+  }, [token]);
 
   const filtered = applications.filter((a) => {
     const matchesStage =
@@ -277,8 +276,39 @@ function Applications() {
     return matchesStage && matchesSearch;
   });
 
+  const handleDeleteApplication = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      setIsDeleting(true);
+
+      setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
+
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error("Failed to delete application:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="applications-page">
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        title="Delete this application?"
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove the ${
+                positions[deleteTarget.position_id]?.title || "selected"
+              } application? This action cannot be undone.`
+            : ""
+        }
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteApplication}
+        isDeleting={isDeleting}
+      />
+
       <h1>My Applications</h1>
 
       {error && <p className="applications-error">{error}</p>}
@@ -339,9 +369,7 @@ function Applications() {
                   key={app.job_id}
                   app={app}
                   position={positions[app.position_id]}
-                  onRemove={(id) =>
-                    setApplications((prev) => prev.filter((a) => a.job_id !== id))
-                  }
+                  onRemove={() => setDeleteTarget(app)}
                 />
               ))}
             </div>

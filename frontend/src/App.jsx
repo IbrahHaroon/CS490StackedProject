@@ -65,14 +65,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/applications"
-            element={
-              <ProtectedRoute>
-                <Applications />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/applications" element={<Applications />} />
         </Routes>
       </main>
     </>
