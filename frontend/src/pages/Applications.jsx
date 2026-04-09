@@ -322,7 +322,10 @@ function Applications() {
                   {s}
                   {s !== "All" && (
                     <span className="app-filter-count">
-                      {applications.filter((a) => a.application_status === s).length}
+                      {
+                        applications.filter((a) => a.application_status === s)
+                          .length
+                      }
                     </span>
                   )}
                 </button>

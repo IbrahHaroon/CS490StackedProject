@@ -309,9 +309,12 @@ function Dashboard() {
                     >
                       Edit Posting
                     </button>
-                  </div>
-                ) : (
-                  <button className="apply-btn" onClick={() => navigate("/signin")}>
+                  ))}
+                {!token && (
+                  <button
+                    className="apply-btn"
+                    onClick={() => navigate("/signin")}
+                  >
                     Sign In to Apply
                   </button>
                 )}
