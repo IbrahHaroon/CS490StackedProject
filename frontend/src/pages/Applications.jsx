@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
+import StageBadge from "../components/StageBadge";
 
 const API = "http://localhost:8000";
 
@@ -113,12 +114,7 @@ function ApplicationCard({ app, position, onRemove }) {
           <span className="app-card-meta">{app.years_of_experience} yr{app.years_of_experience !== 1 ? "s" : ""} experience</span>
         </div>
         <div className="app-card-right">
-          <span
-            className="app-status-badge"
-            style={{ backgroundColor: STATUS_COLOR[app.application_status] }}
-          >
-            {app.application_status}
-          </span>
+          <StageBadge status={app.application_status} />
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
