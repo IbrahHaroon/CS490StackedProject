@@ -261,7 +261,10 @@ function Dashboard() {
 
             {selectedJob && (
               <div className="job-board-detail">
-                <button className="expand-btn" onClick={() => setExpandedJob(true)}>
+                <button
+                  className="expand-btn"
+                  onClick={() => setExpandedJob(true)}
+                >
                   &lt; Expand
                 </button>
                 <h2 className="job-detail-title">
@@ -327,8 +330,14 @@ function Dashboard() {
 
             {/* Expanded job overlay */}
             {expandedJob && selectedJob && (
-              <div className="expand-overlay" onClick={() => setExpandedJob(false)}>
-                <div className="expand-modal" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="expand-overlay"
+                onClick={() => setExpandedJob(false)}
+              >
+                <div
+                  className="expand-modal"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     className="expand-close-btn"
                     onClick={() => setExpandedJob(false)}
@@ -344,7 +353,9 @@ function Dashboard() {
                       ? `$${Number(selectedJob.salary).toLocaleString()}`
                       : "Salary not listed"}
                   </p>
-                  <p className="job-detail-meta">Listed: {selectedJob.listing_date}</p>
+                  <p className="job-detail-meta">
+                    Listed: {selectedJob.listing_date}
+                  </p>
 
                   {selectedJob.description && (
                     <div className="job-detail-section">
@@ -365,13 +376,18 @@ function Dashboard() {
                     </div>
                   )}
                   {token ? (
-                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <div
+                      style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
+                    >
                       {applications.some(
                         (a) =>
                           a.position_id === selectedJob.position_id &&
                           a.application_status !== "Withdrawn"
                       ) ? (
-                        <button className="apply-btn apply-btn-applied" disabled>
+                        <button
+                          className="apply-btn apply-btn-applied"
+                          disabled
+                        >
                           Already Applied
                         </button>
                       ) : (
@@ -393,7 +409,10 @@ function Dashboard() {
                       </button>
                     </div>
                   ) : (
-                    <button className="apply-btn" onClick={() => navigate("/signin")}>
+                    <button
+                      className="apply-btn"
+                      onClick={() => navigate("/signin")}
+                    >
                       Sign In to Apply
                     </button>
                   )}
