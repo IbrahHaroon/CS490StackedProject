@@ -204,3 +204,83 @@ class TestReadApplications:
         )
         assert len(client.get(f"{JOBS_URL}/applications/{u1.user_id}").json()) == 1
         assert len(client.get(f"{JOBS_URL}/applications/{u2.user_id}").json()) == 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PUT /jobs/applications/{job_id}  —  Stage Transitions
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _create_application(client, user_id, position_id):
+    return client.post(
+        f"{JOBS_URL}/applications/",
+        json={
+            "user_id": user_id,
+            "position_id": position_id,
+            "years_of_experience": 2,
+        },
+    ).json()
+
+
+class TestUpdateApplicationStage:
+    def test_valid_stage_change_returns_200(self, client, user_with_auth):
+        user_id, headers = user_with_auth
+        company = _create_company(client)
+        position = _create_position(client, company["company_id"])
+        app = _create_application(client, user_id, position["position_id"])
+        response = client.put(
+            f"{JOBS_URL}/applications/{app['job_id']}",
+            json={"application_status": "Interview"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["application_status"] == "Interview"
+
+    def test_invalid_stage_returns_422(self, client, user_with_auth):
+        user_id, headers = user_with_auth
+        company = _create_company(client)
+        position = _create_position(client, company["company_id"])
+        app = _create_application(client, user_id, position["position_id"])
+        response = client.put(
+            f"{JOBS_URL}/applications/{app['job_id']}",
+            json={"application_status": "NotAStage"},
+            headers=headers,
+        )
+        assert response.status_code == 422
+
+    def test_stage_change_updates_stage_changed_at(self, client, user_with_auth):
+        user_id, headers = user_with_auth
+        company = _create_company(client)
+        position = _create_position(client, company["company_id"])
+        app = _create_application(client, user_id, position["position_id"])
+        original_ts = app.get("stage_changed_at")
+        response = client.put(
+            f"{JOBS_URL}/applications/{app['job_id']}",
+            json={"application_status": "Applied"},
+            headers=headers,
+        )
+        assert response.json()["stage_changed_at"] != original_ts
+
+    def test_nonexistent_application_returns_404(self, client, user_with_auth):
+        _, headers = user_with_auth
+        response = client.put(
+            f"{JOBS_URL}/applications/99999",
+            json={"application_status": "Interview"},
+            headers=headers,
+        )
+        assert response.status_code == 404
+
+    def test_other_users_application_returns_403(
+        self, client, user_with_auth, other_user_with_auth
+    ):
+        user_id, _ = user_with_auth
+        _, other_headers = other_user_with_auth
+        company = _create_company(client)
+        position = _create_position(client, company["company_id"])
+        app = _create_application(client, user_id, position["position_id"])
+        response = client.put(
+            f"{JOBS_URL}/applications/{app['job_id']}",
+            json={"application_status": "Interview"},
+            headers=other_headers,
+        )
+        assert response.status_code == 403

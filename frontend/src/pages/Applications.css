@@ -179,6 +179,27 @@
   font-weight: 600;
 }
 
+.app-stage-select {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 2px solid;
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.app-stage-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-stage-select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .app-history-btn {
   background: none;
   border: 1px solid var(--border);

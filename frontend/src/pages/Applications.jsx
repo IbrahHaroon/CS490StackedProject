@@ -66,7 +66,6 @@ const MOCK_POSITIONS = {
 function Pipeline({ current }) {
   const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
-
   const currentIdx = active.indexOf(current);
 
   return (
@@ -318,7 +317,6 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-
     const query = search.toLowerCase().trim();
 
     const matchesSearch =
@@ -334,11 +332,9 @@ function Applications() {
 
     try {
       setIsDeleting(true);
-
       setApplications((prev) =>
         prev.filter((a) => a.job_id !== deleteTarget.job_id)
       );
-
       setDeleteTarget(null);
     } catch (err) {
       console.error("Failed to delete application:", err);
