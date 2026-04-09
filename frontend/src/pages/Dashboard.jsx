@@ -53,6 +53,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [applyTarget, setApplyTarget] = useState(null);
   const [applySuccess, setApplySuccess] = useState("");
+  const [expandedJob, setExpandedJob] = useState(false);
   const jobBoardRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -237,6 +238,12 @@ function Dashboard() {
 
             {selectedJob && (
               <div className="job-board-detail">
+                <button
+                  className="expand-btn"
+                  onClick={() => setExpandedJob(true)}
+                >
+                  &lt; Expand
+                </button>
                 <h2 className="job-detail-title">
                   {selectedJob.title} @ {selectedJob.company_name}
                 </h2>
@@ -299,6 +306,83 @@ function Dashboard() {
                     Sign In to Apply
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Expanded job overlay */}
+            {expandedJob && selectedJob && (
+              <div className="expand-overlay" onClick={() => setExpandedJob(false)}>
+                <div className="expand-modal" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="expand-close-btn"
+                    onClick={() => setExpandedJob(false)}
+                    title="Minimize"
+                  >
+                    &times;
+                  </button>
+                  <h2 className="job-detail-title">
+                    {selectedJob.title} @ {selectedJob.company_name}
+                  </h2>
+                  <p className="job-detail-meta">
+                    {selectedJob.salary
+                      ? `$${Number(selectedJob.salary).toLocaleString()}`
+                      : "Salary not listed"}
+                  </p>
+                  <p className="job-detail-meta">Listed: {selectedJob.listing_date}</p>
+
+                  {selectedJob.description && (
+                    <div className="job-detail-section">
+                      <h3>Job Description</h3>
+                      <p>{selectedJob.description}</p>
+                    </div>
+                  )}
+                  {selectedJob.education_req && (
+                    <div className="job-detail-section">
+                      <h3>Education</h3>
+                      <p>{selectedJob.education_req}</p>
+                    </div>
+                  )}
+                  {selectedJob.experience_req && (
+                    <div className="job-detail-section">
+                      <h3>Experience</h3>
+                      <p>{selectedJob.experience_req}</p>
+                    </div>
+                  )}
+                  {token ? (
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      {applications.some(
+                        (a) =>
+                          a.position_id === selectedJob.position_id &&
+                          a.application_status !== "Withdrawn"
+                      ) ? (
+                        <button className="apply-btn apply-btn-applied" disabled>
+                          Already Applied
+                        </button>
+                      ) : (
+                        <button
+                          className="apply-btn"
+                          onClick={() => setApplyTarget(selectedJob)}
+                        >
+                          Apply Now
+                        </button>
+                      )}
+                      <button
+                        className="apply-btn"
+                        style={{ backgroundColor: "#6c757d" }}
+                        onClick={() => navigate(`/jobs/edit/${selectedJob.position_id}`)}
+                      >
+                        Edit Posting
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="apply-btn"
+                      onClick={() => navigate("/signin")}
+                    >
+                      Sign In to Apply
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </>
