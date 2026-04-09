@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
 import StageBadge from "../components/StageBadge";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 const API = "http://localhost:8000";
 
@@ -65,7 +66,6 @@ const MOCK_POSITIONS = {
 function Pipeline({ current }) {
   const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
-
   const currentIdx = active.indexOf(current);
 
   return (
@@ -108,7 +108,9 @@ function Pipeline({ current }) {
 function ApplicationCard({ app, position, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
-  const [removing, setRemoving] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const token = localStorage.getItem("token");
 
   const loadActivity = async () => {
@@ -116,11 +118,46 @@ function ApplicationCard({ app, position, onRemove }) {
       setExpanded(!expanded);
       return;
     }
-    const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) setActivity(await res.json());
+
+    try {
+      const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        setActivity(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to load activity:", err);
+    }
+
     setExpanded(true);
+  };
+
+  const generateCoverLetter = async () => {
+    try {
+      setIsGenerating(true);
+
+      const title = position?.title || "this role";
+      const company = position?.company_name || "your company";
+
+      const generated = `Dear Hiring Manager,
+
+I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
+
+Through my previous work and projects, I have developed relevant technical and problem-solving skills that align with the responsibilities of this role. I am especially interested in contributing to ${company} and continuing to grow in a position like ${title}.
+
+I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
+
+`;
+
+      setCoverLetter(generated);
+      setShowCoverLetter(true);
+    } catch (err) {
+      console.error("Failed to generate cover letter:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const title = position?.title || `Position #${app.position_id}`;
@@ -153,30 +190,42 @@ function ApplicationCard({ app, position, onRemove }) {
             {app.years_of_experience !== 1 ? "s" : ""} experience
           </span>
         </div>
+
         <div className="app-card-right">
           <StageBadge status={app.application_status} />
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
-          <button
-            className="app-remove-btn"
-            disabled={removing}
-            onClick={async () => {
-              if (!window.confirm("Remove this application?")) return;
-              setRemoving(true);
-              await fetch(`${API}/jobs/applications/${app.job_id}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              onRemove(app.job_id);
-            }}
-          >
-            {removing ? "Removing…" : "Remove"}
+          <button className="app-secondary-btn" onClick={generateCoverLetter}>
+            {isGenerating ? "Generating..." : "Generate Cover Letter"}
+          </button>
+          <button className="app-remove-btn" onClick={onRemove}>
+            Remove
           </button>
         </div>
       </div>
 
       <Pipeline current={app.application_status} />
+
+      {showCoverLetter && (
+        <div className="cover-letter-box">
+          <div className="cover-letter-header">
+            <h4 className="cover-letter-title">Cover Letter Draft</h4>
+            <button
+              className="app-history-btn"
+              onClick={() => setShowCoverLetter((prev) => !prev)}
+            >
+              {showCoverLetter ? "Hide Draft" : "Show Draft"}
+            </button>
+          </div>
+
+          <textarea
+            className="cover-letter-textarea"
+            value={coverLetter}
+            onChange={(e) => setCoverLetter(e.target.value)}
+          />
+        </div>
+      )}
 
       {expanded && activity && (
         <div className="app-activity">
@@ -208,6 +257,8 @@ function Applications() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -260,7 +311,7 @@ function Applications() {
     };
 
     load();
-  }, []);
+  }, [token]);
 
   const filtered = applications.filter((a) => {
     const matchesStage =
@@ -270,7 +321,6 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-
     const query = search.toLowerCase().trim();
 
     const matchesSearch =
@@ -281,8 +331,37 @@ function Applications() {
     return matchesStage && matchesSearch;
   });
 
+  const handleDeleteApplication = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      setIsDeleting(true);
+      setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error("Failed to delete application:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="applications-page">
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        title="Delete this application?"
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove the ${
+                positions[deleteTarget.position_id]?.title || "selected"
+              } application? This action cannot be undone.`
+            : ""
+        }
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteApplication}
+        isDeleting={isDeleting}
+      />
+
       <h1>My Applications</h1>
 
       {error && <p className="applications-error">{error}</p>}

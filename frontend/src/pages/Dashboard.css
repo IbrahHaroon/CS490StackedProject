@@ -150,9 +150,82 @@
   background-color: var(--surface);
   color: var(--text);
   border-radius: 8px;
-  padding: 2rem;
+  padding: 3.5rem 2rem 2rem;
   overflow-y: auto;
   max-height: 600px;
+  position: relative;
+}
+
+/* Expand button */
+.expand-btn {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.expand-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+/* Expanded job overlay */
+.expand-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.expand-modal {
+  position: relative;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 3rem;
+  width: 90vw;
+  max-width: 1100px;
+  height: 85vh;
+  overflow-y: auto;
+}
+
+.expand-close-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.expand-close-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
 }
 
 .job-detail-title {
