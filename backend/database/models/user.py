@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from database.models.education import Education
     from database.models.experience import Experience
     from database.models.profile import Profile
-    from database.models.recruiter import Recruiter
     from database.models.skills import Skills
 
 
@@ -36,9 +35,6 @@ class User(Base):
     experiences: Mapped[list["Experience"]] = relationship(back_populates="user")
     skills: Mapped[list["Skills"]] = relationship(back_populates="user")
     career_preferences: Mapped["CareerPreferences | None"] = relationship(
-        back_populates="user", uselist=False
-    )
-    recruiter: Mapped["Recruiter | None"] = relationship(
         back_populates="user", uselist=False
     )
 

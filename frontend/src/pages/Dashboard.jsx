@@ -61,29 +61,33 @@ function Dashboard() {
 
   useEffect(() => {
     const fetchAll = async () => {
-      // Positions are public — no auth needed
-      const posRes = await fetch(`${API}/jobs/positions/`);
-      if (posRes.ok) {
-        const data = await posRes.json();
-        setJobs(data);
-        if (data.length > 0) setSelectedJob(data[0]);
-      }
+      try {
+        // Positions are public — no auth needed
+        const posRes = await fetch(`${API}/jobs/positions/`);
+        if (posRes.ok) {
+          const data = await posRes.json();
+          setJobs(data);
+          if (data.length > 0) setSelectedJob(data[0]);
+        }
 
-      // Applications and documents require auth
-      if (token) {
-        const [appRes, docRes] = await Promise.all([
-          fetch(`${API}/jobs/dashboard`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API}/documents/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-        if (appRes.ok) setApplications(await appRes.json());
-        if (docRes.ok) setDocuments(await docRes.json());
+        // Applications and documents require auth
+        if (token) {
+          const [appRes, docRes] = await Promise.all([
+            fetch(`${API}/jobs/dashboard`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API}/documents/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+          if (appRes.ok) setApplications(await appRes.json());
+          if (docRes.ok) setDocuments(await docRes.json());
+        }
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
     fetchAll();
   }, [location.pathname, token]);
@@ -219,7 +223,9 @@ function Dashboard() {
                     {doc.document_type}
                   </span>
                   <span className="preview-job-title">
-                    {doc.document_location.split("/").pop()}
+                    {doc.document_location
+                      ? doc.document_location.split("/").pop()
+                      : doc.document_name || "Unnamed document"}
                   </span>
                 </div>
               ))

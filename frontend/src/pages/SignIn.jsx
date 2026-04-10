@@ -17,6 +17,7 @@ function SignIn() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isRecruiter, setIsRecruiter] = useState(false);
   const [signup, setSignup] = useState(EMPTY_SIGNUP);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -97,7 +98,11 @@ function SignIn() {
     form.append("username", email);
     form.append("password", password);
 
-    const res = await fetch(`${API}/auth/login`, {
+    const endpoint = isRecruiter
+      ? `${API}/auth/recruiter/login`
+      : `${API}/auth/login`;
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString(),
@@ -110,11 +115,13 @@ function SignIn() {
 
     const data = await res.json();
     localStorage.setItem("token", data.access_token);
+    localStorage.setItem("isRecruiter", isRecruiter ? "true" : "false");
     navigate("/");
   };
 
   const switchMode = () => {
     setMode(mode === "signin" ? "signup" : "signin");
+    setIsRecruiter(false);
     setError("");
     setSuccess("");
   };
@@ -201,6 +208,16 @@ function SignIn() {
             placeholder="••••••••"
             required
           />
+          {mode === "signin" && (
+            <label style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "14px", fontWeight: "normal" }}>
+              <input
+                type="checkbox"
+                checked={isRecruiter}
+                onChange={(e) => setIsRecruiter(e.target.checked)}
+              />
+              I am a recruiter
+            </label>
+          )}
           <button type="submit" className="signin-btn">
             {mode === "signin" ? "Sign In" : "Sign Up"}
           </button>

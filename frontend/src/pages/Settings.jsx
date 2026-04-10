@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import EditModal from "../components/EditModal";
 
 const API = "http://localhost:8000";
 
@@ -118,55 +119,6 @@ function ChangePasswordModal({ onCancel }) {
               Update Password
             </button>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditModal({ title, fields, onSave, onCancel }) {
-  const [values, setValues] = useState(() =>
-    Object.fromEntries(fields.map((f) => [f.name, f.value]))
-  );
-  const [error, setError] = useState("");
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async () => {
-    setError("");
-    const err = await onSave(values);
-    if (err) setError(err);
-  };
-
-  return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <h3 style={styles.modalTitle}>{title}</h3>
-        {fields.map((f) => (
-          <div key={f.name} style={styles.modalField}>
-            <label style={styles.modalLabel}>{f.label}</label>
-            <input
-              type={f.type || "text"}
-              name={f.name}
-              value={values[f.name]}
-              onChange={handleChange}
-              style={styles.modalInput}
-              placeholder={f.placeholder || ""}
-              maxLength={f.maxLength}
-            />
-          </div>
-        ))}
-        {error && <p style={styles.error}>{error}</p>}
-        <div style={styles.modalActions}>
-          <button style={styles.cancelBtn} onClick={onCancel}>
-            Cancel
-          </button>
-          <button style={styles.saveBtn} onClick={handleSave}>
-            Save
-          </button>
         </div>
       </div>
     </div>

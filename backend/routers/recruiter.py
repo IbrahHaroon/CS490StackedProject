@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db
-from database.auth import get_current_recruiter, get_current_user
+from database.auth import get_current_recruiter
 from database.models.applied_jobs import (
     PIPELINE_STAGES,
     get_applied_jobs,
@@ -20,11 +20,9 @@ from database.models.position import (
 )
 from database.models.recruiter import (
     Recruiter,
-    create_recruiter,
-    get_recruiter_by_user_id,
+    get_recruiter,
     update_recruiter,
 )
-from database.models.user import User
 from schemas import (
     ApplicationResponse,
     JobActivityResponse,
@@ -33,7 +31,6 @@ from schemas import (
     PositionUpdate,
     RecruiterActivityCreate,
     RecruiterApplicationStatusUpdate,
-    RecruiterCreate,
     RecruiterResponse,
     RecruiterUpdate,
 )
@@ -44,33 +41,6 @@ router = APIRouter()
 # --------------------------------------------------------------------------- #
 #  Recruiter Profile                                                            #
 # --------------------------------------------------------------------------- #
-
-
-@router.post("/", response_model=RecruiterResponse, status_code=status.HTTP_201_CREATED)
-def create_recruiter_profile(
-    body: RecruiterCreate,
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if body.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create recruiter profile for another user",
-        )
-    existing = get_recruiter_by_user_id(session, current_user.user_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Recruiter profile already exists",
-        )
-    return create_recruiter(
-        session,
-        user_id=body.user_id,
-        company_id=body.company_id,
-        first_name=body.first_name,
-        last_name=body.last_name,
-        job_title=body.job_title,
-    )
 
 
 @router.get("/me", response_model=RecruiterResponse)
@@ -93,7 +63,7 @@ def update_my_recruiter_profile(
     if body.job_title is not None:
         current_recruiter.job_title = body.job_title
     update_recruiter(session, current_recruiter)
-    return get_recruiter_by_user_id(session, current_recruiter.user_id)
+    return get_recruiter(session, current_recruiter.recruiter_id)
 
 
 # --------------------------------------------------------------------------- #

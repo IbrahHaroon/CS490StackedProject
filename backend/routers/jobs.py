@@ -200,6 +200,8 @@ def update_application(
         job_id,
         application_status=body.application_status,
         years_of_experience=body.years_of_experience,
+        deadline=body.deadline,
+        recruiter_notes=body.recruiter_notes,
     )
     return updated
 

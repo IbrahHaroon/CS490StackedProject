@@ -16,6 +16,7 @@ from routers import (
     documents,
     education,
     experience,
+    follow_ups,
     interviews,
     job_documents,
     jobs,
@@ -59,6 +60,7 @@ app.include_router(documents.router, prefix="/documents", tags=["Documents"])
 app.include_router(company.router, prefix="/company", tags=["Company"])
 app.include_router(recruiter.router, prefix="/recruiter", tags=["Recruiter"])
 app.include_router(experience.router, prefix="/experience", tags=["Experience"])
+app.include_router(follow_ups.router, prefix="", tags=["Follow-Ups"])
 
 
 @app.get("/")
