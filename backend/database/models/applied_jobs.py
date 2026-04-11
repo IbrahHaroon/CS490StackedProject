@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from database.models.follow_up import FollowUp
     from database.models.interview import Interview
     from database.models.job_activity import JobActivity
+    from database.models.job_document import JobDocument
+    from database.models.outcome import Outcome
     from database.models.position import Position
     from database.models.user import User
 
@@ -64,6 +66,12 @@ class AppliedJobs(Base):
     position: Mapped["Position"] = relationship(back_populates="applied_jobs")
     activities: Mapped[list["JobActivity"]] = relationship(back_populates="job")
     interviews: Mapped[list["Interview"]] = relationship(back_populates="job")
+    outcome: Mapped["Outcome"] = relationship(
+        back_populates="job", uselist=False, cascade="all, delete-orphan"
+    )
+    job_documents: Mapped[list["JobDocument"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     follow_ups: Mapped[list["FollowUp"]] = relationship(back_populates="job")
     documents: Mapped[list["Documents"]] = relationship(back_populates="job")
 
@@ -135,15 +143,21 @@ def update_applied_job(
 def delete_applied_job(session: Session, job_id: int) -> bool:
     """Delete an application by primary key. Returns True if deleted.
 
-    Deletes associated job_activity rows first to satisfy the FK constraint
-    (job_activity.job_id has NO ACTION on delete).
+    Deletes associated job_activity, interview, outcome, and job_document rows first
+    to satisfy the FK constraints (these have NO ACTION on delete).
     """
+    from database.models.interview import Interview
     from database.models.job_activity import JobActivity
+    from database.models.job_document import JobDocument
+    from database.models.outcome import Outcome
 
     job = get_applied_jobs(session, job_id)
     if job is None:
         return False
     session.execute(JobActivity.__table__.delete().where(JobActivity.job_id == job_id))
+    session.execute(Interview.__table__.delete().where(Interview.job_id == job_id))
+    session.execute(JobDocument.__table__.delete().where(JobDocument.job_id == job_id))
+    session.execute(Outcome.__table__.delete().where(Outcome.job_id == job_id))
     session.delete(job)
     session.commit()
     return True

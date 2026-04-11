@@ -44,6 +44,26 @@ class UserResponse(BaseModel):
     email: str
 
 
+class RecruiterRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
+
+
+class RecruiterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    recruiter_id: int
+    email: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
+
+
 # --------------------------------------------------------------------------- #
 #  Address  (used as a nested input inside Profile, Education, and Company)    #
 # --------------------------------------------------------------------------- #
@@ -168,6 +188,58 @@ class DocumentResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+#  Job Document                                                                #
+# --------------------------------------------------------------------------- #
+
+
+class JobDocumentCreate(BaseModel):
+    job_id: int
+    title: str
+    content: str
+
+
+class JobDocumentUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
+
+class JobDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    job_document_id: int
+    job_id: int
+    title: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+#  Outcome                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+class OutcomeCreate(BaseModel):
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
+
+
+class OutcomeUpdate(BaseModel):
+    outcome_state: str | None = None
+    outcome_notes: str | None = None
+
+
+class OutcomeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    outcome_id: int
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
+
+
+# --------------------------------------------------------------------------- #
 #  Company                                                                      #
 # --------------------------------------------------------------------------- #
 
@@ -189,28 +261,9 @@ class CompanyResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-class RecruiterCreate(BaseModel):
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
-    job_title: str | None = None
-
-
 class RecruiterUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    job_title: str | None = None
-
-
-class RecruiterResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    recruiter_id: int
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
     job_title: str | None = None
 
 

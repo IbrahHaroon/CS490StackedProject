@@ -3,7 +3,13 @@ import "./DocumentLibrary.css";
 
 const API = "http://localhost:8000";
 
-const DOCUMENT_TYPES = ["Resume", "Cover Letter", "Transcript", "Certificate", "Other"];
+const DOCUMENT_TYPES = [
+  "Resume",
+  "Cover Letter",
+  "Transcript",
+  "Certificate",
+  "Other",
+];
 
 function DocumentLibrary() {
   const [documents, setDocuments] = useState([]);
@@ -99,9 +105,15 @@ function DocumentLibrary() {
           />
 
           {uploadError && <p className="doclibrary-error">{uploadError}</p>}
-          {uploadSuccess && <p className="doclibrary-success">{uploadSuccess}</p>}
+          {uploadSuccess && (
+            <p className="doclibrary-success">{uploadSuccess}</p>
+          )}
 
-          <button type="submit" className="doclibrary-upload-btn" disabled={uploading}>
+          <button
+            type="submit"
+            className="doclibrary-upload-btn"
+            disabled={uploading}
+          >
             {uploading ? "Uploading…" : "Upload"}
           </button>
         </form>

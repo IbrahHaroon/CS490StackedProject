@@ -420,3 +420,247 @@
   font-weight: 500;
   min-width: 140px;
 }
+
+.app-secondary-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.app-secondary-btn:hover {
+  color: var(--text-strong);
+  border-color: var(--text-muted);
+}
+
+.cover-letter-box {
+  border-top: 1px solid var(--border-light);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.cover-letter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.cover-letter-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-strong);
+}
+
+.cover-letter-textarea {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #394264;
+  background: #151a33;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.cover-letter-textarea:focus {
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
+}
+
+/* ── S2-007 Details Section ────────────────────────── */
+
+.details-section {
+  border-top: 1px solid var(--border-light);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.details-toggle {
+  margin-bottom: 0;
+}
+
+.details-body {
+  margin-top: 0.6rem;
+}
+
+.details-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.3rem 0;
+  font-size: 0.875rem;
+}
+
+.details-label {
+  color: var(--text-muted);
+  min-width: 130px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.details-value {
+  color: var(--text-strong);
+  font-size: 0.875rem;
+  word-break: break-word;
+}
+
+.details-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0.4rem;
+}
+
+.details-input {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #394264;
+  background: #151a33;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.details-input:focus {
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
+}
+
+.details-textarea {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #394264;
+  background: #151a33;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.details-textarea:focus {
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
+}
+
+/* ── S2-012 Follow-Ups Section ─────────────────────── */
+
+.followup-section {
+  border-top: 1px solid var(--border-light);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.followup-toggle {
+  margin-bottom: 0;
+}
+
+.followup-body {
+  margin-top: 0.6rem;
+}
+
+.followup-empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  margin: 0.4rem 0;
+}
+
+.followup-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.followup-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.followup-checkbox {
+  flex-shrink: 0;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+.followup-desc {
+  flex: 1;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+
+.followup-done {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.followup-date {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.followup-delete-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.followup-delete-btn:hover {
+  color: #ef4444;
+}
+
+.followup-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #2a3050;
+  background: #0f1428;
+}
+
+.followup-input {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #394264;
+  background: #151a33;
+  color: #ffffff;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.followup-input:focus {
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
+}

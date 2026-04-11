@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import EditModal from "../components/EditModal";
 
 const API = "http://localhost:8000";
 
@@ -52,7 +53,10 @@ function ChangePasswordModal({ onCancel }) {
     const checkRes = await fetch(`${API}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username: me.email, password: current }).toString(),
+      body: new URLSearchParams({
+        username: me.email,
+        password: current,
+      }).toString(),
     });
     if (!checkRes.ok) return setError("Current password is incorrect.");
 
@@ -63,7 +67,9 @@ function ChangePasswordModal({ onCancel }) {
     });
 
     if (!forgotRes.ok) return setError("Failed to initiate password change.");
-    setSuccess("A password reset email has been sent. Please check your inbox.");
+    setSuccess(
+      "A password reset email has been sent. Please check your inbox."
+    );
   };
 
   return (
@@ -101,7 +107,9 @@ function ChangePasswordModal({ onCancel }) {
           />
         </div>
         {error && <p style={{ color: "red", fontSize: "13px" }}>{error}</p>}
-        {success && <p style={{ color: "green", fontSize: "13px" }}>{success}</p>}
+        {success && (
+          <p style={{ color: "green", fontSize: "13px" }}>{success}</p>
+        )}
         <div style={styles.modalActions}>
           <button style={styles.cancelBtn} onClick={onCancel}>
             Cancel
@@ -111,55 +119,6 @@ function ChangePasswordModal({ onCancel }) {
               Update Password
             </button>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditModal({ title, fields, onSave, onCancel }) {
-  const [values, setValues] = useState(() =>
-    Object.fromEntries(fields.map((f) => [f.name, f.value]))
-  );
-  const [error, setError] = useState("");
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = async () => {
-    setError("");
-    const err = await onSave(values);
-    if (err) setError(err);
-  };
-
-  return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <h3 style={styles.modalTitle}>{title}</h3>
-        {fields.map((f) => (
-          <div key={f.name} style={styles.modalField}>
-            <label style={styles.modalLabel}>{f.label}</label>
-            <input
-              type={f.type || "text"}
-              name={f.name}
-              value={values[f.name]}
-              onChange={handleChange}
-              style={styles.modalInput}
-              placeholder={f.placeholder || ""}
-              maxLength={f.maxLength}
-            />
-          </div>
-        ))}
-        {error && <p style={styles.error}>{error}</p>}
-        <div style={styles.modalActions}>
-          <button style={styles.cancelBtn} onClick={onCancel}>
-            Cancel
-          </button>
-          <button style={styles.saveBtn} onClick={handleSave}>
-            Save
-          </button>
         </div>
       </div>
     </div>
@@ -200,7 +159,9 @@ function Settings() {
       .then((r) => r.json())
       .then((d) => setEmail(d.email || ""));
 
-    fetch(`${API}/profile/me`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API}/profile/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setProfile(d);
@@ -285,7 +246,9 @@ function Settings() {
               <span
                 style={{
                   ...styles.toggleKnob,
-                  transform: emailNotifications ? "translateX(20px)" : "translateX(0)",
+                  transform: emailNotifications
+                    ? "translateX(20px)"
+                    : "translateX(0)",
                 }}
               />
             </button>
@@ -294,14 +257,20 @@ function Settings() {
             <div>
               <span style={styles.fieldLabel}>Dark Mode</span>
               <span
-                style={{ ...styles.toggleStatus, color: darkMode ? "#16a34a" : "#888" }}
+                style={{
+                  ...styles.toggleStatus,
+                  color: darkMode ? "#16a34a" : "#888",
+                }}
               >
                 {darkMode ? "Enabled" : "Disabled"}
               </span>
             </div>
             <button
               type="button"
-              style={{ ...styles.toggle, background: darkMode ? "#4f8ef7" : "#ccc" }}
+              style={{
+                ...styles.toggle,
+                background: darkMode ? "#4f8ef7" : "#ccc",
+              }}
               onClick={() => setDarkMode((v) => !v)}
             >
               <span
@@ -331,7 +300,9 @@ function Settings() {
         </div>
       </div>
 
-      {modal === "password" && <ChangePasswordModal onCancel={() => setModal(null)} />}
+      {modal === "password" && (
+        <ChangePasswordModal onCancel={() => setModal(null)} />
+      )}
 
       {/* Name edit modal */}
       {modal === "name" && (
@@ -343,7 +314,11 @@ function Settings() {
               label: "First Name",
               value: profile?.first_name || "",
             },
-            { name: "last_name", label: "Last Name", value: profile?.last_name || "" },
+            {
+              name: "last_name",
+              label: "Last Name",
+              value: profile?.last_name || "",
+            },
           ]}
           onSave={saveProfile}
           onCancel={() => setModal(null)}

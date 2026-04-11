@@ -63,7 +63,8 @@ function JobForm() {
 
   const validate = () => {
     const errs = {};
-    if (!formData.company_name.trim()) errs.company_name = "Company name is required.";
+    if (!formData.company_name.trim())
+      errs.company_name = "Company name is required.";
     if (!formData.title.trim()) errs.title = "Job title is required.";
     if (!formData.listing_date) errs.listing_date = "Listing date is required.";
     return errs;
@@ -78,7 +79,10 @@ function JobForm() {
     // Company doesn't exist — create it with a placeholder address
     const res = await fetch(`${API}/company/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         name: formData.company_name.trim(),
         address: { address: "TBD", state: "N/A", zip_code: 0 },
@@ -105,7 +109,9 @@ function JobForm() {
         return;
       }
 
-      const url = isEditMode ? `${API}/jobs/positions/${id}` : `${API}/jobs/positions/`;
+      const url = isEditMode
+        ? `${API}/jobs/positions/${id}`
+        : `${API}/jobs/positions/`;
       const method = isEditMode ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -129,13 +135,17 @@ function JobForm() {
         const err = await res.json().catch(() => ({}));
         setMessage(
           err.detail ||
-            (isEditMode ? "Failed to update posting." : "Failed to create posting.")
+            (isEditMode
+              ? "Failed to update posting."
+              : "Failed to create posting.")
         );
         return;
       }
 
       setMessage(
-        isEditMode ? "Posting updated successfully." : "Posting created successfully."
+        isEditMode
+          ? "Posting updated successfully."
+          : "Posting created successfully."
       );
       setTimeout(() => navigate("/"), 1500);
     } catch (err) {
@@ -143,6 +153,33 @@ function JobForm() {
     } finally {
       setIsSaving(false);
     }
+
+    const res = await fetch(`${API}/jobs/positions/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        company_id,
+        title: formData.title,
+        listing_date: formData.listing_date,
+        salary: formData.salary ? Number(formData.salary) : null,
+        education_req: formData.education_req || null,
+        experience_req: formData.experience_req || null,
+        description: formData.description || null,
+      }),
+    });
+    setIsSaving(false);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setMessage(err.detail || "Failed to create posting.");
+      return;
+    }
+
+    setMessage("Posting created successfully.");
+    setTimeout(() => navigate("/"), 1500);
   };
 
   if (loading) {
@@ -155,7 +192,9 @@ function JobForm() {
 
   return (
     <div style={styles.page}>
-      <h1 style={styles.title}>{isEditMode ? "Edit Posting" : "Add Posting"}</h1>
+      <h1 style={styles.title}>
+        {isEditMode ? "Edit Posting" : "Add Posting"}
+      </h1>
       <form onSubmit={handleSubmit} style={styles.card}>
         <label style={styles.label}>Company Name</label>
         <input
@@ -166,7 +205,9 @@ function JobForm() {
           style={styles.input}
           placeholder="e.g. Acme Corp"
         />
-        {errors.company_name && <p style={styles.error}>{errors.company_name}</p>}
+        {errors.company_name && (
+          <p style={styles.error}>{errors.company_name}</p>
+        )}
 
         <label style={styles.label}>Job Title</label>
         <input
@@ -187,7 +228,9 @@ function JobForm() {
           onChange={handleChange}
           style={styles.input}
         />
-        {errors.listing_date && <p style={styles.error}>{errors.listing_date}</p>}
+        {errors.listing_date && (
+          <p style={styles.error}>{errors.listing_date}</p>
+        )}
 
         <label style={styles.label}>Salary (optional)</label>
         <input
@@ -229,7 +272,11 @@ function JobForm() {
         />
 
         <button type="submit" style={styles.button} disabled={isSaving}>
-          {isSaving ? "Saving…" : isEditMode ? "Save Changes" : "Create Posting"}
+          {isSaving
+            ? "Saving…"
+            : isEditMode
+              ? "Save Changes"
+              : "Create Posting"}
         </button>
 
         {message && (

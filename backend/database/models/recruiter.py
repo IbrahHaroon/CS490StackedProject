@@ -9,7 +9,7 @@ from database.base import Base
 
 if TYPE_CHECKING:
     from database.models.company import Company
-    from database.models.user import User
+    from database.models.recruiter_credentials import RecruiterCredentials
 
 
 class Recruiter(Base):
@@ -18,9 +18,7 @@ class Recruiter(Base):
     recruiter_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
     )
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("user.user_id"), nullable=False, unique=True
-    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     company_id: Mapped[int] = mapped_column(
         ForeignKey("company.company_id"), nullable=False
     )
@@ -29,8 +27,10 @@ class Recruiter(Base):
     job_title: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Relationships
-    user: Mapped["User"] = relationship(back_populates="recruiter")
     company: Mapped["Company"] = relationship(back_populates="recruiters")
+    credentials: Mapped["RecruiterCredentials"] = relationship(
+        back_populates="recruiter", uselist=False
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -40,7 +40,7 @@ class Recruiter(Base):
 
 def create_recruiter(
     session: Session,
-    user_id: int,
+    email: str,
     company_id: int,
     first_name: str,
     last_name: str,
@@ -48,7 +48,7 @@ def create_recruiter(
 ) -> "Recruiter":
     """Create a new Recruiter row and return the persisted object."""
     new_recruiter = Recruiter(
-        user_id=user_id,
+        email=email,
         company_id=company_id,
         first_name=first_name,
         last_name=last_name,
@@ -65,10 +65,10 @@ def get_recruiter(session: Session, recruiter_id: int) -> "Recruiter | None":
     return session.get(Recruiter, recruiter_id)
 
 
-def get_recruiter_by_user_id(session: Session, user_id: int) -> "Recruiter | None":
-    """Return Recruiter object by user_id, or None if not found."""
+def get_recruiter_by_email(session: Session, email: str) -> "Recruiter | None":
+    """Return Recruiter object by email, or None if not found."""
     return session.execute(
-        select(Recruiter).where(Recruiter.user_id == user_id)
+        select(Recruiter).where(Recruiter.email == email)
     ).scalar_one_or_none()
 
 

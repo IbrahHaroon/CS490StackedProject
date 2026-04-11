@@ -9,6 +9,8 @@ from database.models.experience import Experience
 from database.models.follow_up import FollowUp
 from database.models.interview import Interview
 from database.models.job_activity import JobActivity
+from database.models.job_document import JobDocument
+from database.models.outcome import Outcome
 from database.models.password_reset import PasswordResetToken
 from database.models.position import Position
 from database.models.profile import Profile

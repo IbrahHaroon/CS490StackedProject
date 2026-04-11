@@ -27,7 +27,6 @@ const STATUS_COLOR = {
 function Pipeline({ current }) {
   const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
-
   const currentIdx = active.indexOf(current);
 
   return (
@@ -36,7 +35,9 @@ function Pipeline({ current }) {
         <div key={stage} className="pipeline-step">
           <div
             className={`pipeline-dot ${i <= currentIdx ? "pipeline-dot-active" : ""}`}
-            style={i === currentIdx ? { backgroundColor: STATUS_COLOR[current] } : {}}
+            style={
+              i === currentIdx ? { backgroundColor: STATUS_COLOR[current] } : {}
+            }
           />
           <span
             className={`pipeline-label ${i === currentIdx ? "pipeline-label-active" : ""}`}
@@ -56,7 +57,9 @@ function Pipeline({ current }) {
             className="pipeline-dot pipeline-dot-active"
             style={{ backgroundColor: STATUS_COLOR[current] }}
           />
-          <span className="pipeline-label pipeline-label-active">{current}</span>
+          <span className="pipeline-label pipeline-label-active">
+            {current}
+          </span>
         </div>
       )}
     </div>
@@ -66,8 +69,34 @@ function Pipeline({ current }) {
 function ApplicationCard({ app, position, onRemove, onStageChange }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [activityLoaded, setActivityLoaded] = useState(false);
   const [updatingStage, setUpdatingStage] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [showCoverLetter, setShowCoverLetter] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
   const token = localStorage.getItem("token");
+
+  // S2-007 — Deadline & Recruiter Notes
+  const [showDetails, setShowDetails] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [detailValues, setDetailValues] = useState({
+    deadline: app.deadline || "",
+    recruiter_notes: app.recruiter_notes || "",
+  });
+  const [detailSaving, setDetailSaving] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  // S2-012 — Follow-Ups
+  const [showFollowUps, setShowFollowUps] = useState(false);
+  const [followUps, setFollowUps] = useState([]);
+  const [followUpsLoaded, setFollowUpsLoaded] = useState(false);
+  const [newFollowUp, setNewFollowUp] = useState({
+    description: "",
+    due_date: "",
+  });
+  const [addingFollowUp, setAddingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState("");
 
   const handleStageChange = async (newStage) => {
     if (newStage === app.application_status || updatingStage) return;
@@ -92,6 +121,7 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
         onStageChange(app.job_id, previousStage);
       } else {
         setActivity(null);
+        setActivityLoaded(false);
       }
     } catch (err) {
       console.error("Stage change request errored:", err);
@@ -102,15 +132,18 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
   };
 
   const loadActivity = async () => {
-    if (activity) {
-      setExpanded(!expanded);
+    if (activityLoaded) {
+      setExpanded((v) => !v);
       return;
     }
 
     try {
-      const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await fetch(
+        `${API}/jobs/applications/${app.job_id}/activity`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
 
       if (res.ok) {
         setActivity(await res.json());
@@ -119,7 +152,149 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
       console.error("Failed to load activity:", err);
     }
 
+    setActivityLoaded(true);
     setExpanded(true);
+  };
+
+  const generateCoverLetter = async () => {
+    try {
+      setIsGenerating(true);
+
+      const title = position?.title || "this role";
+      const company = position?.company_name || "your company";
+
+      const generated = `Dear Hiring Manager,
+
+I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
+
+Through my previous work and projects, I have developed relevant technical and problem-solving skills that align with the responsibilities of this role. I am especially interested in contributing to ${company} and continuing to grow in a position like ${title}.
+
+I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
+
+`;
+
+      setCoverLetter(generated);
+      setShowCoverLetter(true);
+    } catch (err) {
+      console.error("Failed to generate cover letter:", err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(coverLetter);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // S2-007 — save deadline + recruiter notes
+  const saveDetails = async () => {
+    setDetailSaving(true);
+    setDetailError("");
+    try {
+      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(detailValues),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDetailError(err.detail || "Failed to save.");
+      } else {
+        setEditingDetails(false);
+      }
+    } catch {
+      setDetailError("Failed to save.");
+    } finally {
+      setDetailSaving(false);
+    }
+  };
+
+  // S2-012 — lazy-load follow-ups (mirrors loadActivity pattern)
+  const loadFollowUps = async () => {
+    if (!showFollowUps && !followUpsLoaded) {
+      try {
+        const res = await fetch(`${API}/jobs/${app.job_id}/followups`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setFollowUps(await res.json());
+      } catch {
+        // leave empty on error
+      }
+      setFollowUpsLoaded(true);
+    }
+    setShowFollowUps((v) => !v);
+  };
+
+  const createFollowUp = async () => {
+    if (!newFollowUp.description.trim()) {
+      setFollowUpError("Description is required.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/jobs/${app.job_id}/followups`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          job_id: app.job_id,
+          description: newFollowUp.description,
+          due_date: newFollowUp.due_date || null,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setFollowUps((prev) => [...prev, created]);
+        setNewFollowUp({ description: "", due_date: "" });
+        setFollowUpError("");
+        setAddingFollowUp(false);
+      }
+    } catch {
+      setFollowUpError("Failed to create follow-up.");
+    }
+  };
+
+  const toggleComplete = async (fu) => {
+    try {
+      const res = await fetch(`${API}/followups/${fu.followup_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ completed: !fu.completed }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setFollowUps((prev) =>
+          prev.map((f) => (f.followup_id === fu.followup_id ? updated : f))
+        );
+      }
+    } catch {
+      // silently fail — checkbox will snap back on next load
+    }
+  };
+
+  const deleteFollowUp = async (followup_id) => {
+    try {
+      const res = await fetch(`${API}/followups/${followup_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setFollowUps((prev) =>
+          prev.filter((f) => f.followup_id !== followup_id)
+        );
+      }
+    } catch {
+      // silently fail
+    }
   };
 
   const title = position?.title || `Position #${app.position_id}`;
@@ -150,10 +325,11 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
           {company && <span className="app-card-company">{company}</span>}
           <span className="app-card-meta">Applied {app.application_date}</span>
           <span className="app-card-meta">
-            {app.years_of_experience} yr{app.years_of_experience !== 1 ? "s" : ""}{" "}
-            experience
+            {app.years_of_experience} yr
+            {app.years_of_experience !== 1 ? "s" : ""} experience
           </span>
         </div>
+
         <div className="app-card-right">
           <select
             className="app-stage-select"
@@ -174,6 +350,9 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
+          <button className="app-secondary-btn" onClick={generateCoverLetter}>
+            {isGenerating ? "Generating..." : "Generate Cover Letter"}
+          </button>
           <button className="app-remove-btn" onClick={onRemove}>
             Remove
           </button>
@@ -182,23 +361,280 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
 
       <Pipeline current={app.application_status} />
 
-      {expanded && activity && (
+      {/* S2-007 — Deadline & Recruiter Notes */}
+      <div className="details-section">
+        <button
+          className="app-history-btn details-toggle"
+          onClick={() => setShowDetails((v) => !v)}
+        >
+          Details {showDetails ? "▾" : "▸"}
+        </button>
+        {showDetails && (
+          <div className="details-body">
+            {!editingDetails ? (
+              <>
+                <div className="details-row">
+                  <span className="details-label">Deadline</span>
+                  <span className="details-value">
+                    {detailValues.deadline
+                      ? new Date(
+                          detailValues.deadline + "T00:00:00"
+                        ).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+                <div className="details-row">
+                  <span className="details-label">Recruiter Notes</span>
+                  <span className="details-value">
+                    {detailValues.recruiter_notes || (
+                      <em style={{ color: "#6b7280" }}>No notes yet</em>
+                    )}
+                  </span>
+                </div>
+                <button
+                  className="app-history-btn"
+                  style={{ marginTop: "8px" }}
+                  onClick={() => setEditingDetails(true)}
+                >
+                  Edit
+                </button>
+              </>
+            ) : (
+              <div className="details-edit-form">
+                <label className="details-label">Deadline</label>
+                <input
+                  type="date"
+                  className="details-input"
+                  value={detailValues.deadline}
+                  onChange={(e) =>
+                    setDetailValues((prev) => ({
+                      ...prev,
+                      deadline: e.target.value,
+                    }))
+                  }
+                />
+                <label className="details-label">
+                  Recruiter / Contact Notes
+                </label>
+                <textarea
+                  className="details-textarea"
+                  value={detailValues.recruiter_notes}
+                  onChange={(e) =>
+                    setDetailValues((prev) => ({
+                      ...prev,
+                      recruiter_notes: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                />
+                {detailError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {detailError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={saveDetails}
+                    disabled={detailSaving}
+                  >
+                    {detailSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setEditingDetails(false);
+                      setDetailError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* S2-012 — Follow-Up & Reminder Tracking */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={loadFollowUps}
+        >
+          Follow-Ups{followUps.length > 0 ? ` (${followUps.length})` : ""}{" "}
+          {showFollowUps ? "▾" : "▸"}
+        </button>
+        {showFollowUps && (
+          <div className="followup-body">
+            {followUps.length === 0 ? (
+              <p className="followup-empty">No follow-ups yet.</p>
+            ) : (
+              <ul className="followup-list">
+                {followUps.map((fu) => (
+                  <li key={fu.followup_id} className="followup-item">
+                    <input
+                      type="checkbox"
+                      checked={fu.completed}
+                      onChange={() => toggleComplete(fu)}
+                      className="followup-checkbox"
+                    />
+                    <span
+                      className={
+                        fu.completed
+                          ? "followup-desc followup-done"
+                          : "followup-desc"
+                      }
+                    >
+                      {fu.description}
+                    </span>
+                    {fu.due_date && (
+                      <span className="followup-date">
+                        {new Date(
+                          fu.due_date + "T00:00:00"
+                        ).toLocaleDateString()}
+                      </span>
+                    )}
+                    <button
+                      className="followup-delete-btn"
+                      onClick={() => deleteFollowUp(fu.followup_id)}
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {addingFollowUp ? (
+              <div className="followup-add-form">
+                <input
+                  type="text"
+                  className="followup-input"
+                  placeholder="Description (required)"
+                  value={newFollowUp.description}
+                  onChange={(e) =>
+                    setNewFollowUp((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="date"
+                  className="followup-input"
+                  value={newFollowUp.due_date}
+                  onChange={(e) =>
+                    setNewFollowUp((prev) => ({
+                      ...prev,
+                      due_date: e.target.value,
+                    }))
+                  }
+                />
+                {followUpError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {followUpError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button className="app-history-btn" onClick={createFollowUp}>
+                    Save
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setAddingFollowUp(false);
+                      setNewFollowUp({ description: "", due_date: "" });
+                      setFollowUpError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="app-history-btn"
+                style={{ marginTop: "8px" }}
+                onClick={() => setAddingFollowUp(true)}
+              >
+                + Add Follow-Up
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showCoverLetter && (
+        <div className="cover-letter-box">
+          <div className="cover-letter-header">
+            <h4 className="cover-letter-title">Cover Letter Draft</h4>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                className="app-history-btn"
+                onClick={copyToClipboard}
+                disabled={!coverLetter}
+              >
+                {copied ? "Copied!" : "Copy to Clipboard"}
+              </button>
+              <button
+                className="app-history-btn"
+                onClick={() => setShowCoverLetter((prev) => !prev)}
+              >
+                {showCoverLetter ? "Hide Draft" : "Show Draft"}
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            className="cover-letter-textarea"
+            value={coverLetter}
+            onChange={(e) => setCoverLetter(e.target.value)}
+          />
+        </div>
+      )}
+
+      {expanded && (
         <div className="app-activity">
           <h4 className="app-activity-title">Stage History</h4>
-          <ul className="app-activity-list">
-            {activity.map((a) => (
-              <li key={a.activity_id} className="app-activity-item">
-                <span
-                  className="app-activity-dot"
-                  style={{ backgroundColor: STATUS_COLOR[a.stage] || "#888" }}
-                />
-                <span className="app-activity-stage">{a.stage}</span>
-                <span className="app-activity-date">
-                  {new Date(a.changed_at).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {activity && activity.length > 0 ? (
+            <ul className="app-activity-list">
+              {activity.map((a) => (
+                <li key={a.activity_id} className="app-activity-item">
+                  <span
+                    className="app-activity-dot"
+                    style={{ backgroundColor: STATUS_COLOR[a.stage] || "#888" }}
+                  />
+                  <span className="app-activity-stage">{a.stage}</span>
+                  <span className="app-activity-date">
+                    {new Date(a.changed_at).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p
+              style={{
+                color: "var(--text-muted)",
+                fontSize: "0.85rem",
+                margin: "4px 0 0",
+              }}
+            >
+              No history yet.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -216,14 +652,19 @@ function HistoryOverlay({ applications, positions, onClose }) {
       await Promise.all(
         applications.map(async (app) => {
           try {
-            const res = await fetch(`${API}/jobs/applications/${app.job_id}/activity`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
+            const res = await fetch(
+              `${API}/jobs/applications/${app.job_id}/activity`,
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
             if (res.ok) {
               const activities = await res.json();
               const pos = positions[app.position_id];
               const title = pos?.title || `Position #${app.position_id}`;
-              activities.forEach((a) => results.push({ ...a, jobTitle: title }));
+              activities.forEach((a) =>
+                results.push({ ...a, jobTitle: title })
+              );
             }
           } catch {
             /* skip */
@@ -337,7 +778,6 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-
     const query = search.toLowerCase().trim();
 
     const matchesSearch =
@@ -353,9 +793,13 @@ function Applications() {
 
     try {
       setIsDeleting(true);
-
-      setApplications((prev) => prev.filter((a) => a.job_id !== deleteTarget.job_id));
-
+      await fetch(`${API}/jobs/applications/${deleteTarget.job_id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }).catch(() => {});
+      setApplications((prev) =>
+        prev.filter((a) => a.job_id !== deleteTarget.job_id)
+      );
       setDeleteTarget(null);
     } catch (err) {
       console.error("Failed to delete application:", err);
@@ -391,7 +835,10 @@ function Applications() {
 
       <div className="app-page-header">
         <h1>My Applications</h1>
-        <button className="app-history-global-btn" onClick={() => setShowHistory(true)}>
+        <button
+          className="app-history-global-btn"
+          onClick={() => setShowHistory(true)}
+        >
           History
         </button>
       </div>
@@ -418,7 +865,11 @@ function Applications() {
                 <option value="All">Filter: All</option>
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
-                    {s} ({applications.filter((a) => a.application_status === s).length}
+                    {s} (
+                    {
+                      applications.filter((a) => a.application_status === s)
+                        .length
+                    }
                     )
                   </option>
                 ))}
@@ -455,7 +906,9 @@ function Applications() {
                   onStageChange={(id, newStage) =>
                     setApplications((prev) =>
                       prev.map((a) =>
-                        a.job_id === id ? { ...a, application_status: newStage } : a
+                        a.job_id === id
+                          ? { ...a, application_status: newStage }
+                          : a
                       )
                     )
                   }
