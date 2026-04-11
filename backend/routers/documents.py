@@ -1,11 +1,10 @@
-import os
 import base64
-from io import BytesIO
+import os
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy.orm import Session
-from PyPDF2 import PdfReader
 from docx import Document as DocxDocument
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from PyPDF2 import PdfReader
+from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
@@ -62,7 +61,7 @@ def _write_docx_content(file_path: str, content: str) -> None:
 def _update_file_content(file_path: str, filename: str, content: str) -> None:
     """Update file content based on file extension."""
     ext = os.path.splitext(filename)[1].lower()
-    
+
     if ext == ".txt" or ext == ".md":
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -70,7 +69,9 @@ def _update_file_content(file_path: str, filename: str, content: str) -> None:
         _write_docx_content(file_path, content)
     elif ext == ".pdf":
         # PDF editing not supported - text extraction only
-        raise ValueError("PDF editing via text extraction not yet implemented. Please use DOCX or TXT.")
+        raise ValueError(
+            "PDF editing via text extraction not yet implemented. Please use DOCX or TXT."
+        )
     else:
         raise ValueError(f"Unsupported file type for editing: {ext}")
 
@@ -81,7 +82,7 @@ def _get_file_content_and_format(file_path: str, filename: str) -> dict:
     For text files, returns the text. For binary files, returns base64-encoded data.
     """
     ext = os.path.splitext(filename)[1].lower()
-    
+
     if ext == ".pdf":
         text_content = _extract_pdf_content(file_path)
         # Also return base64-encoded PDF for display
@@ -272,7 +273,9 @@ def update_document_content(
     # If document is a file, update the file and also store in DB
     if document.document_location and os.path.exists(document.document_location):
         try:
-            _update_file_content(document.document_location, document.document_name, content)
+            _update_file_content(
+                document.document_location, document.document_name, content
+            )
             # Also store in DB for quick access
             updated_doc = update_document(session, doc_id, content=content)
             return updated_doc
@@ -287,9 +290,7 @@ def update_document_content(
                 detail=f"Failed to update document: {str(e)}",
             )
 
-    raise HTTPException(
-        status_code=404, detail="Document not found or not accessible"
-    )
+    raise HTTPException(status_code=404, detail="Document not found or not accessible")
 
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
