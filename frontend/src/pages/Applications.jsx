@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
-import StageBadge from "../components/StageBadge";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 const API = "http://localhost:8000";
@@ -25,21 +24,8 @@ const STATUS_COLOR = {
   Withdrawn: "#374151",
 };
 
-function timeAgo(dateStr) {
-  if (!dateStr) return null;
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return "just now";
-}
-
 function Pipeline({ current }) {
-  const isTerminal =
-    current === "Rejected" || current === "Archived" || current === "Withdrawn";
+  const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
   const currentIdx = active.indexOf(current);
 
@@ -71,17 +57,20 @@ function Pipeline({ current }) {
             className="pipeline-dot pipeline-dot-active"
             style={{ backgroundColor: STATUS_COLOR[current] }}
           />
-          <span className="pipeline-label pipeline-label-active">{current}</span>
+          <span className="pipeline-label pipeline-label-active">
+            {current}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-function ApplicationCard({ app, position, onRemove }) {
+function ApplicationCard({ app, position, onRemove, onStageChange }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
+  const [updatingStage, setUpdatingStage] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -109,17 +98,56 @@ function ApplicationCard({ app, position, onRemove }) {
   const [addingFollowUp, setAddingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
 
+  const handleStageChange = async (newStage) => {
+    if (newStage === app.application_status || updatingStage) return;
+    const previousStage = app.application_status;
+    setUpdatingStage(true);
+    onStageChange(app.job_id, newStage);
+    try {
+      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ application_status: newStage }),
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        console.error(
+          `Stage change failed (${res.status}) for job ${app.job_id}:`,
+          detail
+        );
+        onStageChange(app.job_id, previousStage);
+      } else {
+        setActivity(null);
+        setActivityLoaded(false);
+      }
+    } catch (err) {
+      console.error("Stage change request errored:", err);
+      onStageChange(app.job_id, previousStage);
+    } finally {
+      setUpdatingStage(false);
+    }
+  };
+
   const loadActivity = async () => {
     if (activityLoaded) {
       setExpanded((v) => !v);
       return;
     }
+
     try {
       const res = await fetch(
         `${API}/jobs/applications/${app.job_id}/activity`,
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
       );
-      if (res.ok) setActivity(await res.json());
+
+      if (res.ok) {
+        setActivity(await res.json());
+      }
     } catch (err) {
       console.error("Failed to load activity:", err);
     }
@@ -129,10 +157,13 @@ function ApplicationCard({ app, position, onRemove }) {
   };
 
   const generateCoverLetter = async () => {
-    setIsGenerating(true);
-    const title = position?.title || "this role";
-    const company = position?.company_name || "your company";
-    const generated = `Dear Hiring Manager,
+    try {
+      setIsGenerating(true);
+
+      const title = position?.title || "this role";
+      const company = position?.company_name || "your company";
+
+      const generated = `Dear Hiring Manager,
 
 I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
 
@@ -140,11 +171,15 @@ Through my previous work and projects, I have developed relevant technical and p
 
 I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
 
-Sincerely,
-[Your Name]`;
-    setCoverLetter(generated);
-    setShowCoverLetter(true);
-    setIsGenerating(false);
+`;
+
+      setCoverLetter(generated);
+      setShowCoverLetter(true);
+    } catch (err) {
+      console.error("Failed to generate cover letter:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const copyToClipboard = () => {
@@ -263,7 +298,7 @@ Sincerely,
   };
 
   const title = position?.title || `Position #${app.position_id}`;
-  const company = position?.company_name || "";
+  const company = position?.company_name;
 
   return (
     <div
@@ -271,43 +306,52 @@ Sincerely,
       style={{
         border:
           app.application_status === "Interview"
-            ? "2px solid #f59e0b"
+            ? "2px solid orange"
             : app.application_status === "Offer"
-              ? "2px solid #22c55e"
-              : "1px solid var(--border-light)",
+              ? "2px solid green"
+              : "1px solid #333",
         boxShadow:
           app.application_status === "Offer"
-            ? "0 0 12px rgba(34,197,94,0.25)"
+            ? "0 0 12px rgba(40,167,69,0.7)"
             : app.application_status === "Interview"
-              ? "0 0 8px rgba(245,158,11,0.25)"
+              ? "0 0 8px rgba(255,165,0,0.5)"
               : "none",
+        transition: "0.2s ease-in-out",
       }}
     >
       <div className="app-card-header">
         <div className="app-card-info">
           <h3 className="app-card-title">{title}</h3>
-          {company && (
-            <span className="app-card-meta app-card-company">{company}</span>
-          )}
+          {company && <span className="app-card-company">{company}</span>}
           <span className="app-card-meta">Applied {app.application_date}</span>
           <span className="app-card-meta">
             {app.years_of_experience} yr
             {app.years_of_experience !== 1 ? "s" : ""} experience
           </span>
-          {stageChangedLabel && (
-            <span className="app-card-meta app-card-stage-time">
-              Stage updated {stageChangedLabel}
-            </span>
-          )}
         </div>
 
         <div className="app-card-right">
-          <StageBadge status={app.application_status} />
+          <select
+            className="app-stage-select"
+            value={app.application_status}
+            disabled={updatingStage}
+            onChange={(e) => handleStageChange(e.target.value)}
+            style={{
+              borderColor: STATUS_COLOR[app.application_status],
+              color: STATUS_COLOR[app.application_status],
+            }}
+          >
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
           <button className="app-secondary-btn" onClick={generateCoverLetter}>
-            {isGenerating ? "Generating…" : "Generate Cover Letter"}
+            {isGenerating ? "Generating..." : "Generate Cover Letter"}
           </button>
           <button className="app-remove-btn" onClick={onRemove}>
             Remove
@@ -553,6 +597,7 @@ Sincerely,
               </button>
             </div>
           </div>
+
           <textarea
             className="cover-letter-textarea"
             value={coverLetter}
@@ -596,6 +641,76 @@ Sincerely,
   );
 }
 
+function HistoryOverlay({ applications, positions, onClose }) {
+  const [allActivity, setAllActivity] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    const loadAll = async () => {
+      const results = [];
+      await Promise.all(
+        applications.map(async (app) => {
+          try {
+            const res = await fetch(
+              `${API}/jobs/applications/${app.job_id}/activity`,
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+            if (res.ok) {
+              const activities = await res.json();
+              const pos = positions[app.position_id];
+              const title = pos?.title || `Position #${app.position_id}`;
+              activities.forEach((a) =>
+                results.push({ ...a, jobTitle: title })
+              );
+            }
+          } catch {
+            /* skip */
+          }
+        })
+      );
+      results.sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+      setAllActivity(results);
+      setLoadingHistory(false);
+    };
+    loadAll();
+  }, [applications, positions, token]);
+
+  return (
+    <div className="history-overlay" onClick={onClose}>
+      <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="history-close-btn" onClick={onClose}>
+          &times;
+        </button>
+        <h2 className="history-modal-title">Application History</h2>
+        {loadingHistory ? (
+          <p className="applications-placeholder">Loading history...</p>
+        ) : allActivity.length === 0 ? (
+          <p className="applications-placeholder">No activity recorded yet.</p>
+        ) : (
+          <ul className="app-activity-list">
+            {allActivity.map((a, i) => (
+              <li key={`${a.activity_id}-${i}`} className="history-item">
+                <span
+                  className="app-activity-dot"
+                  style={{ backgroundColor: STATUS_COLOR[a.stage] || "#888" }}
+                />
+                <span className="history-job-title">{a.jobTitle}</span>
+                <span className="app-activity-stage">{a.stage}</span>
+                <span className="app-activity-date">
+                  {new Date(a.changed_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Applications() {
   const [applications, setApplications] = useState([]);
   const [positions, setPositions] = useState({});
@@ -605,6 +720,7 @@ function Applications() {
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -615,16 +731,21 @@ function Applications() {
         });
 
         if (!res.ok) {
-          setError("Failed to load applications. Please sign in.");
+          const detail = await res.text();
+          console.error(`Dashboard load failed (${res.status}):`, detail);
+          setApplications([]);
+          setPositions({});
+          setError("Could not load applications. Please sign in again.");
           setLoading(false);
           return;
         }
 
         const apps = await res.json();
-        setApplications(apps);
+        setApplications(apps || []);
 
-        const uniqueIds = [...new Set(apps.map((a) => a.position_id))];
+        const uniqueIds = [...new Set((apps || []).map((a) => a.position_id))];
         const posMap = {};
+
         await Promise.all(
           uniqueIds.map(async (id) => {
             const r = await fetch(`${API}/jobs/positions/${id}`, {
@@ -633,13 +754,19 @@ function Applications() {
             if (r.ok) posMap[id] = await r.json();
           })
         );
+
         setPositions(posMap);
+        setError("");
         setLoading(false);
       } catch (err) {
-        setError("Failed to load applications.");
+        console.error("Dashboard load errored:", err);
+        setApplications([]);
+        setPositions({});
+        setError("Could not reach the server.");
         setLoading(false);
       }
     };
+
     load();
   }, [token]);
 
@@ -651,18 +778,19 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-    const q = search.toLowerCase().trim();
+    const query = search.toLowerCase().trim();
+
     const matchesSearch =
-      !q ||
-      positionTitle.toLowerCase().includes(q) ||
-      companyName.toLowerCase().includes(q);
+      query === "" ||
+      positionTitle.toLowerCase().includes(query) ||
+      companyName.toLowerCase().includes(query);
 
     return matchesStage && matchesSearch;
   });
 
-  const confirmDelete = async () => {
+  const handleDeleteApplication = async () => {
     if (!deleteTarget) return;
-    setIsDeleting(true);
+
     try {
       setIsDeleting(true);
       await fetch(`${API}/jobs/applications/${deleteTarget.job_id}`, {
@@ -672,11 +800,11 @@ function Applications() {
       setApplications((prev) =>
         prev.filter((a) => a.job_id !== deleteTarget.job_id)
       );
+      setDeleteTarget(null);
     } catch (err) {
       console.error("Failed to delete application:", err);
     } finally {
       setIsDeleting(false);
-      setDeleteTarget(null);
     }
   };
 
@@ -684,7 +812,7 @@ function Applications() {
     <div className="applications-page">
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
-        title="Remove this application?"
+        title="Delete this application?"
         message={
           deleteTarget
             ? `Are you sure you want to remove the ${
@@ -693,11 +821,27 @@ function Applications() {
             : ""
         }
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
+        onConfirm={handleDeleteApplication}
         isDeleting={isDeleting}
       />
 
-      <h1>My Applications</h1>
+      {showHistory && (
+        <HistoryOverlay
+          applications={applications}
+          positions={positions}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
+      <div className="app-page-header">
+        <h1>My Applications</h1>
+        <button
+          className="app-history-global-btn"
+          onClick={() => setShowHistory(true)}
+        >
+          History
+        </button>
+      </div>
 
       {error && <p className="applications-error">{error}</p>}
 
@@ -707,11 +851,30 @@ function Applications() {
             <div className="app-search-row">
               <input
                 type="text"
-                placeholder="Search by title or company…"
+                placeholder="Search jobs..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="app-search"
               />
+
+              <select
+                className="app-filter-dropdown"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                <option value="All">Filter: All</option>
+                {STAGES.map((s) => (
+                  <option key={s} value={s}>
+                    {s} (
+                    {
+                      applications.filter((a) => a.application_status === s)
+                        .length
+                    }
+                    )
+                  </option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 className="app-clear-btn"
@@ -723,26 +886,6 @@ function Applications() {
               >
                 Clear
               </button>
-            </div>
-
-            <div className="app-filters">
-              {["All", ...STAGES].map((s) => (
-                <button
-                  key={s}
-                  className={`app-filter-btn ${filter === s ? "app-filter-btn-active" : ""}`}
-                  onClick={() => setFilter(s)}
-                >
-                  {s}
-                  {s !== "All" && (
-                    <span className="app-filter-count">
-                      {
-                        applications.filter((a) => a.application_status === s)
-                          .length
-                      }
-                    </span>
-                  )}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -760,6 +903,15 @@ function Applications() {
                   app={app}
                   position={positions[app.position_id]}
                   onRemove={() => setDeleteTarget(app)}
+                  onStageChange={(id, newStage) =>
+                    setApplications((prev) =>
+                      prev.map((a) =>
+                        a.job_id === id
+                          ? { ...a, application_status: newStage }
+                          : a
+                      )
+                    )
+                  }
                 />
               ))}
             </div>

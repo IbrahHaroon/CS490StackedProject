@@ -19,9 +19,12 @@ function DocumentLibrary() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
-  const [confirmDoc, setConfirmDoc] = useState(null); // doc to delete
-  const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState(null);
+  const [viewContent, setViewContent] = useState("");
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -43,7 +46,8 @@ function DocumentLibrary() {
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -64,74 +68,230 @@ function DocumentLibrary() {
     form.append("document_type", docType);
 
     setUploading(true);
-    try {
-      const res = await fetch(`${API}/documents/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
+    const res = await fetch(`${API}/documents/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    setUploading(false);
 
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/signin";
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setUploadError(err.detail || `Upload failed (${res.status}).`);
-        return;
-      }
-
-      setUploadSuccess("File uploaded successfully.");
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      fetchDocuments();
-    } catch (err) {
-      setUploadError("Cannot reach the server. Make sure the backend is running.");
-    } finally {
-      setUploading(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setUploadError(err.detail || "Upload failed.");
+      return;
     }
+
+    setUploadSuccess("File uploaded successfully.");
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    fetchDocuments();
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!confirmDoc) return;
-    setDeleteError("");
-    setDeleting(true);
+  const handleView = async (doc) => {
+    setEditError("");
+    if (!token) {
+      setEditError("You must be signed in to view documents.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${API}/documents/${confirmDoc.doc_id}`, {
-        method: "DELETE",
+      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/signin";
-        return;
-      }
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setDeleteError(err.detail || "Failed to delete document.");
+        setEditError(err.detail || "Failed to load document content.");
         return;
       }
 
-      setConfirmDoc(null);
-      fetchDocuments();
+      const data = await res.json();
+      setViewingDoc(doc);
+      setViewContent(data.content || "");
     } catch (err) {
-      setDeleteError("Cannot reach the server.");
-    } finally {
-      setDeleting(false);
+      console.error("Error:", err);
+      setEditError("Failed to load document. Check console for details.");
     }
   };
 
-  const docName = (doc) =>
-    doc.document_name ||
-    (doc.document_location ? doc.document_location.split("/").pop() : "Unnamed");
+  const handleEdit = async (doc) => {
+    setEditError("");
+    if (!token) {
+      setEditError("You must be signed in to edit documents.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEditError(err.detail || "Failed to load document content.");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.source === "binary") {
+        setEditError(
+          `Cannot edit binary file: ${data.filename}. Only text-based resumes can be edited.`
+        );
+        return;
+      }
+
+      setEditingDoc(doc);
+      setEditContent(data.content || "");
+    } catch (err) {
+      console.error("Error:", err);
+      setEditError("Failed to load document. Check console for details.");
+    }
+  };
+
+  const handleSave = async () => {
+    if (!token) {
+      setEditError("You must be signed in to save.");
+      return;
+    }
+
+    setSaving(true);
+    setEditError("");
+    const res = await fetch(`${API}/documents/${editingDoc.doc_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content: editContent }),
+    });
+    setSaving(false);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.detail || "Failed to save document.");
+      return;
+    }
+
+    setEditingDoc(null);
+    setEditContent("");
+    setUploadSuccess("Document saved successfully!");
+    setTimeout(() => setUploadSuccess(""), 3000);
+    fetchDocuments();
+  };
+
+  const handleDelete = async (doc) => {
+    if (!window.confirm(`Delete ${doc.document_name}?`)) {
+      return;
+    }
+
+    if (!token) {
+      setEditError("You must be signed in to delete.");
+      return;
+    }
+
+    const res = await fetch(`${API}/documents/${doc.doc_id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.detail || "Failed to delete document.");
+      return;
+    }
+
+    setUploadSuccess("Document deleted successfully!");
+    setTimeout(() => setUploadSuccess(""), 3000);
+    fetchDocuments();
+  };
 
   return (
     <div className="doclibrary">
       <h1>Document Library</h1>
+
+      {viewingDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal">
+            <div className="doclibrary-modal-header">
+              <h2>View {viewingDoc.document_name}</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => {
+                  setViewingDoc(null);
+                  setViewContent("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="doclibrary-viewer">
+              <pre>{viewContent}</pre>
+            </div>
+
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-close-btn"
+                onClick={() => {
+                  setViewingDoc(null);
+                  setViewContent("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal">
+            <div className="doclibrary-modal-header">
+              <h2>Edit {editingDoc.document_name}</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => {
+                  setEditingDoc(null);
+                  setEditContent("");
+                  setEditError("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && <p className="doclibrary-error">{editError}</p>}
+
+            <textarea
+              className="doclibrary-editor"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Edit your resume content here..."
+            />
+
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={() => {
+                  setEditingDoc(null);
+                  setEditContent("");
+                  setEditError("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="doclibrary-save-btn"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="doclibrary-upload">
         <h2>Upload Document</h2>
@@ -181,24 +341,44 @@ function DocumentLibrary() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th></th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {documents.map((doc) => (
                 <tr key={doc.doc_id}>
-                  <td>{docName(doc)}</td>
+                  <td>
+                    {doc.document_name ||
+                      doc.document_location.split("/").pop()}
+                  </td>
                   <td>{doc.document_type}</td>
                   <td>
                     <span className="doclibrary-confirmed">✓ In System</span>
                   </td>
                   <td>
-                    <button
-                      className="doclibrary-delete-btn"
-                      onClick={() => { setDeleteError(""); setConfirmDoc(doc); }}
-                    >
-                      Remove
-                    </button>
+                    <div className="doclibrary-actions">
+                      <button
+                        className="doclibrary-action-btn doclibrary-view-btn"
+                        onClick={() => handleView(doc)}
+                        title="View Resume"
+                      >
+                        View
+                      </button>
+                      <button
+                        className="doclibrary-action-btn doclibrary-edit-btn"
+                        onClick={() => handleEdit(doc)}
+                        title="Edit Resume"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="doclibrary-action-btn doclibrary-delete-btn"
+                        onClick={() => handleDelete(doc)}
+                        title="Delete Resume"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -206,35 +386,6 @@ function DocumentLibrary() {
           </table>
         )}
       </section>
-
-      {confirmDoc && (
-        <div className="doclibrary-overlay">
-          <div className="doclibrary-modal">
-            <h3 className="doclibrary-modal-title">Remove Document</h3>
-            <p className="doclibrary-modal-body">
-              Are you sure you want to remove <strong>{docName(confirmDoc)}</strong>? This
-              cannot be undone.
-            </p>
-            {deleteError && <p className="doclibrary-error">{deleteError}</p>}
-            <div className="doclibrary-modal-actions">
-              <button
-                className="doclibrary-modal-cancel"
-                onClick={() => setConfirmDoc(null)}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                className="doclibrary-modal-confirm"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-              >
-                {deleting ? "Removing…" : "Remove"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
