@@ -260,7 +260,9 @@ function Dashboard() {
       <div className="job-board" ref={jobBoardRef}>
         {filteredJobs.length === 0 ? (
           <p style={{ color: "#888", padding: "1rem" }}>
-            {jobs.length === 0 ? "No job listings available." : "No jobs match your search."}
+            {jobs.length === 0
+              ? "No job listings available."
+              : "No jobs match your search."}
           </p>
         ) : (
           <>
