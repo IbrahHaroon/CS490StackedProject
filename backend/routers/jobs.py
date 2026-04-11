@@ -90,14 +90,26 @@ def create_position_endpoint(body: PositionCreate, session: Session = Depends(ge
     )
 
 
-@router.get("/positions/{position_id}", response_model=PositionResponse)
+@router.get("/positions/{position_id}", response_model=PositionWithCompanyResponse)
 def read_position(position_id: int, session: Session = Depends(get_db)):
     position = get_position(session, position_id)
     if not position:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Position not found"
         )
-    return position
+    return PositionWithCompanyResponse(
+        position_id=position.position_id,
+        company_id=position.company_id,
+        company_name=position.company.name if position.company else "Unknown",
+        title=position.title,
+        listing_date=position.listing_date,
+        salary=position.salary,
+        education_req=position.education_req,
+        experience_req=position.experience_req,
+        description=position.description,
+        location_type=position.location_type,
+        location=position.location,
+    )
 
 
 @router.put("/positions/{position_id}", response_model=PositionResponse)
@@ -165,7 +177,8 @@ def apply_for_job(body: ApplicationCreate, session: Session = Depends(get_db)):
     job = create_applied_jobs(
         session, body.user_id, body.position_id, body.years_of_experience
     )
-    create_job_activity(session, job.job_id, "Interested")
+    create_job_activity(session, job.job_id, "Applied")
+    job = update_applied_job(session, job.job_id, application_status="Applied")
     return job
 
 

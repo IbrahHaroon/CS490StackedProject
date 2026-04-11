@@ -5,11 +5,35 @@
   color: var(--text);
 }
 
+.app-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
 .applications-page h1 {
   font-size: 2rem;
   font-weight: 300;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   color: var(--text-strong);
+}
+
+.app-history-global-btn {
+  padding: 0.6rem 1.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.app-history-global-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--text-muted);
 }
 
 .applications-placeholder {
@@ -80,43 +104,25 @@
   cursor: not-allowed;
 }
 
-.app-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.app-filter-btn {
-  padding: 0.45rem 0.95rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
+.app-filter-dropdown {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #394264;
+  background: #151a33;
+  color: #ffffff;
+  font-size: 14px;
   cursor: pointer;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  transition: 0.2s ease;
+  outline: none;
 }
 
-.app-filter-btn:hover {
-  border-color: var(--text-muted);
-  color: var(--text-strong);
-}
-
-.app-filter-btn-active {
-  background-color: var(--surface-2);
+.app-filter-dropdown:focus {
   border-color: #4f8ef7;
-  color: var(--text-strong);
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
 }
 
-.app-filter-count {
-  background: var(--surface-3);
-  border-radius: 999px;
-  padding: 0 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.app-filter-dropdown option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* Card */
@@ -157,6 +163,12 @@
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+}
+
+.app-card-company {
+  font-size: 14px;
+  color: #cbd5e1;
+  font-weight: 500;
 }
 
 .app-card-meta {
@@ -241,8 +253,8 @@
 .pipeline {
   display: flex;
   flex-direction: row;
-  padding: 0.5rem 0 1.5rem;
-  gap: 36px;
+  padding: 0.5rem 0 1.5rem 2.5rem;
+  gap: 56px;
   margin-top: 10px;
   overflow-x: auto;
 }
@@ -338,6 +350,133 @@
 
 .app-activity-date {
   color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* History overlay */
+.history-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.history-modal {
+  position: relative;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 2.5rem;
+  width: 90vw;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.history-modal-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 1.5rem;
+}
+
+.history-close-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  transition: 0.2s ease;
+}
+
+.history-close-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  padding: 0.4rem 0;
+}
+
+.history-job-title {
+  color: var(--text);
+  font-weight: 500;
+  min-width: 140px;
+}
+
+.history-restore-btn {
+  margin-left: auto;
+}
+
+.history-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.history-section-title:first-of-type {
+  margin-top: 0;
+}
+
+.history-archived-section {
+  margin-bottom: 1rem;
+}
+
+.history-archived-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.history-archived-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.history-archived-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.history-archived-title {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.history-archived-company {
+  color: #cbd5e1;
   font-size: 0.8rem;
 }
 
