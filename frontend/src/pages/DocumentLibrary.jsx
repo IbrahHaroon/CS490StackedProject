@@ -19,6 +19,8 @@ function DocumentLibrary() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [viewingDoc, setViewingDoc] = useState(null);
+  const [viewContent, setViewContent] = useState("");
   const [editingDoc, setEditingDoc] = useState(null);
   const [editContent, setEditContent] = useState("");
   const [saving, setSaving] = useState(false);
@@ -85,33 +87,65 @@ function DocumentLibrary() {
     fetchDocuments();
   };
 
-  const handleViewEdit = async (doc) => {
+  const handleView = async (doc) => {
     setEditError("");
     if (!token) {
       setEditError("You must be signed in to view documents.");
       return;
     }
 
-    const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setEditError(err.detail || "Failed to load document content.");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEditError(err.detail || "Failed to load document content.");
+        return;
+      }
+
+      const data = await res.json();
+      setViewingDoc(doc);
+      setViewContent(data.content || "");
+    } catch (err) {
+      console.error("Error:", err);
+      setEditError("Failed to load document. Check console for details.");
+    }
+  };
+
+  const handleEdit = async (doc) => {
+    setEditError("");
+    if (!token) {
+      setEditError("You must be signed in to edit documents.");
       return;
     }
 
-    const data = await res.json();
-    if (data.source === "binary") {
-      setEditError(
-        `Cannot edit binary file: ${data.filename}. Only text-based resumes can be edited.`
-      );
-      return;
-    }
+    try {
+      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    setEditingDoc(doc);
-    setEditContent(data.content || "");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEditError(err.detail || "Failed to load document content.");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.source === "binary") {
+        setEditError(
+          `Cannot edit binary file: ${data.filename}. Only text-based resumes can be edited.`
+        );
+        return;
+      }
+
+      setEditingDoc(doc);
+      setEditContent(data.content || "");
+    } catch (err) {
+      console.error("Error:", err);
+      setEditError("Failed to load document. Check console for details.");
+    }
   };
 
   const handleSave = async () => {
@@ -174,6 +208,41 @@ function DocumentLibrary() {
   return (
     <div className="doclibrary">
       <h1>Document Library</h1>
+
+      {viewingDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal">
+            <div className="doclibrary-modal-header">
+              <h2>View {viewingDoc.document_name}</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => {
+                  setViewingDoc(null);
+                  setViewContent("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="doclibrary-viewer">
+              <pre>{viewContent}</pre>
+            </div>
+
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-close-btn"
+                onClick={() => {
+                  setViewingDoc(null);
+                  setViewContent("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingDoc && (
         <div className="doclibrary-modal-overlay">
@@ -290,10 +359,17 @@ function DocumentLibrary() {
                     <div className="doclibrary-actions">
                       <button
                         className="doclibrary-action-btn doclibrary-view-btn"
-                        onClick={() => handleViewEdit(doc)}
-                        title="View/Edit Resume"
+                        onClick={() => handleView(doc)}
+                        title="View Resume"
                       >
-                        View/Edit
+                        View
+                      </button>
+                      <button
+                        className="doclibrary-action-btn doclibrary-edit-btn"
+                        onClick={() => handleEdit(doc)}
+                        title="Edit Resume"
+                      >
+                        Edit
                       </button>
                       <button
                         className="doclibrary-action-btn doclibrary-delete-btn"

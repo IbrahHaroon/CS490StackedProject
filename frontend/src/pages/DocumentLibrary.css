@@ -126,6 +126,15 @@
   background-color: #3a7be0;
 }
 
+.doclibrary-edit-btn {
+  background-color: #ff9800;
+  color: #fff;
+}
+
+.doclibrary-edit-btn:hover {
+  background-color: #e68900;
+}
+
 .doclibrary-delete-btn {
   background-color: #ff6b6b;
   color: #fff;
@@ -203,6 +212,24 @@
   line-height: 1.5;
 }
 
+.doclibrary-viewer {
+  flex: 1;
+  padding: 1.5rem;
+  border: none;
+  overflow-y: auto;
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
+.doclibrary-viewer pre {
+  margin: 0;
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
 .doclibrary-modal-actions {
   display: flex;
   gap: 0.75rem;
@@ -242,5 +269,16 @@
 }
 
 .doclibrary-cancel-btn:hover {
+  background-color: var(--surface-2);
+}
+
+.doclibrary-close-btn {
+  background-color: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.6rem 1.2rem;
+}
+
+.doclibrary-close-btn:hover {
   background-color: var(--surface-2);
 }
