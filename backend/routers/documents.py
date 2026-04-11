@@ -100,3 +100,106 @@ def read_document(doc_id: int, session: Session = Depends(get_db)):
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@router.get("/{doc_id}/content")
+def read_document_content(
+    doc_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read document content (for viewing/editing resumes and text documents)."""
+    document = get_document(session, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to view this document",
+        )
+
+    # If document has stored content (text-based)
+    if document.content:
+        return {"content": document.content, "source": "text"}
+
+    # If document is a file, try to read it
+    if document.document_location and os.path.exists(document.document_location):
+        try:
+            if document.document_location.lower().endswith((".txt", ".md")):
+                with open(document.document_location, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return {"content": content, "source": "file"}
+            else:
+                # For non-text files, return filename and location
+                return {
+                    "content": f"[Binary file: {document.document_name}]",
+                    "source": "binary",
+                    "filename": document.document_name,
+                }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {str(e)}",
+            )
+
+    raise HTTPException(
+        status_code=404, detail="Document content not found or not accessible"
+    )
+
+
+@router.put("/{doc_id}", response_model=DocumentResponse)
+def update_document_content(
+    doc_id: int,
+    body: dict,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update document content (for editing text-based resumes and documents)."""
+    from database.models.documents import update_document
+
+    document = get_document(session, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to edit this document",
+        )
+
+    content = body.get("content")
+    if content is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Content field is required",
+        )
+
+    updated_doc = update_document(session, doc_id, content=content)
+    return updated_doc
+
+
+@router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document_endpoint(
+    doc_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a document."""
+    from database.models.documents import delete_document
+
+    document = get_document(session, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this document",
+        )
+
+    # Delete file from disk if it exists
+    if document.document_location and os.path.exists(document.document_location):
+        try:
+            os.remove(document.document_location)
+        except Exception as e:
+            print(f"Warning: Could not delete file {document.document_location}: {e}")
+
+    delete_document(session, doc_id)

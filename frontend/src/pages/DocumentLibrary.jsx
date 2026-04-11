@@ -19,6 +19,10 @@ function DocumentLibrary() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -40,7 +44,8 @@ function DocumentLibrary() {
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -80,9 +85,144 @@ function DocumentLibrary() {
     fetchDocuments();
   };
 
+  const handleViewEdit = async (doc) => {
+    setEditError("");
+    if (!token) {
+      setEditError("You must be signed in to view documents.");
+      return;
+    }
+
+    const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.detail || "Failed to load document content.");
+      return;
+    }
+
+    const data = await res.json();
+    if (data.source === "binary") {
+      setEditError(
+        `Cannot edit binary file: ${data.filename}. Only text-based resumes can be edited.`
+      );
+      return;
+    }
+
+    setEditingDoc(doc);
+    setEditContent(data.content || "");
+  };
+
+  const handleSave = async () => {
+    if (!token) {
+      setEditError("You must be signed in to save.");
+      return;
+    }
+
+    setSaving(true);
+    setEditError("");
+    const res = await fetch(`${API}/documents/${editingDoc.doc_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content: editContent }),
+    });
+    setSaving(false);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.detail || "Failed to save document.");
+      return;
+    }
+
+    setEditingDoc(null);
+    setEditContent("");
+    setUploadSuccess("Document saved successfully!");
+    setTimeout(() => setUploadSuccess(""), 3000);
+    fetchDocuments();
+  };
+
+  const handleDelete = async (doc) => {
+    if (!window.confirm(`Delete ${doc.document_name}?`)) {
+      return;
+    }
+
+    if (!token) {
+      setEditError("You must be signed in to delete.");
+      return;
+    }
+
+    const res = await fetch(`${API}/documents/${doc.doc_id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.detail || "Failed to delete document.");
+      return;
+    }
+
+    setUploadSuccess("Document deleted successfully!");
+    setTimeout(() => setUploadSuccess(""), 3000);
+    fetchDocuments();
+  };
+
   return (
     <div className="doclibrary">
       <h1>Document Library</h1>
+
+      {editingDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal">
+            <div className="doclibrary-modal-header">
+              <h2>Edit {editingDoc.document_name}</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => {
+                  setEditingDoc(null);
+                  setEditContent("");
+                  setEditError("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && <p className="doclibrary-error">{editError}</p>}
+
+            <textarea
+              className="doclibrary-editor"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Edit your resume content here..."
+            />
+
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={() => {
+                  setEditingDoc(null);
+                  setEditContent("");
+                  setEditError("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="doclibrary-save-btn"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="doclibrary-upload">
         <h2>Upload Document</h2>
@@ -132,15 +272,37 @@ function DocumentLibrary() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {documents.map((doc) => (
                 <tr key={doc.doc_id}>
-                  <td>{doc.document_location.split("/").pop()}</td>
+                  <td>
+                    {doc.document_name ||
+                      doc.document_location.split("/").pop()}
+                  </td>
                   <td>{doc.document_type}</td>
                   <td>
                     <span className="doclibrary-confirmed">✓ In System</span>
+                  </td>
+                  <td>
+                    <div className="doclibrary-actions">
+                      <button
+                        className="doclibrary-action-btn doclibrary-view-btn"
+                        onClick={() => handleViewEdit(doc)}
+                        title="View/Edit Resume"
+                      >
+                        View/Edit
+                      </button>
+                      <button
+                        className="doclibrary-action-btn doclibrary-delete-btn"
+                        onClick={() => handleDelete(doc)}
+                        title="Delete Resume"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
