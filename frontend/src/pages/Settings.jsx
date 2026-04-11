@@ -1,205 +1,365 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import EditModal from "../components/EditModal";
+
+const API = "http://localhost:8000";
+
+function Section({ title, children, onEdit }) {
+  return (
+    <div style={styles.section}>
+      <div style={styles.sectionHeader}>
+        <h2 style={styles.sectionTitle}>{title}</h2>
+        <button type="button" style={styles.editBtn} onClick={onEdit}>
+          Edit
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, value }) {
+  return (
+    <div style={styles.field}>
+      <span style={styles.fieldLabel}>{label}</span>
+      <span style={styles.fieldValue}>
+        {value || <em style={{ color: "#aaa" }}>Not set</em>}
+      </span>
+    </div>
+  );
+}
+
+function ChangePasswordModal({ onCancel }) {
+  const [current, setCurrent] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const token = localStorage.getItem("token");
+
+  const handleSave = async () => {
+    setError("");
+    setSuccess("");
+    if (!current) return setError("Current password is required.");
+    if (newPw.length < 6)
+      return setError("New password must be at least 6 characters.");
+    if (newPw !== confirm) return setError("Passwords do not match.");
+
+    // Verify current password by attempting login
+    const meRes = await fetch(`${API}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = await meRes.json();
+
+    const checkRes = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        username: me.email,
+        password: current,
+      }).toString(),
+    });
+    if (!checkRes.ok) return setError("Current password is incorrect.");
+
+    const forgotRes = await fetch(`${API}/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: me.email }),
+    });
+
+    if (!forgotRes.ok) return setError("Failed to initiate password change.");
+    setSuccess(
+      "A password reset email has been sent. Please check your inbox."
+    );
+  };
+
+  return (
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <h3 style={styles.modalTitle}>Change Password</h3>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>Current Password</label>
+          <input
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            style={styles.modalInput}
+            placeholder="••••••••"
+          />
+        </div>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>New Password</label>
+          <input
+            type="password"
+            value={newPw}
+            onChange={(e) => setNewPw(e.target.value)}
+            style={styles.modalInput}
+            placeholder="••••••••"
+          />
+        </div>
+        <div style={styles.modalField}>
+          <label style={styles.modalLabel}>Confirm New Password</label>
+          <input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            style={styles.modalInput}
+            placeholder="••••••••"
+          />
+        </div>
+        {error && <p style={{ color: "red", fontSize: "13px" }}>{error}</p>}
+        {success && (
+          <p style={{ color: "green", fontSize: "13px" }}>{success}</p>
+        )}
+        <div style={styles.modalActions}>
+          <button style={styles.cancelBtn} onClick={onCancel}>
+            Cancel
+          </button>
+          {!success && (
+            <button style={styles.saveBtn} onClick={handleSave}>
+              Update Password
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Settings() {
-  // I kept all the form values inside one object so everything related to the settings form stays in one place and is easier to update.
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    emailNotifications: true,
-    darkMode: false,
-  });
-
-  // This stores validation errors for specific fields.
-  // For example, if email is invalid, errors.email will hold that message.
-  const [errors, setErrors] = useState({});
-
-  // This is just for user feedback after submitting the form.
-  // Right now it shows a simple success or failure message.
+  const [profile, setProfile] = useState(null);
+  const [email, setEmail] = useState("");
+  const [modal, setModal] = useState(null); // null | "name" | "contact" | "password"
   const [statusMessage, setStatusMessage] = useState("");
+  const [emailNotifications, setEmailNotifications] = useState(
+    () => localStorage.getItem("emailNotifications") !== "false"
+  );
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("darkMode") !== "false"
+  );
 
-  // This helps simulate a real save action.
-  // While this is true, the button changes to save.
-  const [isSaving, setIsSaving] = useState(false);
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.remove("light-mode");
+    } else {
+      document.body.classList.add("light-mode");
+    }
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
 
-  // This handles both text inputs and checkboxes.
-  // For checkboxes, I need to use "checked" instead of "value".
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  useEffect(() => {
+    localStorage.setItem("emailNotifications", emailNotifications);
+  }, [emailNotifications]);
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
+  const token = localStorage.getItem("token");
 
-  // Keeping validation in its own function makes the submit logic cleaner.
-  // This also makes it easier to expand later if more settings get added.
-  const validateForm = () => {
-    const newErrors = {};
+  useEffect(() => {
+    if (!token) return;
 
-    // Full name should not be blank
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required.";
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setEmail(d.email || ""));
+
+    fetch(`${API}/profile/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setProfile(d);
+      });
+  }, []);
+
+  const saveProfile = async (values) => {
+    const res = await fetch(`${API}/profile/${profile.profile_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(values),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return err.detail || "Failed to save.";
     }
 
-    // Email should not be blank and should at least look like an email
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required.";
-    } else if (!formData.email.includes("@")) {
-      newErrors.email = "Enter a valid email.";
-    }
-
-    return newErrors;
-  };
-
-  // This runs when the user clicks Save Changes.
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Run validation first before pretending to save anything
-    const validationErrors = validateForm();
-    setErrors(validationErrors);
-
-    // Clear any old status message so the user only sees the newest result
-    setStatusMessage("");
-
-    // If there are validation errors, stop here
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      // This is just simulating a backend request for now.
-      // Later this can be replaced with a real API call.
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setStatusMessage("Settings saved.");
-    } catch (error) {
-      // Even though this mock version probably will not fail,
-      // I still kept this here because real save logic should handle errors.
-      setStatusMessage("Failed to save settings.");
-    } finally {
-      // Always turn off the loading state at the end
-      setIsSaving(false);
-    }
+    const updated = await res.json();
+    setProfile(updated);
+    setModal(null);
+    setStatusMessage("Settings saved.");
+    setTimeout(() => setStatusMessage(""), 3000);
+    return null;
   };
 
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>Settings</h1>
+      <p style={styles.subtitle}>Manage your account preferences.</p>
 
-      <p style={styles.subtitle}>
-        Manage your account preferences and application settings.
-      </p>
+      {statusMessage && <p style={styles.status}>{statusMessage}</p>}
 
-      <form onSubmit={handleSubmit} style={styles.formCard}>
-        {/* Account section holds the main user identity fields */}
+      <div style={styles.formCard}>
+        {/* Account */}
+        <Section title="Account" onEdit={() => setModal("name")}>
+          <Field label="First Name" value={profile?.first_name} />
+          <Field label="Last Name" value={profile?.last_name} />
+          <Field label="Email" value={email} />
+        </Section>
+
+        <hr style={styles.divider} />
+
+        {/* Contact */}
+        <Section title="Contact" onEdit={() => setModal("contact")}>
+          <Field label="Phone" value={profile?.phone_number} />
+          <Field label="Date of Birth" value={profile?.dob} />
+        </Section>
+
+        <hr style={styles.divider} />
+
+        <hr style={styles.divider} />
+
+        {/* Preferences */}
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Account</h2>
-
-          <label style={styles.label}>Full Name</label>
-          <input
-            type="text"
-            name="fullName"
-            value={formData.fullName}
-            onChange={handleChange}
-            style={styles.input}
-            placeholder="Enter your full name"
-          />
-          {errors.fullName && <p style={styles.error}>{errors.fullName}</p>}
-
-          <label style={styles.label}>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            style={styles.input}
-            placeholder="Enter your email"
-          />
-          {errors.email && <p style={styles.error}>{errors.email}</p>}
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Preferences</h2>
+          </div>
+          <div style={styles.toggleRow}>
+            <div>
+              <span style={styles.fieldLabel}>Email Notifications</span>
+              <span
+                style={{
+                  ...styles.toggleStatus,
+                  color: emailNotifications ? "#16a34a" : "#888",
+                }}
+              >
+                {emailNotifications ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <button
+              type="button"
+              style={{
+                ...styles.toggle,
+                background: emailNotifications ? "#4f8ef7" : "#ccc",
+              }}
+              onClick={() => setEmailNotifications((v) => !v)}
+            >
+              <span
+                style={{
+                  ...styles.toggleKnob,
+                  transform: emailNotifications
+                    ? "translateX(20px)"
+                    : "translateX(0)",
+                }}
+              />
+            </button>
+          </div>
+          <div style={styles.toggleRow}>
+            <div>
+              <span style={styles.fieldLabel}>Dark Mode</span>
+              <span
+                style={{
+                  ...styles.toggleStatus,
+                  color: darkMode ? "#16a34a" : "#888",
+                }}
+              >
+                {darkMode ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            <button
+              type="button"
+              style={{
+                ...styles.toggle,
+                background: darkMode ? "#4f8ef7" : "#ccc",
+              }}
+              onClick={() => setDarkMode((v) => !v)}
+            >
+              <span
+                style={{
+                  ...styles.toggleKnob,
+                  transform: darkMode ? "translateX(20px)" : "translateX(0)",
+                }}
+              />
+            </button>
+          </div>
         </div>
 
-        {/* Preferences section is using local state for now.
-            The checkboxes work, but they are not hooked up to a backend yet. */}
+        <hr style={styles.divider} />
+
+        {/* Security */}
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Preferences</h2>
-
-          <label style={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              name="emailNotifications"
-              checked={formData.emailNotifications}
-              onChange={handleChange}
-            />
-            Email notifications
-          </label>
-
-          <label style={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              name="darkMode"
-              checked={formData.darkMode}
-              onChange={handleChange}
-            />
-            Dark mode
-          </label>
-
-          {/* I added these helper lines so the toggles feel more obvious.
-              That way, when the user clicks them, the page visibly updates. */}
-          <p style={styles.helperText}>
-            Email notifications are currently{" "}
-            <strong>{formData.emailNotifications ? "enabled" : "disabled"}</strong>.
-          </p>
-
-          <p style={styles.helperText}>
-            Dark mode is currently{" "}
-            <strong>{formData.darkMode ? "enabled" : "disabled"}</strong>.
-          </p>
-        </div>
-
-        {/* This is just a placeholder section for now.
-            The button does not do anything yet, but it makes the page feel more complete. */}
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Security</h2>
-          <button type="button" style={styles.secondaryButton}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Security</h2>
+          </div>
+          <button
+            type="button"
+            style={styles.secondaryButton}
+            onClick={() => setModal("password")}
+          >
             Change Password
           </button>
         </div>
+      </div>
 
-        {/* Main submit button */}
-        <div style={styles.actions}>
-          <button type="submit" style={styles.primaryButton} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
+      {modal === "password" && (
+        <ChangePasswordModal onCancel={() => setModal(null)} />
+      )}
 
-        {/* This only shows after submit if there is a success/failure message */}
-        {statusMessage && <p style={styles.status}>{statusMessage}</p>}
-      </form>
+      {/* Name edit modal */}
+      {modal === "name" && (
+        <EditModal
+          title="Edit Name"
+          fields={[
+            {
+              name: "first_name",
+              label: "First Name",
+              value: profile?.first_name || "",
+            },
+            {
+              name: "last_name",
+              label: "Last Name",
+              value: profile?.last_name || "",
+            },
+          ]}
+          onSave={saveProfile}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
+      {/* Contact edit modal */}
+      {modal === "contact" && (
+        <EditModal
+          title="Edit Contact"
+          fields={[
+            {
+              name: "phone_number",
+              label: "Phone",
+              value: profile?.phone_number || "",
+              placeholder: "555-0100",
+            },
+            {
+              name: "dob",
+              label: "Date of Birth",
+              value: profile?.dob || "",
+              type: "date",
+            },
+          ]}
+          onSave={saveProfile}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
 
-// I kept the styles in this file for now just to move faster during the baseline build.
-// Later we can move this into a separate CSS file to clean things up.
 const styles = {
   page: {
-    maxWidth: "800px",
+    maxWidth: "720px",
     margin: "0 auto",
     padding: "32px 20px",
     fontFamily: "Arial, sans-serif",
   },
-  title: {
-    fontSize: "32px",
-    marginBottom: "8px",
-  },
-  subtitle: {
-    color: "#555",
-    marginBottom: "24px",
-  },
+  title: { fontSize: "32px", marginBottom: "8px" },
+  subtitle: { color: "#555", marginBottom: "24px" },
   formCard: {
     border: "1px solid #ddd",
     borderRadius: "12px",
@@ -207,58 +367,121 @@ const styles = {
     backgroundColor: "#fff",
     display: "flex",
     flexDirection: "column",
-    gap: "24px",
+    gap: "0",
   },
-  section: {
+  section: { padding: "16px 0" },
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "12px",
+  },
+  sectionTitle: { fontSize: "18px", margin: 0, color: "#444" },
+  editBtn: {
+    padding: "4px 14px",
+    border: "1px solid #ccc",
+    borderRadius: "6px",
+    background: "none",
+    cursor: "pointer",
+    fontSize: "14px",
+    color: "#333",
+  },
+  field: {
+    display: "flex",
+    gap: "16px",
+    padding: "6px 0",
+    fontSize: "15px",
+  },
+  fieldLabel: { color: "#555", width: "140px", flexShrink: 0 },
+  fieldValue: { color: "#222" },
+  divider: { border: "none", borderTop: "1px solid #eee", margin: 0 },
+  secondaryButton: {
+    padding: "8px 16px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    cursor: "pointer",
+    fontSize: "14px",
+    color: "#333",
+  },
+  status: { color: "green", fontSize: "14px", marginBottom: "12px" },
+  // Modal
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.4)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modal: {
+    background: "#fff",
+    borderRadius: "12px",
+    padding: "28px",
+    width: "100%",
+    maxWidth: "400px",
     display: "flex",
     flexDirection: "column",
     gap: "12px",
   },
-  sectionTitle: {
-    fontSize: "20px",
-  },
-  label: {
-    fontWeight: "600",
-  },
-  input: {
-    padding: "10px",
-    borderRadius: "8px",
+  modalTitle: { margin: 0, fontSize: "18px" },
+  modalField: { display: "flex", flexDirection: "column", gap: "4px" },
+  modalLabel: { fontSize: "14px", fontWeight: "600" },
+  modalInput: {
+    padding: "8px 10px",
+    borderRadius: "6px",
     border: "1px solid #ccc",
-  },
-  checkboxRow: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-  },
-  helperText: {
     fontSize: "14px",
-    color: "#555",
-    margin: 0,
   },
-  actions: {
+  modalActions: {
     display: "flex",
     justifyContent: "flex-end",
+    gap: "10px",
+    marginTop: "8px",
   },
-  primaryButton: {
-    padding: "10px 16px",
-    borderRadius: "8px",
+  cancelBtn: {
+    padding: "8px 16px",
+    borderRadius: "6px",
+    border: "1px solid #ccc",
+    background: "none",
+    cursor: "pointer",
+  },
+  saveBtn: {
+    padding: "8px 16px",
+    borderRadius: "6px",
+    border: "none",
+    background: "#4f8ef7",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  error: { color: "red", fontSize: "13px", margin: 0 },
+  toggleRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 0",
+  },
+  toggleStatus: { fontSize: "13px", marginLeft: "10px" },
+  toggle: {
+    width: "44px",
+    height: "24px",
+    borderRadius: "999px",
     border: "none",
     cursor: "pointer",
+    position: "relative",
+    flexShrink: 0,
+    transition: "background 0.2s",
   },
-  secondaryButton: {
-    padding: "10px 16px",
-    borderRadius: "8px",
-    border: "1px solid #ccc",
-    cursor: "pointer",
-  },
-  error: {
-    color: "red",
-    fontSize: "14px",
-    margin: 0,
-  },
-  status: {
-    color: "green",
-    fontSize: "14px",
+  toggleKnob: {
+    position: "absolute",
+    top: "3px",
+    left: "3px",
+    width: "18px",
+    height: "18px",
+    borderRadius: "50%",
+    background: "#fff",
+    transition: "transform 0.2s",
+    display: "block",
   },
 };
 

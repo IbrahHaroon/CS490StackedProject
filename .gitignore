@@ -40,3 +40,6 @@ build/
 
 # Logs
 *.log
+
+# Temp repo for manual code sharing
+temprepo/

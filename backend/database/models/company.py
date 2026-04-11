@@ -11,6 +11,7 @@ from database.models.address import create_address
 if TYPE_CHECKING:
     from database.models.address import Address
     from database.models.position import Position
+    from database.models.recruiter import Recruiter
 
 
 class Company(Base):
@@ -27,6 +28,7 @@ class Company(Base):
     # Relationships
     address: Mapped["Address"] = relationship(back_populates="company")
     positions: Mapped[list["Position"]] = relationship(back_populates="company")
+    recruiters: Mapped[list["Recruiter"]] = relationship(back_populates="company")
 
 
 # --------------------------------------------------------------------------- #
@@ -60,3 +62,10 @@ def create_company(
 def get_company(session: Session, company_id: int) -> "Company | None":
     """Return Company object by primary key, or None if not found."""
     return session.get(Company, company_id)
+
+
+def get_all_companies(session: Session) -> list["Company"]:
+    """Return all companies."""
+    from sqlalchemy import select
+
+    return session.execute(select(Company)).scalars().all()

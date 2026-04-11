@@ -2,10 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from database.models.company import create_company, get_company
+from database.models.company import create_company, get_all_companies, get_company
 from schemas import CompanyCreate, CompanyResponse
 
 router = APIRouter()
+
+
+@router.get("/", response_model=list[CompanyResponse])
+def read_all_companies(session: Session = Depends(get_db)):
+    return get_all_companies(session)
 
 
 @router.post("/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)

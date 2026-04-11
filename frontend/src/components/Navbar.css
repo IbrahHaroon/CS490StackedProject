@@ -2,22 +2,49 @@ nav {
   display: flex;
   gap: 1.5rem;
   padding: 1rem 2rem;
-  background-color: #1a1a2e;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 nav a {
-  color: #ccc;
+  color: var(--text-muted);
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
 }
 
 nav a:hover {
-  color: #fff;
+  color: var(--text-strong);
 }
 
 nav a.active {
-  color: #fff;
-  background-color: #16213e;
+  color: var(--text-strong);
+  background-color: var(--surface-2);
   font-weight: bold;
+}
+
+nav a.signin-nav-btn {
+  margin-left: auto;
+  background-color: #4f8ef7;
+  color: #fff;
+}
+
+nav a.signin-nav-btn:hover {
+  background-color: #3a7be0;
+}
+
+.signout-nav-btn {
+  margin-left: auto;
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.signout-nav-btn:hover {
+  color: var(--text-strong);
+  border-color: var(--text-muted);
 }

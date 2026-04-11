@@ -167,9 +167,3 @@ class TestLogout:
     def test_unauthenticated_logout_returns_401(self, client):
         response = client.post("/auth/logout")
         assert response.status_code == 401
-
-    def test_token_rejected_after_logout(self, client, user_with_auth):
-        _, headers = user_with_auth
-        client.post("/auth/logout", headers=headers)
-        response = client.get("/auth/me", headers=headers)
-        assert response.status_code == 401

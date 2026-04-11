@@ -4,11 +4,36 @@
   box-sizing: border-box;
 }
 
+/* ---- Theme variables (dark default) ---- */
+:root {
+  --bg: #0f0f23;
+  --surface: #1a1a2e;
+  --surface-2: #16213e;
+  --surface-3: #2a2a3e;
+  --text: #e0e0e0;
+  --text-muted: #aaa;
+  --text-strong: #ffffff;
+  --border: #333;
+  --border-light: #2a2a3e;
+}
+
+body.light-mode {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --surface-3: #e2e8f0;
+  --text: #1a1a2e;
+  --text-muted: #64748b;
+  --text-strong: #0f0f23;
+  --border: #d1d5db;
+  --border-light: #e5e7eb;
+}
+
 body {
   font-family:
     system-ui,
     -apple-system,
     sans-serif;
-  background-color: #0f0f23;
-  color: #e0e0e0;
+  background-color: var(--bg);
+  color: var(--text);
 }

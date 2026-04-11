@@ -1,0 +1,175 @@
+.career-prefs-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: var(--text);
+}
+
+.career-prefs-title {
+  font-size: 2rem;
+  font-weight: 300;
+  margin-bottom: 0.4rem;
+  color: var(--text-strong);
+}
+
+.career-prefs-subtitle {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.career-prefs-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Form */
+.career-prefs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: var(--surface-3);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.career-prefs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.career-prefs-field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.career-prefs-field input[type="text"] {
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.career-prefs-field input[type="text"]:focus {
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.15);
+}
+
+.career-prefs-field input::placeholder {
+  color: var(--text-muted);
+}
+
+.career-prefs-hint {
+  font-size: 0.77rem;
+  color: var(--text-muted);
+}
+
+/* Work mode radio group */
+.career-prefs-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.career-prefs-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  transition: 0.2s ease;
+}
+
+.career-prefs-radio-label:has(input:checked) {
+  border-color: #4f8ef7;
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.career-prefs-radio-label input[type="radio"] {
+  display: none;
+}
+
+/* Messages */
+.career-prefs-error {
+  color: #ef4444;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.career-prefs-success {
+  color: #22c55e;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+/* Save button */
+.career-prefs-save-btn {
+  align-self: flex-start;
+  padding: 0.65rem 2rem;
+  background: #4f8ef7;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.career-prefs-save-btn:hover:not(:disabled) {
+  background: #3a7be0;
+}
+
+.career-prefs-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Summary card */
+.career-prefs-summary {
+  background: var(--surface-3);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+}
+
+.career-prefs-summary-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 1rem;
+}
+
+.career-prefs-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.career-prefs-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.career-prefs-summary-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.career-prefs-summary-value {
+  font-size: 0.9rem;
+  color: var(--text);
+}

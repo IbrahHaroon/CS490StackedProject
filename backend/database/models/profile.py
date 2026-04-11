@@ -80,6 +80,15 @@ def get_profile(session: Session, profile_id: int) -> "Profile | None":
     return session.get(Profile, profile_id)
 
 
+def get_profile_by_user_id(session: Session, user_id: int) -> "Profile | None":
+    """Return Profile object by user_id, or None if not found."""
+    from sqlalchemy import select
+
+    return session.execute(
+        select(Profile).where(Profile.user_id == user_id)
+    ).scalar_one_or_none()
+
+
 def update_profile(session: Session, updated_profile: "Profile") -> bool:
     """Persist all field changes on an already-loaded Profile object."""
     try:

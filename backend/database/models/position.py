@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from database.models.applied_jobs import AppliedJobs
     from database.models.company import Company
 
+LOCATION_TYPES = ["Remote", "Hybrid", "Onsite"]
+
 
 class Position(Base):
     __tablename__ = "position"
@@ -27,6 +29,8 @@ class Position(Base):
         ForeignKey("company.company_id"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    location_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     salary: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=True)
     education_req: Mapped[str] = mapped_column(String(255), nullable=True)
     experience_req: Mapped[str] = mapped_column(String(255), nullable=True)
@@ -52,11 +56,15 @@ def create_position(
     experience_req: str,
     description: str,
     listing_date: date,
+    location: str | None = None,
+    location_type: str | None = None,
 ) -> "Position":
     """Create a new Position row and return the persisted object."""
     new_position = Position(
         company_id=company_id,
         title=title,
+        location_type=location_type,
+        location=location,
         salary=salary,
         education_req=education_req,
         experience_req=experience_req,
@@ -74,6 +82,13 @@ def get_position(session: Session, position_id: int) -> "Position | None":
     return session.get(Position, position_id)
 
 
+def get_all_positions(session: Session) -> list["Position"]:
+    """Return all positions."""
+    from sqlalchemy import select
+
+    return session.execute(select(Position)).scalars().all()
+
+
 def update_position(session: Session, updated_position: "Position") -> bool:
     """Persist all field changes on an already-loaded Position object."""
     try:
@@ -83,3 +98,13 @@ def update_position(session: Session, updated_position: "Position") -> bool:
     except Exception:
         session.rollback()
         return False
+
+
+def delete_position(session: Session, position_id: int) -> bool:
+    """Delete a position by primary key. Returns True if deleted."""
+    position = get_position(session, position_id)
+    if position is None:
+        return False
+    session.delete(position)
+    session.commit()
+    return True

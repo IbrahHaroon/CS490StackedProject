@@ -3,11 +3,29 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
-from database.models.profile import create_profile, get_profile, update_profile
+from database.models.profile import (
+    create_profile,
+    get_profile,
+    get_profile_by_user_id,
+    update_profile,
+)
 from database.models.user import User
 from schemas import ProfileCreate, ProfileResponse, ProfileUpdate
 
 router = APIRouter()
+
+
+@router.get("/me", response_model=ProfileResponse)
+def get_my_profile(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    profile = get_profile_by_user_id(session, current_user.user_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
+    return profile
 
 
 @router.post("/", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)

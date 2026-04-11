@@ -23,6 +23,10 @@ class JobActivity(Base):
     )
     stage: Mapped[str] = mapped_column(String(50), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    event_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="stage_change"
+    )
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     job: Mapped["AppliedJobs"] = relationship(back_populates="activities")
@@ -37,12 +41,16 @@ def create_job_activity(
     session: Session,
     job_id: int,
     stage: str,
+    event_type: str = "stage_change",
+    notes: str | None = None,
 ) -> "JobActivity":
     """Record a stage change event for a job."""
     activity = JobActivity(
         job_id=job_id,
         stage=stage,
         changed_at=datetime.utcnow(),
+        event_type=event_type,
+        notes=notes,
     )
     session.add(activity)
     session.commit()

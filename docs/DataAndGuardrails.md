@@ -17,11 +17,10 @@ All user-generated or user-related data must belong to a specific authenticated 
 
 Examples of user-owned data include:
 
-* Job applications
-* Saved jobs
-* Notes
-* Resume or cover letter content
-* Dashboard analytics tied to account activity
+* Job applications (`applied_jobs`)
+* Profile, education, experience, skills, career preferences
+* Documents (resumes, cover letters)
+* Interviews, follow-ups, and job activity history
 
 Rules:
 
@@ -104,7 +103,20 @@ Examples of prohibited behavior:
 * The backend must not accept `user_id` from the frontend as proof of ownership.
 * Queries such as `SELECT * FROM applications` without user filtering must not be used for user-specific endpoints.
 
-## 5. Backend Enforcement Rules
+## 5. Recruiter Ownership Rules
+
+Recruiters are users with an additional `recruiter` profile linked to a `company`. Their access rules differ from job seekers:
+
+* A recruiter can only manage positions that belong to their own `company_id`.
+* A recruiter can only view and update applications submitted to their company's positions.
+* Ownership is derived from `get_current_recruiter` — never from frontend-provided IDs.
+* Check order: 404 (resource not found) before 403 (wrong company) — consistent with all other endpoints.
+
+Example:
+* `GET /recruiter/positions/{id}/applications` — valid only if `position.company_id == current_recruiter.company_id`
+* `PUT /recruiter/applications/{job_id}/status` — valid only if the application's position belongs to the recruiter's company
+
+## 6. Backend Enforcement Rules (General)
 
 The backend is the primary enforcement layer for data security.
 
@@ -116,16 +128,15 @@ Rules:
 * Use consistent error responses for unauthorized and forbidden access.
 * Validate request data before processing.
 
-Example secure pattern:
+Example secure pattern (SQLAlchemy 2.x style used in this project):
 
 ```python
-application = db.query(Application).filter(
-    Application.id == application_id,
-    Application.user_id == current_user.id
-).first()
+job = session.get(AppliedJobs, job_id)
+if job is None or job.user_id != current_user.user_id:
+    raise HTTPException(status_code=403, detail="Access denied")
 ```
 
-## 6. Database Guardrails
+## 7. Database Guardrails
 
 The database must support secure ownership and data integrity.
 
@@ -138,10 +149,11 @@ Rules:
 
 Example:
 
-* `applications.user_id` references `users.id`
-* `saved_jobs.user_id` references `users.id`
+* `applied_jobs.user_id` references `user.user_id`
+* `profile.user_id` references `user.user_id`
+* `recruiter.user_id` references `user.user_id` (one-to-one, unique)
 
-## 7. Frontend Guardrails
+## 8. Frontend Guardrails
 
 Frontend safeguards improve user experience but do not replace backend security.
 
@@ -157,17 +169,15 @@ Example:
 * If an API request returns `401`, redirect the user to the login page.
 * If an API request returns `403`, show an access denied message.
 
-## 8. Error Response Conventions
+## 9. Error Response Conventions
 
 Security-related errors should follow consistent API response patterns.
 
-Example unauthorized response:
+Example unauthorized response (FastAPI `HTTPException` format):
 
 ```json
 {
-  "success": false,
-  "error": "Unauthorized",
-  "message": "Authentication is required to access this resource."
+  "detail": "Could not validate credentials"
 }
 ```
 
@@ -175,9 +185,7 @@ Example forbidden response:
 
 ```json
 {
-  "success": false,
-  "error": "Forbidden",
-  "message": "You do not have permission to access this resource."
+  "detail": "Access denied"
 }
 ```
 
@@ -187,7 +195,7 @@ Rules:
 * Use `403 Forbidden` when the user is authenticated but not allowed to access the resource.
 * Do not expose internal stack traces or system details in responses.
 
-## 9. Team Responsibility
+## 10. Team Responsibility
 
 Security is a shared responsibility across the team.
 

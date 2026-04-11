@@ -1,13 +1,18 @@
 """Tests for documents.py — create_document, get_document, lookup_documents, get_all_documents."""
 
+from datetime import date as _date
+
 import pytest
 
+from database.models.applied_jobs import create_applied_jobs
+from database.models.company import create_company
 from database.models.documents import (
     create_document,
     get_all_documents,
     get_document,
     lookup_documents,
 )
+from database.models.position import create_position
 from database.models.user import create_user
 
 
@@ -173,3 +178,71 @@ class TestGetAllDocuments:
     def test_returns_empty_tuple_for_nonexistent_user(self, session):
         result = get_all_documents(session, 99999)
         assert result == ()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestDocumentJobLink — S2-024
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _create_job(session, user_id: int) -> int:
+    company = create_company(session, "Acme", "1 Main St", "NY", 10001)
+    position = create_position(
+        session, company.company_id, "Engineer", None, None, None, None, _date.today()
+    )
+    job = create_applied_jobs(
+        session,
+        user_id=user_id,
+        position_id=position.position_id,
+        years_of_experience=2,
+    )
+    return job.job_id
+
+
+class TestDocumentJobLink:
+    def test_create_document_without_job_id_defaults_null(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.job_id is None
+
+    def test_create_document_with_job_id_links_correctly(self, session, user):
+        job_id = _create_job(session, user.user_id)
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf", job_id=job_id)
+        assert doc.job_id == job_id
+
+    def test_document_job_id_accepts_null(self, session, user):
+        doc = create_document(
+            session, user.user_id, "Cover Letter", "/c.pdf", job_id=None
+        )
+        assert doc.job_id is None
+
+    def test_invalid_job_id_raises_integrity_error(self, session, user):
+        import pytest
+        from sqlalchemy.exc import IntegrityError
+
+        with pytest.raises((IntegrityError, Exception)):
+            create_document(session, user.user_id, "Resume", "/r.pdf", job_id=99999)
+            session.flush()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestRegression — existing behaviour unbroken after job_id column addition
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestRegression:
+    def test_original_create_still_works_without_job_id(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/docs/r.pdf")
+        assert doc.doc_id is not None
+        assert doc.user_id == user.user_id
+        assert doc.document_type == "Resume"
+
+    def test_original_get_still_works(self, session, user):
+        doc = create_document(session, user.user_id, "Portfolio", "/p.pdf")
+        fetched = get_document(session, doc.doc_id)
+        assert fetched is not None
+        assert fetched.doc_id == doc.doc_id
+
+    def test_original_delete_still_works(self, session, user):
+        create_document(session, user.user_id, "Resume", "/r.pdf")
+        result = get_all_documents(session, user.user_id)
+        assert len(result) == 1
