@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Date, ForeignKey, Integer, Numeric, Sequence, String
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -29,8 +29,8 @@ class Position(Base):
         ForeignKey("company.company_id"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    location_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    location_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     salary: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=True)
     education_req: Mapped[str] = mapped_column(String(255), nullable=True)
     experience_req: Mapped[str] = mapped_column(String(255), nullable=True)
