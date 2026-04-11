@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -22,7 +22,7 @@ class FollowUp(Base):
         ForeignKey("applied_jobs.job_id"), nullable=False
     )
     description: Mapped[str] = mapped_column(String(500), nullable=False)
-    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Relationships

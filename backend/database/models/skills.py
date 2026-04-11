@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -17,8 +17,8 @@ class Skills(Base):
     skill_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    proficiency: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    proficiency: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships

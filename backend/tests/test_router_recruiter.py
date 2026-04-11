@@ -20,6 +20,7 @@ POSITION_PAYLOAD_BASE = {
 
 
 def _register_and_login(client, email, password="testpass123"):
+    """Register and log in a regular job-seeker user. Returns (user_id, headers)."""
     reg = client.post(
         f"{AUTH_URL}/register", json={"email": email, "password": password}
     )
@@ -36,20 +37,29 @@ def _create_company(client):
     return res.json()
 
 
-def _create_recruiter_with_auth(client, email="rec@example.com"):
-    user_id, headers = _register_and_login(client, email)
+def _create_recruiter_with_auth(
+    client, email="rec@example.com", password="testpass123"
+):
+    """Register and log in a recruiter. Returns (recruiter_id, company_id, headers)."""
     company = _create_company(client)
-    rec_res = client.post(
-        f"{RECRUITER_URL}/",
+    reg = client.post(
+        f"{AUTH_URL}/recruiter/register",
         json={
-            "user_id": user_id,
+            "email": email,
+            "password": password,
             "company_id": company["company_id"],
             "first_name": "Jane",
             "last_name": "Doe",
         },
-        headers=headers,
     )
-    return rec_res.json()["recruiter_id"], company["company_id"], headers
+    recruiter_id = reg.json()["recruiter_id"]
+    login = client.post(
+        f"{AUTH_URL}/recruiter/login",
+        data={"username": email, "password": password},
+    )
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    return recruiter_id, company["company_id"], headers
 
 
 def _create_position(client, company_id, headers):
@@ -65,48 +75,45 @@ def _create_position(client, company_id, headers):
 
 class TestCreateRecruiterProfile:
     def test_returns_201_on_success(self, client):
-        user_id, headers = _register_and_login(client, "newrec@example.com")
         company = _create_company(client)
         res = client.post(
-            f"{RECRUITER_URL}/",
+            f"{AUTH_URL}/recruiter/register",
             json={
-                "user_id": user_id,
+                "email": "newrec@example.com",
+                "password": "testpass123",
                 "company_id": company["company_id"],
                 "first_name": "Jane",
                 "last_name": "Doe",
             },
-            headers=headers,
         )
         assert res.status_code == 201
 
     def test_response_contains_recruiter_id(self, client):
-        user_id, headers = _register_and_login(client, "newrecid@example.com")
         company = _create_company(client)
         res = client.post(
-            f"{RECRUITER_URL}/",
+            f"{AUTH_URL}/recruiter/register",
             json={
-                "user_id": user_id,
+                "email": "newrecid@example.com",
+                "password": "testpass123",
                 "company_id": company["company_id"],
                 "first_name": "Jane",
                 "last_name": "Doe",
             },
-            headers=headers,
         )
         assert "recruiter_id" in res.json()
 
     def test_fields_stored_correctly(self, client):
-        user_id, headers = _register_and_login(client, "recfields@example.com")
         company = _create_company(client)
         res = client.post(
-            f"{RECRUITER_URL}/",
+            f"{AUTH_URL}/recruiter/register",
             json={
-                "user_id": user_id,
+                "email": "recfields@example.com",
+                "password": "testpass123",
                 "company_id": company["company_id"],
                 "first_name": "Alice",
                 "last_name": "Smith",
                 "job_title": "Recruiter",
             },
-            headers=headers,
         )
         data = res.json()
         assert data["first_name"] == "Alice"
@@ -114,49 +121,24 @@ class TestCreateRecruiterProfile:
         assert data["job_title"] == "Recruiter"
 
     def test_returns_400_on_duplicate(self, client):
-        rec_id, company_id, headers = _create_recruiter_with_auth(
-            client, "dup@example.com"
-        )
-        user_id = client.get(f"{AUTH_URL}/me", headers=headers).json()["user_id"]
-        res = client.post(
-            f"{RECRUITER_URL}/",
-            json={
-                "user_id": user_id,
-                "company_id": company_id,
-                "first_name": "Jane",
-                "last_name": "Doe",
-            },
-            headers=headers,
-        )
+        company = _create_company(client)
+        payload = {
+            "email": "dup@example.com",
+            "password": "testpass123",
+            "company_id": company["company_id"],
+            "first_name": "Jane",
+            "last_name": "Doe",
+        }
+        client.post(f"{AUTH_URL}/recruiter/register", json=payload)
+        res = client.post(f"{AUTH_URL}/recruiter/register", json=payload)
         assert res.status_code == 400
 
-    def test_returns_403_for_wrong_user_id(self, client):
-        user_id, headers = _register_and_login(client, "wronguid@example.com")
-        company = _create_company(client)
+    def test_missing_required_field_returns_422(self, client):
         res = client.post(
-            f"{RECRUITER_URL}/",
-            json={
-                "user_id": 99999,
-                "company_id": company["company_id"],
-                "first_name": "Jane",
-                "last_name": "Doe",
-            },
-            headers=headers,
+            f"{AUTH_URL}/recruiter/register",
+            json={"email": "missing@example.com"},
         )
-        assert res.status_code == 403
-
-    def test_returns_401_unauthenticated(self, client):
-        company = _create_company(client)
-        res = client.post(
-            f"{RECRUITER_URL}/",
-            json={
-                "user_id": 1,
-                "company_id": company["company_id"],
-                "first_name": "Jane",
-                "last_name": "Doe",
-            },
-        )
-        assert res.status_code == 401
+        assert res.status_code == 422
 
 
 # --------------------------------------------------------------------------- #
@@ -183,10 +165,10 @@ class TestGetRecruiterMe:
         res = client.get(f"{RECRUITER_URL}/me")
         assert res.status_code == 401
 
-    def test_returns_403_for_non_recruiter_user(self, client):
+    def test_returns_401_for_non_recruiter_user(self, client):
         _, headers = _register_and_login(client, "norec@example.com")
         res = client.get(f"{RECRUITER_URL}/me", headers=headers)
-        assert res.status_code == 403
+        assert res.status_code == 401
 
 
 # --------------------------------------------------------------------------- #
@@ -319,10 +301,7 @@ class TestRecruiterPositions:
 
 class TestRecruiterApplications:
     def _setup_application(self, client):
-        """Create a recruiter, a position, a job seeker, and an application.
-
-        Returns (job_id, position_id, rec_headers, company_id, seeker_headers).
-        """
+        """Create a recruiter, a position, a job seeker, and an application."""
         rec_id, company_id, rec_headers = _create_recruiter_with_auth(
             client, "appRec@example.com"
         )
@@ -336,6 +315,7 @@ class TestRecruiterApplications:
                 "position_id": pos["position_id"],
                 "years_of_experience": 2,
             },
+            headers=seeker_headers,
         )
         apps = client.get(
             f"{RECRUITER_URL}/positions/{pos['position_id']}/applications",
@@ -386,7 +366,6 @@ class TestRecruiterApplications:
             json={"application_status": "Interview"},
             headers=rec_headers,
         )
-        # Activity endpoint enforces job seeker ownership — use seeker headers
         activity = client.get(
             f"{JOBS_URL}/applications/{job_id}/activity",
             headers=seeker_headers,
@@ -433,6 +412,7 @@ class TestRecruiterActivity:
                 "position_id": pos["position_id"],
                 "years_of_experience": 1,
             },
+            headers=seeker_headers,
         )
         apps = client.get(
             f"{RECRUITER_URL}/positions/{pos['position_id']}/applications",
@@ -460,7 +440,6 @@ class TestRecruiterActivity:
             json={"event_type": "note", "notes": "Reviewed resume."},
             headers=rec_headers,
         )
-        # Activity endpoint enforces job seeker ownership — use seeker headers
         activity = client.get(
             f"{JOBS_URL}/applications/{job_id}/activity",
             headers=seeker_headers,
@@ -477,7 +456,7 @@ class TestRecruiterActivity:
             json={"event_type": "note"},
             headers=rec_headers,
         )
-        assert res.json()["stage"] == "Interested"
+        assert res.json()["stage"] == "Applied"
 
     def test_add_activity_403_cross_company(self, client):
         job_id, _, _, _ = self._setup_application(

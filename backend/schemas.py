@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -42,6 +44,26 @@ class UserResponse(BaseModel):
 
     user_id: int
     email: str
+
+
+class RecruiterRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
+
+
+class RecruiterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    recruiter_id: int
+    email: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -241,28 +263,9 @@ class CompanyResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-class RecruiterCreate(BaseModel):
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
-    job_title: str | None = None
-
-
 class RecruiterUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    job_title: str | None = None
-
-
-class RecruiterResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    recruiter_id: int
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
     job_title: str | None = None
 
 

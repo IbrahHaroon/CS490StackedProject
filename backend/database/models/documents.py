@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Integer, Sequence, String, Text, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -22,17 +22,17 @@ class Documents(Base):
         autoincrement=True,
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
-    job_id: Mapped[int | None] = mapped_column(
+    job_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("applied_jobs.job_id"), nullable=True
     )
-    document_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     document_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    document_location: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")
-    job: Mapped["AppliedJobs | None"] = relationship(back_populates="documents")
+    job: Mapped["Optional[AppliedJobs]"] = relationship(back_populates="documents")
 
 
 # --------------------------------------------------------------------------- #
@@ -93,3 +93,30 @@ def get_all_documents(session: Session, user_id: int) -> tuple["Documents", ...]
         .all()
     )
     return tuple(rows)
+
+
+def update_document(
+    session: Session, doc_id: int, content: str | None = None
+) -> "Documents | None":
+    """Update document content. Returns updated document or None if not found."""
+    document = get_document(session, doc_id)
+    if document is None:
+        return None
+
+    if content is not None:
+        document.content = content
+
+    session.commit()
+    session.refresh(document)
+    return document
+
+
+def delete_document(session: Session, doc_id: int) -> bool:
+    """Delete a document by ID. Returns True if deleted, False if not found."""
+    document = get_document(session, doc_id)
+    if document is None:
+        return False
+
+    session.delete(document)
+    session.commit()
+    return True

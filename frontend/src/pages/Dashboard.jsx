@@ -54,6 +54,7 @@ function Dashboard() {
   const [applyTarget, setApplyTarget] = useState(null);
   const [applySuccess, setApplySuccess] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const jobBoardRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,29 +62,33 @@ function Dashboard() {
 
   useEffect(() => {
     const fetchAll = async () => {
-      // Positions are public — no auth needed
-      const posRes = await fetch(`${API}/jobs/positions/`);
-      if (posRes.ok) {
-        const data = await posRes.json();
-        setJobs(data);
-        if (data.length > 0) setSelectedJob(data[0]);
-      }
+      try {
+        // Positions are public — no auth needed
+        const posRes = await fetch(`${API}/jobs/positions/`);
+        if (posRes.ok) {
+          const data = await posRes.json();
+          setJobs(data);
+          if (data.length > 0) setSelectedJob(data[0]);
+        }
 
-      // Applications and documents require auth
-      if (token) {
-        const [appRes, docRes] = await Promise.all([
-          fetch(`${API}/jobs/dashboard`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API}/documents/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-        if (appRes.ok) setApplications(await appRes.json());
-        if (docRes.ok) setDocuments(await docRes.json());
+        // Applications and documents require auth
+        if (token) {
+          const [appRes, docRes] = await Promise.all([
+            fetch(`${API}/jobs/dashboard`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API}/documents/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+          if (appRes.ok) setApplications(await appRes.json());
+          if (docRes.ok) setDocuments(await docRes.json());
+        }
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
     fetchAll();
   }, [location.pathname, token]);
@@ -123,6 +128,18 @@ function Dashboard() {
     if (appRes.ok) setApplications(await appRes.json());
     return null;
   };
+
+  const filteredJobs = searchQuery.trim()
+    ? jobs.filter((job) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          job.title?.toLowerCase().includes(q) ||
+          job.company_name?.toLowerCase().includes(q) ||
+          job.location?.toLowerCase().includes(q) ||
+          job.location_type?.toLowerCase().includes(q)
+        );
+      })
+    : jobs;
 
   const scrollToJobBoard = () => {
     jobBoardRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -219,7 +236,9 @@ function Dashboard() {
                     {doc.document_type}
                   </span>
                   <span className="preview-job-title">
-                    {doc.document_location.split("/").pop()}
+                    {doc.document_location
+                      ? doc.document_location.split("/").pop()
+                      : doc.document_name || "Unnamed document"}
                   </span>
                 </div>
               ))
@@ -229,15 +248,26 @@ function Dashboard() {
       </div>
 
       {/* Full job board */}
+      <div className="job-board-search-row">
+        <input
+          className="job-board-search"
+          type="text"
+          placeholder="Search by title, company, or location…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
       <div className="job-board" ref={jobBoardRef}>
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <p style={{ color: "#888", padding: "1rem" }}>
-            No job listings available.
+            {jobs.length === 0
+              ? "No job listings available."
+              : "No jobs match your search."}
           </p>
         ) : (
           <>
             <div className="job-board-list">
-              {jobs.map((job) => (
+              {filteredJobs.map((job) => (
                 <div
                   key={job.position_id}
                   className={`job-card ${
@@ -297,16 +327,26 @@ function Dashboard() {
                     <p>{selectedJob.experience_req}</p>
                   </div>
                 )}
-                {token &&
-                  (applications.some(
-                    (a) =>
-                      a.position_id === selectedJob.position_id &&
-                      a.application_status !== "Withdrawn"
-                  ) ? (
-                    <button className="apply-btn apply-btn-applied" disabled>
-                      Already Applied
-                    </button>
-                  ) : (
+                {token && (
+                  <div
+                    style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
+                  >
+                    {applications.some(
+                      (a) =>
+                        a.position_id === selectedJob.position_id &&
+                        a.application_status !== "Withdrawn"
+                    ) ? (
+                      <button className="apply-btn apply-btn-applied" disabled>
+                        Already Applied
+                      </button>
+                    ) : (
+                      <button
+                        className="apply-btn"
+                        onClick={() => setApplyTarget(selectedJob)}
+                      >
+                        Apply Now
+                      </button>
+                    )}
                     <button
                       className="apply-btn"
                       style={{ backgroundColor: "#6c757d" }}
@@ -316,7 +356,8 @@ function Dashboard() {
                     >
                       Edit Posting
                     </button>
-                  ))}
+                  </div>
+                )}
                 {!token && (
                   <button
                     className="apply-btn"

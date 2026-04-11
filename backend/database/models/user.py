@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from database.models.education import Education
     from database.models.experience import Experience
     from database.models.profile import Profile
-    from database.models.recruiter import Recruiter
     from database.models.skills import Skills
 
 
@@ -35,10 +34,7 @@ class User(Base):
     applied_jobs: Mapped[list["AppliedJobs"]] = relationship(back_populates="user")
     experiences: Mapped[list["Experience"]] = relationship(back_populates="user")
     skills: Mapped[list["Skills"]] = relationship(back_populates="user")
-    career_preferences: Mapped["CareerPreferences | None"] = relationship(
-        back_populates="user", uselist=False
-    )
-    recruiter: Mapped["Recruiter | None"] = relationship(
+    career_preferences: Mapped["Optional[CareerPreferences]"] = relationship(
         back_populates="user", uselist=False
     )
 

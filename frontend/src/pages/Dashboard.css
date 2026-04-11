@@ -91,6 +91,32 @@
   font-style: italic;
 }
 
+/* ---- Job Board Search ---- */
+.job-board-search-row {
+  margin-bottom: 1rem;
+}
+
+.job-board-search {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.job-board-search:focus {
+  border-color: #5a5aff;
+}
+
+.job-board-search::placeholder {
+  color: var(--text-muted);
+}
+
 /* ---- Job Board ---- */
 .job-board {
   display: grid;
