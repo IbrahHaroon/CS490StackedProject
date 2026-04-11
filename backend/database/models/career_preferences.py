@@ -21,7 +21,9 @@ class CareerPreferences(Base):
         ForeignKey("user.user_id"), nullable=False, unique=True
     )
     target_roles: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    location_preferences: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    location_preferences: Mapped[Optional[str]] = mapped_column(
+        String(500), nullable=True
+    )
     work_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     salary_preference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
