@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, Sequence, String, Text, func, select
@@ -93,3 +94,15 @@ def get_all_documents(session: Session, user_id: int) -> tuple["Documents", ...]
         .all()
     )
     return tuple(rows)
+
+
+def delete_document(session: Session, doc_id: int, user_id: int) -> bool:
+    """Delete a document owned by user_id. Returns True if deleted, False if not found."""
+    doc = session.get(Documents, doc_id)
+    if doc is None or doc.user_id != user_id:
+        return False
+    if doc.document_location and os.path.isfile(doc.document_location):
+        os.remove(doc.document_location)
+    session.delete(doc)
+    session.commit()
+    return True

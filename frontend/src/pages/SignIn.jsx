@@ -33,64 +33,94 @@ function SignIn() {
     setError("");
     setSuccess("");
 
-    if (mode === "signup") {
-      // 1. Register
-      const regRes = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    try {
+      if (mode === "signup") {
+        // 1. Register
+        const regRes = await fetch(`${API}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
 
-      if (!regRes.ok) {
-        const err = await regRes.json().catch(() => ({}));
-        setError(err.detail || "Registration failed.");
+        if (!regRes.ok) {
+          const err = await regRes.json().catch(() => ({}));
+          setError(err.detail || "Registration failed.");
+          return;
+        }
+
+        const newUser = await regRes.json();
+
+        // 2. Login to get token
+        const form = new URLSearchParams();
+        form.append("username", email);
+        form.append("password", password);
+        const loginRes = await fetch(`${API}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        });
+
+        if (!loginRes.ok) {
+          setError("Account created but login failed. Please sign in manually.");
+          return;
+        }
+
+        const loginData = await loginRes.json();
+        const token = loginData.access_token;
+
+        // 3. Create profile
+        const profileRes = await fetch(`${API}/profile/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            user_id: newUser.user_id,
+            first_name: signup.firstName,
+            last_name: signup.lastName,
+            dob: signup.dob,
+            address: {
+              address: signup.address,
+              state: signup.state,
+              zip_code: parseInt(signup.zipCode, 10),
+            },
+          }),
+        });
+
+        if (!profileRes.ok) {
+          const err = await profileRes.json().catch(() => ({}));
+          setError(err.detail || "Account created but profile setup failed.");
+          return;
+        }
+
+        setSuccess("Account created! Signing you in…");
+        localStorage.setItem("token", token);
+        navigate("/");
         return;
       }
 
-      const newUser = await regRes.json();
-
-      // 2. Login to get token
+      // Sign in
       const form = new URLSearchParams();
       form.append("username", email);
       form.append("password", password);
-      const loginRes = await fetch(`${API}/auth/login`, {
+
+      const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
       });
-      const loginData = await loginRes.json();
-      const token = loginData.access_token;
 
-      // 3. Create profile
-      const profileRes = await fetch(`${API}/profile/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user_id: newUser.user_id,
-          first_name: signup.firstName,
-          last_name: signup.lastName,
-          dob: signup.dob,
-          address: {
-            address: signup.address,
-            state: signup.state,
-            zip_code: parseInt(signup.zipCode, 10),
-          },
-        }),
-      });
-
-      if (!profileRes.ok) {
-        const err = await profileRes.json().catch(() => ({}));
-        setError(err.detail || "Account created but profile setup failed.");
+      if (!res.ok) {
+        setError("Invalid email or password.");
         return;
       }
 
-      setSuccess("Account created! Signing you in…");
-      localStorage.setItem("token", token);
+      const data = await res.json();
+      localStorage.setItem("token", data.access_token);
       navigate("/");
-      return;
+    } catch (err) {
+      setError("Cannot reach the server. Make sure the backend is running.");
     }
 
     // Sign in

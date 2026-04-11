@@ -221,8 +221,6 @@ def delete_application(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    # Record withdrawal in history before deleting (delete_applied_job will
-    # then purge job_activity rows to satisfy the FK constraint)
     create_job_activity(session, job_id, "Withdrawn")
     delete_applied_job(session, job_id)
 

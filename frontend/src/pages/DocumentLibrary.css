@@ -102,3 +102,95 @@
   font-size: 0.85rem;
   font-weight: 600;
 }
+
+.doclibrary-delete-btn {
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #ef444466;
+  background: transparent;
+  color: #ef4444;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.doclibrary-delete-btn:hover {
+  background-color: #ef444415;
+}
+
+/* Confirmation modal */
+.doclibrary-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.doclibrary-modal {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.doclibrary-modal-title {
+  color: var(--text-strong);
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.doclibrary-modal-body {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.doclibrary-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.doclibrary-modal-cancel {
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.doclibrary-modal-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doclibrary-modal-confirm {
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.15s;
+}
+
+.doclibrary-modal-confirm:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.doclibrary-modal-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -25,46 +25,21 @@ const STATUS_COLOR = {
   Withdrawn: "#374151",
 };
 
-const MOCK_APPLICATIONS = [
-  {
-    job_id: 101,
-    position_id: 1,
-    application_status: "Applied",
-    application_date: "2026-04-01",
-    years_of_experience: 1,
-  },
-  {
-    job_id: 102,
-    position_id: 2,
-    application_status: "Interview",
-    application_date: "2026-04-03",
-    years_of_experience: 2,
-  },
-  {
-    job_id: 103,
-    position_id: 3,
-    application_status: "Offer",
-    application_date: "2026-04-05",
-    years_of_experience: 1,
-  },
-  {
-    job_id: 104,
-    position_id: 4,
-    application_status: "Rejected",
-    application_date: "2026-04-02",
-    years_of_experience: 3,
-  },
-];
-
-const MOCK_POSITIONS = {
-  1: { title: "Frontend Developer Intern", company_name: "Google" },
-  2: { title: "Software Engineer Intern", company_name: "Microsoft" },
-  3: { title: "UX Engineer Intern", company_name: "Spotify" },
-  4: { title: "Product Analyst Intern", company_name: "Amazon" },
-};
+function timeAgo(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  return "just now";
+}
 
 function Pipeline({ current }) {
-  const isTerminal = current === "Rejected" || current === "Archived";
+  const isTerminal =
+    current === "Rejected" || current === "Archived" || current === "Withdrawn";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
   const currentIdx = active.indexOf(current);
 
@@ -96,9 +71,7 @@ function Pipeline({ current }) {
             className="pipeline-dot pipeline-dot-active"
             style={{ backgroundColor: STATUS_COLOR[current] }}
           />
-          <span className="pipeline-label pipeline-label-active">
-            {current}
-          </span>
+          <span className="pipeline-label pipeline-label-active">{current}</span>
         </div>
       )}
     </div>
@@ -141,18 +114,12 @@ function ApplicationCard({ app, position, onRemove }) {
       setExpanded((v) => !v);
       return;
     }
-
     try {
       const res = await fetch(
         `${API}/jobs/applications/${app.job_id}/activity`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
-
-      if (res.ok) {
-        setActivity(await res.json());
-      }
+      if (res.ok) setActivity(await res.json());
     } catch (err) {
       console.error("Failed to load activity:", err);
     }
@@ -162,13 +129,10 @@ function ApplicationCard({ app, position, onRemove }) {
   };
 
   const generateCoverLetter = async () => {
-    try {
-      setIsGenerating(true);
-
-      const title = position?.title || "this role";
-      const company = position?.company_name || "your company";
-
-      const generated = `Dear Hiring Manager,
+    setIsGenerating(true);
+    const title = position?.title || "this role";
+    const company = position?.company_name || "your company";
+    const generated = `Dear Hiring Manager,
 
 I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
 
@@ -176,15 +140,11 @@ Through my previous work and projects, I have developed relevant technical and p
 
 I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
 
-`;
-
-      setCoverLetter(generated);
-      setShowCoverLetter(true);
-    } catch (err) {
-      console.error("Failed to generate cover letter:", err);
-    } finally {
-      setIsGenerating(false);
-    }
+Sincerely,
+[Your Name]`;
+    setCoverLetter(generated);
+    setShowCoverLetter(true);
+    setIsGenerating(false);
   };
 
   const copyToClipboard = () => {
@@ -303,6 +263,7 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
   };
 
   const title = position?.title || `Position #${app.position_id}`;
+  const company = position?.company_name || "";
 
   return (
     <div
@@ -310,27 +271,34 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
       style={{
         border:
           app.application_status === "Interview"
-            ? "2px solid orange"
+            ? "2px solid #f59e0b"
             : app.application_status === "Offer"
-              ? "2px solid green"
-              : "1px solid #333",
+              ? "2px solid #22c55e"
+              : "1px solid var(--border-light)",
         boxShadow:
           app.application_status === "Offer"
-            ? "0 0 12px rgba(40,167,69,0.7)"
+            ? "0 0 12px rgba(34,197,94,0.25)"
             : app.application_status === "Interview"
-              ? "0 0 8px rgba(255,165,0,0.5)"
+              ? "0 0 8px rgba(245,158,11,0.25)"
               : "none",
-        transition: "0.2s ease-in-out",
       }}
     >
       <div className="app-card-header">
         <div className="app-card-info">
           <h3 className="app-card-title">{title}</h3>
+          {company && (
+            <span className="app-card-meta app-card-company">{company}</span>
+          )}
           <span className="app-card-meta">Applied {app.application_date}</span>
           <span className="app-card-meta">
             {app.years_of_experience} yr
             {app.years_of_experience !== 1 ? "s" : ""} experience
           </span>
+          {stageChangedLabel && (
+            <span className="app-card-meta app-card-stage-time">
+              Stage updated {stageChangedLabel}
+            </span>
+          )}
         </div>
 
         <div className="app-card-right">
@@ -339,7 +307,7 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
           <button className="app-secondary-btn" onClick={generateCoverLetter}>
-            {isGenerating ? "Generating..." : "Generate Cover Letter"}
+            {isGenerating ? "Generating…" : "Generate Cover Letter"}
           </button>
           <button className="app-remove-btn" onClick={onRemove}>
             Remove
@@ -585,7 +553,6 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
               </button>
             </div>
           </div>
-
           <textarea
             className="cover-letter-textarea"
             value={coverLetter}
@@ -648,28 +615,16 @@ function Applications() {
         });
 
         if (!res.ok) {
-          setApplications(MOCK_APPLICATIONS);
-          setPositions(MOCK_POSITIONS);
-          setError("");
+          setError("Failed to load applications. Please sign in.");
           setLoading(false);
           return;
         }
 
         const apps = await res.json();
-
-        if (!apps || apps.length === 0) {
-          setApplications(MOCK_APPLICATIONS);
-          setPositions(MOCK_POSITIONS);
-          setError("");
-          setLoading(false);
-          return;
-        }
-
         setApplications(apps);
 
         const uniqueIds = [...new Set(apps.map((a) => a.position_id))];
         const posMap = {};
-
         await Promise.all(
           uniqueIds.map(async (id) => {
             const r = await fetch(`${API}/jobs/positions/${id}`, {
@@ -678,17 +633,13 @@ function Applications() {
             if (r.ok) posMap[id] = await r.json();
           })
         );
-
         setPositions(posMap);
         setLoading(false);
       } catch (err) {
-        setApplications(MOCK_APPLICATIONS);
-        setPositions(MOCK_POSITIONS);
-        setError("");
+        setError("Failed to load applications.");
         setLoading(false);
       }
     };
-
     load();
   }, [token]);
 
@@ -700,19 +651,18 @@ function Applications() {
 
     const positionTitle = positions[a.position_id]?.title || "";
     const companyName = positions[a.position_id]?.company_name || "";
-    const query = search.toLowerCase().trim();
-
+    const q = search.toLowerCase().trim();
     const matchesSearch =
-      query === "" ||
-      positionTitle.toLowerCase().includes(query) ||
-      companyName.toLowerCase().includes(query);
+      !q ||
+      positionTitle.toLowerCase().includes(q) ||
+      companyName.toLowerCase().includes(q);
 
     return matchesStage && matchesSearch;
   });
 
-  const handleDeleteApplication = async () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-
+    setIsDeleting(true);
     try {
       setIsDeleting(true);
       await fetch(`${API}/jobs/applications/${deleteTarget.job_id}`, {
@@ -722,11 +672,11 @@ function Applications() {
       setApplications((prev) =>
         prev.filter((a) => a.job_id !== deleteTarget.job_id)
       );
-      setDeleteTarget(null);
     } catch (err) {
       console.error("Failed to delete application:", err);
     } finally {
       setIsDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -734,7 +684,7 @@ function Applications() {
     <div className="applications-page">
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
-        title="Delete this application?"
+        title="Remove this application?"
         message={
           deleteTarget
             ? `Are you sure you want to remove the ${
@@ -743,7 +693,7 @@ function Applications() {
             : ""
         }
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteApplication}
+        onConfirm={confirmDelete}
         isDeleting={isDeleting}
       />
 
@@ -757,12 +707,11 @@ function Applications() {
             <div className="app-search-row">
               <input
                 type="text"
-                placeholder="Search jobs..."
+                placeholder="Search by title or company…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="app-search"
               />
-
               <button
                 type="button"
                 className="app-clear-btn"

@@ -7,6 +7,7 @@ import Profile from "./pages/Profile.jsx";
 import DocumentLibrary from "./pages/DocumentLibrary.jsx";
 import Settings from "./pages/Settings.jsx";
 import Applications from "./pages/Applications.jsx";
+import CareerPreferences from "./pages/CareerPreferences.jsx";
 import JobForm from "./pages/JobForm";
 import SignIn from "./pages/SignIn";
 import "./App.css";
@@ -70,6 +71,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Applications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/career-preferences"
+            element={
+              <ProtectedRoute>
+                <CareerPreferences />
               </ProtectedRoute>
             }
           />

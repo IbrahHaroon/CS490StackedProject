@@ -19,6 +19,9 @@ function DocumentLibrary() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [confirmDoc, setConfirmDoc] = useState(null); // doc to delete
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -61,24 +64,70 @@ function DocumentLibrary() {
     form.append("document_type", docType);
 
     setUploading(true);
-    const res = await fetch(`${API}/documents/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    setUploading(false);
+    try {
+      const res = await fetch(`${API}/documents/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setUploadError(err.detail || "Upload failed.");
-      return;
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        window.location.href = "/signin";
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err.detail || `Upload failed (${res.status}).`);
+        return;
+      }
+
+      setUploadSuccess("File uploaded successfully.");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      fetchDocuments();
+    } catch (err) {
+      setUploadError("Cannot reach the server. Make sure the backend is running.");
+    } finally {
+      setUploading(false);
     }
-
-    setUploadSuccess("File uploaded successfully.");
-    setFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    fetchDocuments();
   };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDoc) return;
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API}/documents/${confirmDoc.doc_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        window.location.href = "/signin";
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.detail || "Failed to delete document.");
+        return;
+      }
+
+      setConfirmDoc(null);
+      fetchDocuments();
+    } catch (err) {
+      setDeleteError("Cannot reach the server.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const docName = (doc) =>
+    doc.document_name ||
+    (doc.document_location ? doc.document_location.split("/").pop() : "Unnamed");
 
   return (
     <div className="doclibrary">
@@ -132,15 +181,24 @@ function DocumentLibrary() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {documents.map((doc) => (
                 <tr key={doc.doc_id}>
-                  <td>{doc.document_location.split("/").pop()}</td>
+                  <td>{docName(doc)}</td>
                   <td>{doc.document_type}</td>
                   <td>
                     <span className="doclibrary-confirmed">✓ In System</span>
+                  </td>
+                  <td>
+                    <button
+                      className="doclibrary-delete-btn"
+                      onClick={() => { setDeleteError(""); setConfirmDoc(doc); }}
+                    >
+                      Remove
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -148,6 +206,35 @@ function DocumentLibrary() {
           </table>
         )}
       </section>
+
+      {confirmDoc && (
+        <div className="doclibrary-overlay">
+          <div className="doclibrary-modal">
+            <h3 className="doclibrary-modal-title">Remove Document</h3>
+            <p className="doclibrary-modal-body">
+              Are you sure you want to remove <strong>{docName(confirmDoc)}</strong>? This
+              cannot be undone.
+            </p>
+            {deleteError && <p className="doclibrary-error">{deleteError}</p>}
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-modal-cancel"
+                onClick={() => setConfirmDoc(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="doclibrary-modal-confirm"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting ? "Removing…" : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

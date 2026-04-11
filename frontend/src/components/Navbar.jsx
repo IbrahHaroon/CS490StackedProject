@@ -28,10 +28,6 @@ export function MyAppNav() {
             Document Library
           </NavLink>
 
-          <NavLink to="/settings" end>
-            Settings
-          </NavLink>
-
           <NavLink to="/applications" end>
             Applications
           </NavLink>

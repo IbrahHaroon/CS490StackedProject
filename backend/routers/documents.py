@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
-from database.models.documents import create_document, get_all_documents, get_document
+from database.models.documents import create_document, delete_document, get_all_documents, get_document
 from database.models.profile import get_profile_by_user_id
 from database.models.user import User
 from schemas import DocumentCreate, DocumentResponse
@@ -100,3 +100,14 @@ def read_document(doc_id: int, session: Session = Depends(get_db)):
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_document(
+    doc_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    deleted = delete_document(session, doc_id, current_user.user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found")
