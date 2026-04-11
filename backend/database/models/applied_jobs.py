@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     Date,
@@ -57,9 +57,9 @@ class AppliedJobs(Base):
         String(50), nullable=False, default="Interested"
     )
     stage_changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
-    recruiter_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    outcome_notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    recruiter_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    outcome_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="applied_jobs")

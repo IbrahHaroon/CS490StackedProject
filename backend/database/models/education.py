@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Date, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -27,10 +27,10 @@ class Education(Base):
     highest_education: Mapped[str] = mapped_column(String(100), nullable=False)
     degree: Mapped[str] = mapped_column(String(100), nullable=False)
     school_or_college: Mapped[str] = mapped_column(String(255), nullable=False)
-    field_of_study: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    gpa: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    field_of_study: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    gpa: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="educations")

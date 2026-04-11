@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -26,7 +26,7 @@ class JobActivity(Base):
     event_type: Mapped[str] = mapped_column(
         String(50), nullable=False, default="stage_change"
     )
-    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     job: Mapped["AppliedJobs"] = relationship(back_populates="activities")
