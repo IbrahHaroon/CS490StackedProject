@@ -626,9 +626,13 @@ function Profile() {
               <li key={f.label} style={styles.missingItem}>
                 {f.label} —{" "}
                 <span style={{ color: "#888" }}>
-                  {f.label === "Resume"
-                    ? "upload via Document Library"
-                    : "update above"}
+                  {f.label === "Resume" ? (
+                    <a href="/documents" style={{ color: "#4f8ef7" }}>
+                      upload via Document Library
+                    </a>
+                  ) : (
+                    "update above"
+                  )}
                 </span>
               </li>
             ))}

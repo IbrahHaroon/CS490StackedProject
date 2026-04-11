@@ -456,7 +456,7 @@ class TestRecruiterActivity:
             json={"event_type": "note"},
             headers=rec_headers,
         )
-        assert res.json()["stage"] == "Interested"
+        assert res.json()["stage"] == "Applied"
 
     def test_add_activity_403_cross_company(self, client):
         job_id, _, _, _ = self._setup_application(

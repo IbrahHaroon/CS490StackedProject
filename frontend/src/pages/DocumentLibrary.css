@@ -103,26 +103,55 @@
   font-weight: 600;
 }
 
-.doclibrary-delete-btn {
-  padding: 0.3rem 0.75rem;
+.doclibrary-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.doclibrary-action-btn {
+  padding: 0.4rem 0.8rem;
+  border: none;
   border-radius: 4px;
-  border: 1px solid #ef444466;
-  background: transparent;
-  color: #ef4444;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: background-color 0.2s ease;
+}
+
+.doclibrary-view-btn {
+  background-color: #4f8ef7;
+  color: #fff;
+}
+
+.doclibrary-view-btn:hover {
+  background-color: #3a7be0;
+}
+
+.doclibrary-edit-btn {
+  background-color: #ff9800;
+  color: #fff;
+}
+
+.doclibrary-edit-btn:hover {
+  background-color: #e68900;
+}
+
+.doclibrary-delete-btn {
+  background-color: #ff6b6b;
+  color: #fff;
 }
 
 .doclibrary-delete-btn:hover {
-  background-color: #ef444415;
+  background-color: #ff5252;
 }
 
-/* Confirmation modal */
-.doclibrary-overlay {
+/* Modal Overlay */
+.doclibrary-modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -130,67 +159,126 @@
 }
 
 .doclibrary-modal {
-  background: var(--surface);
-  border-radius: 10px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 380px;
+  background-color: var(--surface);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.doclibrary-modal-title {
-  color: var(--text-strong);
-  font-size: 1.15rem;
+.doclibrary-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.doclibrary-modal-header h2 {
   margin: 0;
+  font-size: 1.3rem;
 }
 
-.doclibrary-modal-body {
+.doclibrary-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doclibrary-modal-close:hover {
+  color: var(--text);
+}
+
+.doclibrary-editor {
+  flex: 1;
+  padding: 1.5rem;
+  border: none;
+  resize: vertical;
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 0.95rem;
+  background-color: var(--surface-2);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.doclibrary-viewer {
+  flex: 1;
+  padding: 1.5rem;
+  border: none;
+  overflow-y: auto;
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
+.doclibrary-viewer pre {
   margin: 0;
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
   line-height: 1.5;
 }
 
 .doclibrary-modal-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 0.75rem;
-  margin-top: 0.25rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
 }
 
-.doclibrary-modal-cancel {
-  padding: 0.55rem 1.1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.doclibrary-modal-cancel:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.doclibrary-modal-confirm {
-  padding: 0.55rem 1.1rem;
-  border-radius: 6px;
+.doclibrary-save-btn,
+.doclibrary-cancel-btn {
+  padding: 0.6rem 1.2rem;
   border: none;
-  background: #ef4444;
-  color: #fff;
+  border-radius: 4px;
+  font-size: 0.95rem;
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.15s;
+  transition: background-color 0.2s ease;
 }
 
-.doclibrary-modal-confirm:hover:not(:disabled) {
-  background-color: #dc2626;
+.doclibrary-save-btn {
+  background-color: #4caf50;
+  color: #fff;
 }
 
-.doclibrary-modal-confirm:disabled {
+.doclibrary-save-btn:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.doclibrary-save-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.doclibrary-cancel-btn {
+  background-color: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.doclibrary-cancel-btn:hover {
+  background-color: var(--surface-2);
+}
+
+.doclibrary-close-btn {
+  background-color: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.6rem 1.2rem;
+}
+
+.doclibrary-close-btn:hover {
+  background-color: var(--surface-2);
 }
