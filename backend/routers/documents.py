@@ -58,6 +58,56 @@ def _write_docx_content(file_path: str, content: str) -> None:
         raise ValueError(f"Failed to write DOCX content: {str(e)}")
 
 
+def _write_pdf_content(file_path: str, content: str) -> None:
+    """
+    Write text content to a PDF file.
+    Creates a new PDF with the edited text content as plain text pages.
+    """
+    try:
+        from io import BytesIO
+
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+        # Create document in memory
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=72,
+        )
+
+        # Build content
+        story = []
+        styles = getSampleStyleSheet()
+
+        # Add the edited text as paragraphs
+        for line in content.split("\n"):
+            if line.strip():
+                p = Paragraph(line, styles["Normal"])
+                story.append(p)
+                story.append(Spacer(1, 0.12 * inch))
+
+        # Build PDF
+        doc.build(story)
+
+        # Write to file
+        buffer.seek(0)
+        with open(file_path, "wb") as f:
+            f.write(buffer.read())
+    except ImportError:
+        raise ValueError(
+            "reportlab library not available. PDF editing requires reportlab package."
+        )
+    except Exception as e:
+        raise ValueError(f"Failed to write PDF content: {str(e)}")
+
+
 def _update_file_content(file_path: str, filename: str, content: str) -> None:
     """Update file content based on file extension."""
     ext = os.path.splitext(filename)[1].lower()
@@ -68,10 +118,7 @@ def _update_file_content(file_path: str, filename: str, content: str) -> None:
     elif ext == ".docx":
         _write_docx_content(file_path, content)
     elif ext == ".pdf":
-        # PDF editing not supported - text extraction only
-        raise ValueError(
-            "PDF editing via text extraction not yet implemented. Please use DOCX or TXT."
-        )
+        _write_pdf_content(file_path, content)
     else:
         raise ValueError(f"Unsupported file type for editing: {ext}")
 
@@ -92,7 +139,7 @@ def _get_file_content_and_format(file_path: str, filename: str) -> dict:
             "content": text_content,
             "format": "pdf",
             "binary_data": pdf_base64,
-            "editable": False,  # PDF viewing only for now
+            "editable": True,
         }
     elif ext == ".docx":
         text_content = _extract_docx_content(file_path)

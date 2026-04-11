@@ -145,7 +145,7 @@ function DocumentLibrary() {
       const data = await res.json();
       if (!data.editable) {
         setEditError(
-          `Cannot edit this file format. Only text-based files (.txt, .md, .docx) can be edited.`
+          `Cannot edit this file format. Only text-based files (.txt, .md, .docx, .pdf) can be edited.`
         );
         return;
       }
