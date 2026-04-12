@@ -95,20 +95,44 @@
 }
 
 /* Stage-specific accent colors */
-.metrics-stage-interested { border-left: 3px solid #888; }
-.metrics-stage-applied    { border-left: 3px solid #4f8ef7; }
-.metrics-stage-interview  { border-left: 3px solid #f59e0b; }
-.metrics-stage-offer      { border-left: 3px solid #10b981; }
-.metrics-stage-rejected   { border-left: 3px solid #ef4444; }
-.metrics-stage-archived   { border-left: 3px solid #6b7280; }
-.metrics-stage-withdrawn  { border-left: 3px solid #9ca3af; }
+.metrics-stage-interested {
+  border-left: 3px solid #888;
+}
+.metrics-stage-applied {
+  border-left: 3px solid #4f8ef7;
+}
+.metrics-stage-interview {
+  border-left: 3px solid #f59e0b;
+}
+.metrics-stage-offer {
+  border-left: 3px solid #10b981;
+}
+.metrics-stage-rejected {
+  border-left: 3px solid #ef4444;
+}
+.metrics-stage-archived {
+  border-left: 3px solid #6b7280;
+}
+.metrics-stage-withdrawn {
+  border-left: 3px solid #9ca3af;
+}
 
 /* Outcome-specific accent colors */
-.metrics-outcome-applied   { border-left: 3px solid #4f8ef7; }
-.metrics-outcome-rejected  { border-left: 3px solid #ef4444; }
-.metrics-outcome-offer     { border-left: 3px solid #10b981; }
-.metrics-outcome-accepted  { border-left: 3px solid #059669; }
-.metrics-outcome-withdrawn { border-left: 3px solid #9ca3af; }
+.metrics-outcome-applied {
+  border-left: 3px solid #4f8ef7;
+}
+.metrics-outcome-rejected {
+  border-left: 3px solid #ef4444;
+}
+.metrics-outcome-offer {
+  border-left: 3px solid #10b981;
+}
+.metrics-outcome-accepted {
+  border-left: 3px solid #059669;
+}
+.metrics-outcome-withdrawn {
+  border-left: 3px solid #9ca3af;
+}
 
 /* ---- Preview Cards Grid ---- */
 .dashboard-preview-grid {

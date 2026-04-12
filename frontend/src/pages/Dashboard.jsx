@@ -173,39 +173,49 @@ function Dashboard() {
         <div className="metrics-section">
           <div className="metrics-summary">
             <div className="metrics-stat">
-              <span className="metrics-stat-value">{metrics.total_applications}</span>
+              <span className="metrics-stat-value">
+                {metrics.total_applications}
+              </span>
               <span className="metrics-stat-label">Total Applications</span>
             </div>
             <div className="metrics-stat">
-              <span className="metrics-stat-value">{metrics.response_rate}%</span>
+              <span className="metrics-stat-value">
+                {metrics.response_rate}%
+              </span>
               <span className="metrics-stat-label">Response Rate</span>
             </div>
             <div className="metrics-stat">
               <span className="metrics-stat-value">
-                {metrics.outcome_counts["Offer"] + metrics.outcome_counts["Accepted"]}
+                {metrics.outcome_counts["Offer"] +
+                  metrics.outcome_counts["Accepted"]}
               </span>
               <span className="metrics-stat-label">Offers</span>
             </div>
             <div className="metrics-stat">
-              <span className="metrics-stat-value">{metrics.stage_counts["Interview"] ?? 0}</span>
+              <span className="metrics-stat-value">
+                {metrics.stage_counts["Interview"] ?? 0}
+              </span>
               <span className="metrics-stat-label">In Interview</span>
             </div>
           </div>
 
           {Object.values(metrics.stage_counts).some((v) => v > 0) && (
-          <div className="metrics-stages">
-            <h3 className="metrics-heading">Pipeline Stages</h3>
-            <div className="metrics-stage-grid">
-              {Object.entries(metrics.stage_counts)
-                .filter(([, count]) => count > 0)
-                .map(([stage, count]) => (
-                  <div key={stage} className={`metrics-stage-badge metrics-stage-${stage.toLowerCase()}`}>
-                    <span className="metrics-stage-count">{count}</span>
-                    <span className="metrics-stage-name">{stage}</span>
-                  </div>
-                ))}
+            <div className="metrics-stages">
+              <h3 className="metrics-heading">Pipeline Stages</h3>
+              <div className="metrics-stage-grid">
+                {Object.entries(metrics.stage_counts)
+                  .filter(([, count]) => count > 0)
+                  .map(([stage, count]) => (
+                    <div
+                      key={stage}
+                      className={`metrics-stage-badge metrics-stage-${stage.toLowerCase()}`}
+                    >
+                      <span className="metrics-stage-count">{count}</span>
+                      <span className="metrics-stage-name">{stage}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
-          </div>
           )}
 
           {Object.values(metrics.outcome_counts).some((v) => v > 0) && (
@@ -215,7 +225,10 @@ function Dashboard() {
                 {Object.entries(metrics.outcome_counts)
                   .filter(([, count]) => count > 0)
                   .map(([state, count]) => (
-                    <div key={state} className={`metrics-stage-badge metrics-outcome-${state.toLowerCase()}`}>
+                    <div
+                      key={state}
+                      className={`metrics-stage-badge metrics-outcome-${state.toLowerCase()}`}
+                    >
                       <span className="metrics-stage-count">{count}</span>
                       <span className="metrics-stage-name">{state}</span>
                     </div>
