@@ -212,9 +212,13 @@ def get_dashboard_metrics(session: Session, user_id: int) -> dict:
             outcome_counts[outcome.outcome_state] += 1
 
     applications_with_response = sum(
-        1 for job in jobs if job.application_status in ("Interview", "Offer", "Rejected")
+        1
+        for job in jobs
+        if job.application_status in ("Interview", "Offer", "Rejected")
     )
-    response_rate = round((applications_with_response / total * 100), 1) if total else 0.0
+    response_rate = (
+        round((applications_with_response / total * 100), 1) if total else 0.0
+    )
 
     return {
         "total_applications": total,
