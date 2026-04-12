@@ -54,6 +54,7 @@ function Dashboard() {
   const [applyTarget, setApplyTarget] = useState(null);
   const [applySuccess, setApplySuccess] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const jobBoardRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -127,6 +128,18 @@ function Dashboard() {
     if (appRes.ok) setApplications(await appRes.json());
     return null;
   };
+
+  const filteredJobs = searchQuery.trim()
+    ? jobs.filter((job) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          job.title?.toLowerCase().includes(q) ||
+          job.company_name?.toLowerCase().includes(q) ||
+          job.location?.toLowerCase().includes(q) ||
+          job.location_type?.toLowerCase().includes(q)
+        );
+      })
+    : jobs;
 
   const scrollToJobBoard = () => {
     jobBoardRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -235,15 +248,26 @@ function Dashboard() {
       </div>
 
       {/* Full job board */}
+      <div className="job-board-search-row">
+        <input
+          className="job-board-search"
+          type="text"
+          placeholder="Search by title, company, or location…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
       <div className="job-board" ref={jobBoardRef}>
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <p style={{ color: "#888", padding: "1rem" }}>
-            No job listings available.
+            {jobs.length === 0
+              ? "No job listings available."
+              : "No jobs match your search."}
           </p>
         ) : (
           <>
             <div className="job-board-list">
-              {jobs.map((job) => (
+              {filteredJobs.map((job) => (
                 <div
                   key={job.position_id}
                   className={`job-card ${
