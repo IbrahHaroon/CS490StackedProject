@@ -7,7 +7,6 @@ from database.models.skills import (
     delete_skill,
     get_skill,
     get_skills_by_user,
-    update_skill,
 )
 from schemas import SkillCreate, SkillResponse, SkillUpdate
 
