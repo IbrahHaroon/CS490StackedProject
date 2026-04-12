@@ -914,7 +914,10 @@ function Profile() {
               value={careerPrefs.location_preferences}
             />
             <InfoRow label="Work Mode" value={careerPrefs.work_mode} />
-            <InfoRow label="Salary" value={careerPrefs.salary_preference} />
+            <InfoRow
+              label="Salary"
+              value={formatSalary(careerPrefs.salary_preference)}
+            />
           </div>
         ) : (
           <p style={styles.emptyText}>No preferences set yet.</p>
@@ -1158,6 +1161,14 @@ function Profile() {
         isDeleting={isDeleting}
       />
     </div>
+  );
+}
+
+function formatSalary(value) {
+  if (!value) return value;
+  // Replace any plain integer-like number in the string with formatted currency
+  return value.replace(/\d+/g, (n) =>
+    Number(n) >= 1000 ? "$" + Number(n).toLocaleString("en-US") : n
   );
 }
 
