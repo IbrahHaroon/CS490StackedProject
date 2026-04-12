@@ -423,6 +423,37 @@ function Profile() {
     }
   };
 
+  const moveSkill = async (index, direction) => {
+    const swapIndex = index + direction;
+    if (swapIndex < 0 || swapIndex >= skills.length) return;
+    const a = skills[index];
+    const b = skills[swapIndex];
+    await Promise.all([
+      fetch(`${API}/skills/${a.skill_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sort_order: b.sort_order }),
+      }),
+      fetch(`${API}/skills/${b.skill_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sort_order: a.sort_order }),
+      }),
+    ]);
+    setSkills((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...a, sort_order: b.sort_order };
+      updated[swapIndex] = { ...b, sort_order: a.sort_order };
+      return updated.sort((x, y) => x.sort_order - y.sort_order);
+    });
+  };
+
   // ── Career Preferences ─────────────────────────────────────────────────────
 
   const saveCareerPrefs = async (values) => {
@@ -800,14 +831,42 @@ function Profile() {
         {skills.length === 0 ? (
           <p style={styles.emptyText}>No skills added yet.</p>
         ) : (
-          skills.map((skill) => (
+          skills.map((skill, index) => (
             <div key={skill.skill_id} style={styles.itemRow}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "6px",
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  style={styles.reorderBtn}
+                  onClick={() => moveSkill(index, -1)}
+                  disabled={index === 0}
+                  title="Move up"
+                >
+                  ↑
+                </button>
+                <button
+                  style={styles.reorderBtn}
+                  onClick={() => moveSkill(index, 1)}
+                  disabled={index === skills.length - 1}
+                  title="Move down"
+                >
+                  ↓
+                </button>
+              </div>
               <div style={styles.itemInfo}>
-                <p style={styles.itemPrimary}>
-                  {skill.name}
-                  {skill.category ? ` · ${skill.category}` : ""}
-                  {skill.proficiency ? ` · ${skill.proficiency}` : ""}
-                </p>
+                <p style={styles.itemPrimary}>{skill.name}</p>
+                {(skill.category || skill.proficiency) && (
+                  <p style={styles.itemSecondary}>
+                    {[skill.category, skill.proficiency]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
               </div>
               <div style={styles.itemActions}>
                 <button
@@ -1000,14 +1059,32 @@ function Profile() {
             {
               name: "category",
               label: "Category (optional)",
+              type: "select",
               value: activeRecord?.category || "",
-              placeholder: "e.g. Backend, Frontend",
+              placeholder: "— Select a category —",
+              options: [
+                "Technical Skills",
+                "Soft Skills",
+                "Programming Languages",
+                "Frameworks & Libraries",
+                "Tools & Platforms",
+                "Data & Analytics",
+                "Design",
+                "Marketing",
+                "Finance",
+                "Management & Leadership",
+                "Communication",
+                "Languages (spoken)",
+                "Other",
+              ],
             },
             {
               name: "proficiency",
               label: "Proficiency (optional)",
+              type: "select",
               value: activeRecord?.proficiency || "",
-              placeholder: "e.g. Advanced, Intermediate",
+              placeholder: "— Select proficiency —",
+              options: ["Beginner", "Intermediate", "Advanced", "Expert"],
             },
           ]}
           onSave={saveSkill}

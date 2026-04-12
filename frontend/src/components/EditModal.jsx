@@ -51,6 +51,20 @@ function EditModal({ title, fields, onSave, onCancel }) {
                 }}
                 placeholder={f.placeholder || ""}
               />
+            ) : f.type === "select" ? (
+              <select
+                name={f.name}
+                value={values[f.name]}
+                onChange={handleChange}
+                style={styles.modalInput}
+              >
+                {f.placeholder && <option value="">{f.placeholder}</option>}
+                {(f.options || []).map((opt) => (
+                  <option key={opt.value ?? opt} value={opt.value ?? opt}>
+                    {opt.label ?? opt}
+                  </option>
+                ))}
+              </select>
             ) : (
               <input
                 type={f.type || "text"}

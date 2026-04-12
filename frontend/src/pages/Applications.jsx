@@ -310,12 +310,7 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
             : app.application_status === "Offer"
               ? "2px solid green"
               : "1px solid #333",
-        boxShadow:
-          app.application_status === "Offer"
-            ? "0 0 12px rgba(40,167,69,0.7)"
-            : app.application_status === "Interview"
-              ? "0 0 8px rgba(255,165,0,0.5)"
-              : "none",
+        boxShadow: "none",
         transition: "0.2s ease-in-out",
       }}
     >

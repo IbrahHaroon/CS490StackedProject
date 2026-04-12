@@ -45,16 +45,13 @@ def update_skill_endpoint(
     body: SkillUpdate,
     session: Session = Depends(get_db),
 ):
-    skill = update_skill(
-        session,
-        skill_id=skill_id,
-        name=body.name,
-        category=body.category,
-        proficiency=body.proficiency,
-        sort_order=body.sort_order,
-    )
+    skill = get_skill(session, skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(skill, field, value)
+    session.commit()
+    session.refresh(skill)
     return skill
 
 
