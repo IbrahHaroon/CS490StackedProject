@@ -6,9 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Resolve the project root (two levels up from this file: database/ -> backend/ -> root)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 _ROOT_ENV = os.path.join(_PROJECT_ROOT, ".env")
-_BACKEND_ENV = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+_BACKEND_ENV = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
+)
 
 
 class Settings(BaseSettings):
@@ -26,7 +30,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
 
     # Load root .env first, then backend .env — later files override earlier ones
-    model_config = SettingsConfigDict(env_file=[_ROOT_ENV, _BACKEND_ENV], extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=[_ROOT_ENV, _BACKEND_ENV], extra="ignore"
+    )
 
 
 @lru_cache()

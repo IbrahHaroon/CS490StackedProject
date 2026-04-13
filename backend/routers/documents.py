@@ -393,8 +393,9 @@ def generate_resume_from_profile(
     current_user: User = Depends(get_current_user),
 ):
     """Generate a tailored resume draft using OpenAI from the user's profile and optional job context."""
-    import openai
     from datetime import date as date_class
+
+    import openai
 
     from database.models.education import get_educations_by_user
     from database.models.experience import get_experiences_by_user
@@ -487,7 +488,9 @@ def generate_resume_from_profile(
         "- Use plain text suitable for saving as a .txt file"
     )
 
-    user_message = f"Generate a professional resume from this profile:\n\n{profile_text}"
+    user_message = (
+        f"Generate a professional resume from this profile:\n\n{profile_text}"
+    )
     if job_context:
         user_message += f"\n\n{job_context}"
     if instructions:
@@ -545,8 +548,9 @@ def generate_cover_letter(
     current_user: User = Depends(get_current_user),
 ):
     """Generate a tailored cover letter using OpenAI from the user's profile and job context."""
-    import openai
     from datetime import date as date_class
+
+    import openai
 
     from database.models.experience import get_experiences_by_user
     from database.models.skills import get_skills_by_user
@@ -631,7 +635,9 @@ def generate_cover_letter(
     if job_context:
         user_message += f"\n\n{job_context}"
     else:
-        user_message += "\n\nNote: No specific job was provided — write a general cover letter."
+        user_message += (
+            "\n\nNote: No specific job was provided — write a general cover letter."
+        )
     if instructions:
         user_message += f"\n\nAdditional instructions: {instructions}"
 
