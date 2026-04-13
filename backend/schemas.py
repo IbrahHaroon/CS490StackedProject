@@ -516,6 +516,18 @@ class SkillResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+#  Dashboard Metrics                                                            #
+# --------------------------------------------------------------------------- #
+
+
+class DashboardMetricsResponse(BaseModel):
+    total_applications: int
+    stage_counts: dict[str, int]
+    outcome_counts: dict[str, int]
+    response_rate: float  # % of applications that have an outcome recorded
+
+
+# --------------------------------------------------------------------------- #
 #  Career Preferences                                                           #
 # --------------------------------------------------------------------------- #
 

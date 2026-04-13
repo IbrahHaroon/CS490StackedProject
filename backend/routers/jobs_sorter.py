@@ -3,15 +3,25 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
+from database.models.applied_jobs import get_dashboard_metrics
 from database.models.user import User
 from database.services.job_sorter import (
     SortField,
     SortOrder,
     get_sorted_jobs,
 )
-from schemas import ApplicationResponse
+from schemas import ApplicationResponse, DashboardMetricsResponse
 
 router = APIRouter()
+
+
+@router.get("/metrics", response_model=DashboardMetricsResponse)
+def get_metrics(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return stage counts, outcome counts, and response rate for the current user."""
+    return get_dashboard_metrics(session, current_user.user_id)
 
 
 @router.get("/dashboard/sorted", response_model=list[ApplicationResponse])

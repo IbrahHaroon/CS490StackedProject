@@ -11,6 +11,129 @@
   color: var(--text-strong);
 }
 
+/* ---- Metrics Section ---- */
+.metrics-section {
+  background-color: var(--surface-3);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.metrics-summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.metrics-stat {
+  flex: 1;
+  min-width: 100px;
+  background-color: var(--surface-2);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metrics-stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1;
+}
+
+.metrics-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.metrics-heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.metrics-stage-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.metrics-stage-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  min-width: 64px;
+  background-color: var(--surface-2);
+}
+
+.metrics-stage-count {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1;
+}
+
+.metrics-stage-name {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Stage-specific accent colors */
+.metrics-stage-interested {
+  border-left: 3px solid #888;
+}
+.metrics-stage-applied {
+  border-left: 3px solid #4f8ef7;
+}
+.metrics-stage-interview {
+  border-left: 3px solid #f59e0b;
+}
+.metrics-stage-offer {
+  border-left: 3px solid #10b981;
+}
+.metrics-stage-rejected {
+  border-left: 3px solid #ef4444;
+}
+.metrics-stage-archived {
+  border-left: 3px solid #6b7280;
+}
+.metrics-stage-withdrawn {
+  border-left: 3px solid #9ca3af;
+}
+
+/* Outcome-specific accent colors */
+.metrics-outcome-applied {
+  border-left: 3px solid #4f8ef7;
+}
+.metrics-outcome-rejected {
+  border-left: 3px solid #ef4444;
+}
+.metrics-outcome-offer {
+  border-left: 3px solid #10b981;
+}
+.metrics-outcome-accepted {
+  border-left: 3px solid #059669;
+}
+.metrics-outcome-withdrawn {
+  border-left: 3px solid #9ca3af;
+}
+
 /* ---- Preview Cards Grid ---- */
 .dashboard-preview-grid {
   display: grid;

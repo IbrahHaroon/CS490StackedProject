@@ -130,6 +130,7 @@ function Dashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [applications, setApplications] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applyTarget, setApplyTarget] = useState(null);
   const [applySuccess, setApplySuccess] = useState("");
@@ -164,17 +165,22 @@ function Dashboard() {
           if (data.length > 0) setSelectedJob(data[0]);
         }
 
+        // Applications, documents, and metrics require auth
         if (token) {
-          const [appRes, docRes] = await Promise.all([
+          const [appRes, docRes, metricsRes] = await Promise.all([
             fetch(`${API}/jobs/dashboard`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
             fetch(`${API}/documents/me`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
+            fetch(`${API}/dashboard/metrics`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
           if (appRes.ok) setApplications(await appRes.json());
           if (docRes.ok) setDocuments(await docRes.json());
+          if (metricsRes.ok) setMetrics(await metricsRes.json());
         }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -646,6 +652,76 @@ function Dashboard() {
 
       <h1 className="dashboard-welcome">Welcome</h1>
       {applySuccess && <p className="apply-success-msg">{applySuccess}</p>}
+
+      {token && metrics && (
+        <div className="metrics-section">
+          <div className="metrics-summary">
+            <div className="metrics-stat">
+              <span className="metrics-stat-value">
+                {metrics.total_applications}
+              </span>
+              <span className="metrics-stat-label">Total Applications</span>
+            </div>
+            <div className="metrics-stat">
+              <span className="metrics-stat-value">
+                {metrics.response_rate}%
+              </span>
+              <span className="metrics-stat-label">Response Rate</span>
+            </div>
+            <div className="metrics-stat">
+              <span className="metrics-stat-value">
+                {metrics.outcome_counts["Offer"] +
+                  metrics.outcome_counts["Accepted"]}
+              </span>
+              <span className="metrics-stat-label">Offers</span>
+            </div>
+            <div className="metrics-stat">
+              <span className="metrics-stat-value">
+                {metrics.stage_counts["Interview"] ?? 0}
+              </span>
+              <span className="metrics-stat-label">In Interview</span>
+            </div>
+          </div>
+
+          {Object.values(metrics.stage_counts).some((v) => v > 0) && (
+            <div className="metrics-stages">
+              <h3 className="metrics-heading">Pipeline Stages</h3>
+              <div className="metrics-stage-grid">
+                {Object.entries(metrics.stage_counts)
+                  .filter(([, count]) => count > 0)
+                  .map(([stage, count]) => (
+                    <div
+                      key={stage}
+                      className={`metrics-stage-badge metrics-stage-${stage.toLowerCase()}`}
+                    >
+                      <span className="metrics-stage-count">{count}</span>
+                      <span className="metrics-stage-name">{stage}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {Object.values(metrics.outcome_counts).some((v) => v > 0) && (
+            <div className="metrics-outcomes">
+              <h3 className="metrics-heading">Outcomes</h3>
+              <div className="metrics-stage-grid">
+                {Object.entries(metrics.outcome_counts)
+                  .filter(([, count]) => count > 0)
+                  .map(([state, count]) => (
+                    <div
+                      key={state}
+                      className={`metrics-stage-badge metrics-outcome-${state.toLowerCase()}`}
+                    >
+                      <span className="metrics-stage-count">{count}</span>
+                      <span className="metrics-stage-name">{state}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="dashboard-preview-grid">
         <div className="preview-card preview-card-jobs">

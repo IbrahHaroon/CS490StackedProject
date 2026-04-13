@@ -183,3 +183,46 @@ def get_all_applied_jobs(session: Session, user_id: int) -> tuple["AppliedJobs",
         .all()
     )
     return tuple(rows)
+
+
+def get_dashboard_metrics(session: Session, user_id: int) -> dict:
+    """Return stage counts, outcome counts, and response rate for a user."""
+    from database.models.outcome import OUTCOME_STATES, Outcome
+
+    jobs = get_all_applied_jobs(session, user_id)
+    total = len(jobs)
+
+    stage_counts = {stage: 0 for stage in PIPELINE_STAGES}
+    for job in jobs:
+        if job.application_status in stage_counts:
+            stage_counts[job.application_status] += 1
+
+    job_ids = [job.job_id for job in jobs]
+    outcome_rows = (
+        session.execute(select(Outcome).where(Outcome.job_id.in_(job_ids)))
+        .scalars()
+        .all()
+        if job_ids
+        else []
+    )
+
+    outcome_counts = {state: 0 for state in OUTCOME_STATES}
+    for outcome in outcome_rows:
+        if outcome.outcome_state in outcome_counts:
+            outcome_counts[outcome.outcome_state] += 1
+
+    applications_with_response = sum(
+        1
+        for job in jobs
+        if job.application_status in ("Interview", "Offer", "Rejected")
+    )
+    response_rate = (
+        round((applications_with_response / total * 100), 1) if total else 0.0
+    )
+
+    return {
+        "total_applications": total,
+        "stage_counts": stage_counts,
+        "outcome_counts": outcome_counts,
+        "response_rate": response_rate,
+    }
