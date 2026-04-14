@@ -12,7 +12,7 @@ A full-stack Applicant Tracking System built for CS490. Users can register, log 
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL |
 | Auth | JWT (Bearer tokens) + bcrypt |
-| Email | Gmail SMTP (password reset) |
+| AI | OpenAI API |
 
 ---
 
@@ -64,12 +64,7 @@ A full-stack Applicant Tracking System built for CS490. Users can register, log 
    SECRET_KEY=<your_secret_key>
    ALGORITHM=HS256
    ACCESS_TOKEN_EXPIRE_MINUTES=30
-   GEMINI_API_KEY=<your_gemini_api_key>
-
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=your_gmail@gmail.com
-   SMTP_PASSWORD=your_gmail_app_password
+   OPENAI_API_KEY=sk-...your-key...
    FRONTEND_URL=http://localhost:3000
    ```
 
@@ -117,39 +112,6 @@ A full-stack Applicant Tracking System built for CS490. Users can register, log 
 
 ---
 
-## Password Reset (SMTP Setup)
-
-Password reset emails are sent via Gmail SMTP. Each developer needs their own Gmail App Password in their local `.env`. The `.env` file is gitignored — never commit it.
-
-### Step 1 — Enable 2-Step Verification on your Google account
-
-1. Go to [myaccount.google.com](https://myaccount.google.com)
-2. Click **Security** in the left sidebar
-3. Under "How you sign in to Google", click **2-Step Verification**
-4. Follow the prompts to turn it on (required before App Passwords are available)
-
-### Step 2 — Generate a Gmail App Password
-
-1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-   - Or navigate: **Security → 2-Step Verification → scroll down to App passwords**
-2. Sign in again if prompted
-3. Under "App name", type something like `490Project SMTP`
-4. Click **Create**
-5. Google shows a **16-character password** — copy it immediately, it won't be shown again
-
-### Step 3 — Add your credentials to `backend/.env`
-
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_gmail@gmail.com
-SMTP_PASSWORD=xxxx xxxx xxxx xxxx
-```
-
-> Spaces in the App Password are fine — Gmail ignores them.
-
----
-
 ## Running Tests
 
 ```bash
@@ -167,9 +129,5 @@ pytest
 | `SECRET_KEY` | JWT signing secret |
 | `ALGORITHM` | JWT algorithm (default `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime in minutes |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `SMTP_HOST` | SMTP server (default `smtp.gmail.com`) |
-| `SMTP_PORT` | SMTP port (default `587`) |
-| `SMTP_USER` | Gmail address to send from |
-| `SMTP_PASSWORD` | Gmail App Password |
-| `FRONTEND_URL` | Frontend base URL for reset links |
+| `OPENAI_API_KEY` | OpenAI API key for resume/cover letter generation |
+| `FRONTEND_URL` | Frontend base URL for redirects |
