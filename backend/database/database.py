@@ -51,9 +51,11 @@ engine_kwargs = {"echo": True}
 if "postgresql" in sync_url:
     engine_kwargs.update(
         {
-            "pool_size": 20,  # Base pool connections
-            "max_overflow": 10,  # Extra connections when pool exhausted
-            "pool_pre_ping": True,  # Test connections before using
+            # Supabase Session Mode restricts client connections, so keep the pool very small.
+            "pool_size": 1,
+            "max_overflow": 0,
+            "pool_timeout": 30,
+            "pool_pre_ping": True,
         }
     )
 
