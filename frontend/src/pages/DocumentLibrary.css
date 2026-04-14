@@ -567,3 +567,14 @@
   word-wrap: break-word;
   line-height: 1.5;
 }
+
+.doclibrary-linked-job {
+  color: #a78bfa;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.doclibrary-unlinked {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.82rem;
+}

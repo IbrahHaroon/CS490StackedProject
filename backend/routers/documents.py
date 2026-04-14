@@ -486,6 +486,7 @@ def generate_resume_from_profile(
     job_id = body.get("job_id")
     position_id = body.get("position_id")
     resolved_job_id = None  # for linking the saved document
+    job_label = ""  # used in the document name
 
     if job_id:
         from database.models.applied_jobs import get_applied_jobs
@@ -494,12 +495,31 @@ def generate_resume_from_profile(
         if applied_job and applied_job.user_id == current_user.user_id:
             job_context = _build_position_context(applied_job.position)
             resolved_job_id = job_id
+            company_name = (
+                applied_job.position.company.name if applied_job.position.company else ""
+            )
+            job_label = (
+                f" - {applied_job.position.title} @ {company_name}"
+                if company_name
+                else f" - {applied_job.position.title}"
+            )
     elif position_id:
+        from database.models.applied_jobs import get_applied_job_by_position
         from database.models.position import get_position
 
         pos = get_position(session, position_id)
         if pos:
             job_context = _build_position_context(pos)
+            company_name = pos.company.name if pos.company else ""
+            job_label = (
+                f" - {pos.title} @ {company_name}" if company_name else f" - {pos.title}"
+            )
+            # Link to an existing application for this position if one exists
+            existing_app = get_applied_job_by_position(
+                session, current_user.user_id, position_id
+            )
+            if existing_app:
+                resolved_job_id = existing_app.job_id
 
     settings = get_settings()
     api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
@@ -560,7 +580,7 @@ def generate_resume_from_profile(
             detail=f"Resume generation failed: {str(e)}",
         )
 
-    doc_name = f"AI Resume Draft - {date_class.today().strftime('%Y-%m-%d')}.txt"
+    doc_name = f"AI Resume{job_label} - {date_class.today().strftime('%Y-%m-%d')}.txt"
     new_doc = create_document(
         session,
         current_user.user_id,
@@ -628,6 +648,7 @@ def generate_cover_letter(
     job_id = body.get("job_id")
     position_id = body.get("position_id")
     resolved_job_id = None
+    job_label = ""  # used in the document name
 
     if job_id:
         from database.models.applied_jobs import get_applied_jobs
@@ -636,12 +657,31 @@ def generate_cover_letter(
         if applied_job and applied_job.user_id == current_user.user_id:
             job_context = _build_position_context(applied_job.position)
             resolved_job_id = job_id
+            company_name = (
+                applied_job.position.company.name if applied_job.position.company else ""
+            )
+            job_label = (
+                f" - {applied_job.position.title} @ {company_name}"
+                if company_name
+                else f" - {applied_job.position.title}"
+            )
     elif position_id:
+        from database.models.applied_jobs import get_applied_job_by_position
         from database.models.position import get_position
 
         pos = get_position(session, position_id)
         if pos:
             job_context = _build_position_context(pos)
+            company_name = pos.company.name if pos.company else ""
+            job_label = (
+                f" - {pos.title} @ {company_name}" if company_name else f" - {pos.title}"
+            )
+            # Link to an existing application for this position if one exists
+            existing_app = get_applied_job_by_position(
+                session, current_user.user_id, position_id
+            )
+            if existing_app:
+                resolved_job_id = existing_app.job_id
 
     settings = get_settings()
     api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
@@ -705,7 +745,7 @@ def generate_cover_letter(
             detail=f"Cover letter generation failed: {str(e)}",
         )
 
-    doc_name = f"AI Cover Letter - {date_class.today().strftime('%Y-%m-%d')}.txt"
+    doc_name = f"AI Cover Letter{job_label} - {date_class.today().strftime('%Y-%m-%d')}.txt"
     new_doc = create_document(
         session,
         current_user.user_id,
@@ -745,20 +785,41 @@ def ai_rewrite_document(
     original_content = None
     if document.content:
         original_content = document.content
-    elif document.document_location and os.path.exists(document.document_location):
+    elif document.document_location:
+        if not os.path.exists(document.document_location):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Document file not found on server. Please re-upload the file.",
+            )
+        # Derive extension from name, fall back to location path
         ext = os.path.splitext(document.document_name or "")[1].lower()
-        if ext == ".pdf":
-            original_content = _extract_pdf_content(document.document_location)
-        elif ext == ".docx":
-            original_content = _extract_docx_content(document.document_location)
-        elif ext in (".txt", ".md"):
-            with open(document.document_location, "r", encoding="utf-8") as f:
-                original_content = f.read()
+        if not ext:
+            ext = os.path.splitext(document.document_location)[1].lower()
+        try:
+            if ext == ".pdf":
+                original_content = _extract_pdf_content(document.document_location)
+            elif ext == ".docx":
+                original_content = _extract_docx_content(document.document_location)
+            elif ext in (".txt", ".md"):
+                with open(document.document_location, "r", encoding="utf-8") as f:
+                    original_content = f.read()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported file type '{ext}'. Only PDF, DOCX, TXT, and MD files are supported.",
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Could not read document content: {str(e)}",
+            )
 
     if not original_content or not original_content.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not extract text content from this document. Only PDF, DOCX, TXT, and MD files are supported.",
+            detail="Document appears to be empty or contains no extractable text. If this is a scanned PDF, please use a text-based PDF or paste the content manually.",
         )
 
     settings = get_settings()

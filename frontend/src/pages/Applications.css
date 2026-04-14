@@ -599,9 +599,9 @@
 .details-input {
   padding: 7px 10px;
   border-radius: 8px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   outline: none;
   width: 100%;
@@ -616,9 +616,9 @@
 .details-textarea {
   padding: 7px 10px;
   border-radius: 8px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   outline: none;
   width: 100%;

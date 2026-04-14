@@ -73,11 +73,18 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({ app, position, onRemove, onStageChange }) {
+function ApplicationCard({
+  app,
+  position,
+  onRemove,
+  onStageChange,
+  linkedDocs,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const [updatingStage, setUpdatingStage] = useState(false);
+  const [stageError, setStageError] = useState("");
   const [coverLetter, setCoverLetter] = useState("");
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -117,28 +124,21 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
   });
   const [interviewError, setInterviewError] = useState("");
 
-  // Outcome
-  const [showOutcome, setShowOutcome] = useState(false);
-  const [outcome, setOutcome] = useState(null);
-  const [outcomeLoaded, setOutcomeLoaded] = useState(false);
-  const [addingOutcome, setAddingOutcome] = useState(false);
-  const [newOutcome, setNewOutcome] = useState({
-    outcome_state: "",
-    outcome_notes: "",
-  });
-  const [outcomeError, setOutcomeError] = useState("");
-  const OUTCOME_STATES = [
-    "Applied",
-    "Rejected",
-    "Offer",
-    "Accepted",
-    "Withdrawn",
-  ];
+  // Documents
+  const [showDocs, setShowDocs] = useState(false);
+
+  // Notes
+  const [showNotes, setShowNotes] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState(app.outcome_notes || "");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState("");
 
   const handleStageChange = async (newStage) => {
     if (newStage === app.application_status || updatingStage) return;
     const previousStage = app.application_status;
     setUpdatingStage(true);
+    setStageError("");
     onStageChange(app.job_id, newStage);
     try {
       const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
@@ -150,18 +150,17 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
         body: JSON.stringify({ application_status: newStage }),
       });
       if (!res.ok) {
-        const detail = await res.text();
-        console.error(
-          `Stage change failed (${res.status}) for job ${app.job_id}:`,
-          detail
+        const errBody = await res.json().catch(() => ({}));
+        setStageError(
+          errBody.detail || `Failed to update stage (${res.status}).`
         );
         onStageChange(app.job_id, previousStage);
       } else {
         setActivity(null);
         setActivityLoaded(false);
       }
-    } catch (err) {
-      console.error("Stage change request errored:", err);
+    } catch {
+      setStageError("Could not reach server. Stage change reverted.");
       onStageChange(app.job_id, previousStage);
     } finally {
       setUpdatingStage(false);
@@ -408,97 +407,30 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
     }
   };
 
-  const loadOutcome = async () => {
-    if (!showOutcome && !outcomeLoaded) {
-      try {
-        const res = await fetch(`${API}/jobs/${app.job_id}/outcome`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) setOutcome(await res.json());
-        // 404 just means no outcome yet — leave as null
-      } catch {
-        // leave empty
-      }
-      setOutcomeLoaded(true);
-    }
-    setShowOutcome((v) => !v);
-  };
-
-  const OUTCOME_TO_STAGE = {
-    Accepted: "Offer",
-    Offer: "Offer",
-    Rejected: "Rejected",
-    Withdrawn: "Withdrawn",
-    Applied: "Applied",
-  };
-
-  const saveOutcome = async () => {
-    if (!newOutcome.outcome_state) {
-      setOutcomeError("Please select an outcome.");
-      return;
-    }
+  const saveNotes = async () => {
+    setNotesSaving(true);
+    setNotesError("");
     try {
-      const method = outcome ? "PUT" : "POST";
-      const url = outcome
-        ? `${API}/outcome/${outcome.outcome_id}`
-        : `${API}/jobs/${app.job_id}/outcome`;
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          job_id: app.job_id,
-          outcome_state: newOutcome.outcome_state,
-          outcome_notes: newOutcome.outcome_notes || null,
-        }),
+        body: JSON.stringify({ outcome_notes: notesValue }),
       });
       if (res.ok) {
-        const saved = await res.json();
-        setOutcome(saved);
-        setNewOutcome({ outcome_state: "", outcome_notes: "" });
-        setOutcomeError("");
-        setAddingOutcome(false);
-        setActivity(null);
-        setActivityLoaded(false);
-
-        // Auto-update the application stage to match the outcome
-        const targetStage = OUTCOME_TO_STAGE[newOutcome.outcome_state];
-        if (targetStage && targetStage !== app.application_status) {
-          await fetch(`${API}/jobs/applications/${app.job_id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ application_status: targetStage }),
-          });
-          onStageChange(app.job_id, targetStage);
-        }
+        setEditingNotes(false);
       } else {
-        const detail = await res.json().catch(() => ({}));
-        setOutcomeError(detail.detail || "Failed to save outcome.");
+        const errBody = await res.json().catch(() => ({}));
+        setNotesError(
+          errBody.detail || `Failed to save notes (${res.status}).`
+        );
       }
     } catch {
-      setOutcomeError("Failed to save outcome.");
+      setNotesError("Failed to save notes.");
     }
-  };
-
-  const deleteOutcome = async () => {
-    if (!outcome) return;
-    try {
-      const res = await fetch(`${API}/outcome/${outcome.outcome_id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setOutcome(null);
-        setOutcomeLoaded(false);
-      }
-    } catch {
-      // silently fail
-    }
+    setNotesSaving(false);
   };
 
   const title = position?.title || `Position #${app.position_id}`;
@@ -546,6 +478,18 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
               </option>
             ))}
           </select>
+          {stageError && (
+            <span
+              className="applications-error"
+              style={{
+                fontSize: "0.75rem",
+                maxWidth: "160px",
+                textAlign: "right",
+              }}
+            >
+              {stageError}
+            </span>
+          )}
           <button className="app-history-btn" onClick={loadActivity}>
             {expanded ? "Hide History ▲" : "View History ▼"}
           </button>
@@ -873,89 +817,62 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
         )}
       </div>
 
-      {/* Outcome */}
+      {/* Linked Documents */}
       <div className="followup-section">
         <button
           className="app-history-btn followup-toggle"
-          onClick={loadOutcome}
+          onClick={() => setShowDocs((v) => !v)}
         >
-          Outcome{outcome ? ` — ${outcome.outcome_state}` : ""}{" "}
-          {showOutcome ? "▾" : "▸"}
+          Documents
+          {linkedDocs && linkedDocs.length > 0
+            ? ` (${linkedDocs.length})`
+            : ""}{" "}
+          {showDocs ? "▾" : "▸"}
         </button>
-        {showOutcome && (
+        {showDocs && (
           <div className="followup-body">
-            {outcome && !addingOutcome ? (
-              <div
-                className="followup-item"
-                style={{
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: "4px",
-                }}
-              >
-                <span className="followup-desc">
-                  🏁 {outcome.outcome_state}
-                </span>
-                {outcome.outcome_notes && (
-                  <span className="followup-date">{outcome.outcome_notes}</span>
-                )}
-                <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-                  <button
-                    className="app-history-btn"
-                    onClick={() => {
-                      setNewOutcome({
-                        outcome_state: outcome.outcome_state,
-                        outcome_notes: outcome.outcome_notes || "",
-                      });
-                      setAddingOutcome(true);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="followup-delete-btn"
-                    onClick={deleteOutcome}
-                  >
-                    ✕ Remove
-                  </button>
-                </div>
-              </div>
-            ) : !addingOutcome ? (
-              <p className="followup-empty">No outcome recorded yet.</p>
-            ) : null}
+            {!linkedDocs || linkedDocs.length === 0 ? (
+              <p className="followup-empty">
+                No documents linked to this application yet. Generate a resume
+                or cover letter from the Dashboard or Document Library.
+              </p>
+            ) : (
+              <ul className="followup-list">
+                {linkedDocs.map((doc) => (
+                  <li key={doc.doc_id} className="followup-item">
+                    <span className="followup-desc">
+                      {doc.document_name || `Document #${doc.doc_id}`}
+                    </span>
+                    <span className="followup-date">{doc.document_type}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
-            {addingOutcome ? (
+      {/* Notes */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={() => setShowNotes((v) => !v)}
+        >
+          Notes {showNotes ? "▾" : "▸"}
+        </button>
+        {showNotes && (
+          <div className="followup-body">
+            {editingNotes ? (
               <div className="followup-add-form">
-                <select
+                <textarea
                   className="followup-input"
-                  value={newOutcome.outcome_state}
-                  onChange={(e) =>
-                    setNewOutcome((prev) => ({
-                      ...prev,
-                      outcome_state: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Select outcome…</option>
-                  {OUTCOME_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  className="followup-input"
-                  placeholder="Notes (optional)"
-                  value={newOutcome.outcome_notes}
-                  onChange={(e) =>
-                    setNewOutcome((prev) => ({
-                      ...prev,
-                      outcome_notes: e.target.value,
-                    }))
-                  }
+                  rows={4}
+                  placeholder="Add your notes here…"
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  style={{ resize: "vertical" }}
                 />
-                {outcomeError && (
+                {notesError && (
                   <p
                     style={{
                       color: "#ef4444",
@@ -963,19 +880,23 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
                       margin: "4px 0",
                     }}
                   >
-                    {outcomeError}
+                    {notesError}
                   </p>
                 )}
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <button className="app-history-btn" onClick={saveOutcome}>
-                    Save
+                  <button
+                    className="app-history-btn"
+                    onClick={saveNotes}
+                    disabled={notesSaving}
+                  >
+                    {notesSaving ? "Saving…" : "Save"}
                   </button>
                   <button
                     className="app-history-btn"
                     onClick={() => {
-                      setAddingOutcome(false);
-                      setNewOutcome({ outcome_state: "", outcome_notes: "" });
-                      setOutcomeError("");
+                      setEditingNotes(false);
+                      setNotesValue(app.outcome_notes || "");
+                      setNotesError("");
                     }}
                   >
                     Cancel
@@ -983,13 +904,25 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
                 </div>
               </div>
             ) : (
-              <button
-                className="app-history-btn"
-                style={{ marginTop: "8px" }}
-                onClick={() => setAddingOutcome(true)}
-              >
-                + Record Outcome
-              </button>
+              <>
+                {notesValue ? (
+                  <p
+                    className="followup-desc"
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {notesValue}
+                  </p>
+                ) : (
+                  <p className="followup-empty">No notes yet.</p>
+                )}
+                <button
+                  className="app-history-btn"
+                  style={{ marginTop: "8px" }}
+                  onClick={() => setEditingNotes(true)}
+                >
+                  {notesValue ? "Edit Notes" : "+ Add Notes"}
+                </button>
+              </>
             )}
           </div>
         )}
@@ -1421,6 +1354,7 @@ function AddJobModal({ onClose, onAdded }) {
 function Applications() {
   const [applications, setApplications] = useState([]);
   const [positions, setPositions] = useState({});
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
@@ -1468,6 +1402,14 @@ function Applications() {
         }
 
         setPositions(posMap);
+
+        if (token) {
+          const docRes = await fetch(`${API}/documents/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (docRes.ok) setDocuments(await docRes.json());
+        }
+
         setError("");
         setLoading(false);
       } catch (err) {
@@ -1665,6 +1607,7 @@ function Applications() {
                   key={app.job_id}
                   app={app}
                   position={positions[app.position_id]}
+                  linkedDocs={documents.filter((d) => d.job_id === app.job_id)}
                   onRemove={() => setDeleteTarget(app)}
                   onStageChange={(id, newStage) =>
                     setApplications((prev) =>

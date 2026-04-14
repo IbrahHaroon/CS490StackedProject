@@ -92,6 +92,17 @@ function DocumentLibrary() {
 
   useEffect(() => {
     fetchDocuments();
+    if (token) {
+      Promise.all([
+        fetch(`${API}/jobs/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API}/jobs/positions/?include_manual=true`),
+      ]).then(([jobsRes, posRes]) => {
+        if (jobsRes.ok) jobsRes.json().then(setAppliedJobs);
+        if (posRes.ok) posRes.json().then(setPositions);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -1027,59 +1038,76 @@ function DocumentLibrary() {
               <tr>
                 <th>Name</th>
                 <th>Type</th>
-                <th>Status</th>
+                <th>Linked Job</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
-                <tr key={doc.doc_id}>
-                  <td>
-                    {doc.document_name ||
-                      doc.document_location.split("/").pop()}
-                  </td>
-                  <td>{doc.document_type}</td>
-                  <td>
-                    <span className="doclibrary-confirmed">✓ In System</span>
-                  </td>
-                  <td>
-                    <div className="doclibrary-actions">
-                      <button
-                        className="doclibrary-action-btn doclibrary-view-btn"
-                        onClick={() => handleView(doc)}
-                        disabled={deletingId !== null}
-                        title="View Document"
-                      >
-                        View
-                      </button>
-                      <button
-                        className="doclibrary-action-btn doclibrary-edit-btn"
-                        onClick={() => handleEdit(doc)}
-                        disabled={deletingId !== null}
-                        title="Edit Document"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="doclibrary-action-btn doclibrary-ai-btn"
-                        onClick={() => handleAiImprove(doc)}
-                        disabled={deletingId !== null}
-                        title="AI Improve"
-                      >
-                        AI Improve
-                      </button>
-                      <button
-                        className="doclibrary-action-btn doclibrary-delete-btn"
-                        onClick={() => handleDelete(doc)}
-                        disabled={deletingId === doc.doc_id}
-                        title="Delete Document"
-                      >
-                        {deletingId === doc.doc_id ? "Deleting…" : "Delete"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {documents.map((doc) => {
+                const linkedJob = doc.job_id
+                  ? appliedJobs.find((j) => j.job_id === doc.job_id)
+                  : null;
+                const linkedPos = linkedJob
+                  ? positionMap[linkedJob.position_id]
+                  : null;
+                const jobLabel = linkedPos
+                  ? `${linkedPos.title} @ ${linkedPos.company_name}`
+                  : null;
+                return (
+                  <tr key={doc.doc_id}>
+                    <td>
+                      {doc.document_name ||
+                        doc.document_location.split("/").pop()}
+                    </td>
+                    <td>{doc.document_type}</td>
+                    <td>
+                      {jobLabel ? (
+                        <span className="doclibrary-linked-job">
+                          {jobLabel}
+                        </span>
+                      ) : (
+                        <span className="doclibrary-unlinked">—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="doclibrary-actions">
+                        <button
+                          className="doclibrary-action-btn doclibrary-view-btn"
+                          onClick={() => handleView(doc)}
+                          disabled={deletingId !== null}
+                          title="View Document"
+                        >
+                          View
+                        </button>
+                        <button
+                          className="doclibrary-action-btn doclibrary-edit-btn"
+                          onClick={() => handleEdit(doc)}
+                          disabled={deletingId !== null}
+                          title="Edit Document"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="doclibrary-action-btn doclibrary-ai-btn"
+                          onClick={() => handleAiImprove(doc)}
+                          disabled={deletingId !== null}
+                          title="AI Improve"
+                        >
+                          AI Improve
+                        </button>
+                        <button
+                          className="doclibrary-action-btn doclibrary-delete-btn"
+                          onClick={() => handleDelete(doc)}
+                          disabled={deletingId === doc.doc_id}
+                          title="Delete Document"
+                        >
+                          {deletingId === doc.doc_id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

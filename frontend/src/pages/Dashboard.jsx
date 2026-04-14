@@ -4,6 +4,13 @@ import "./Dashboard.css";
 
 const API = "http://localhost:8000";
 
+// Extract city portion from a location string so variants like
+// "New York, NY" and "New York" resolve to the same filter bucket.
+const normalizeLocation = (loc) => {
+  if (!loc) return "";
+  return loc.split(",")[0].trim();
+};
+
 function ApplyModal({
   job,
   documents,
@@ -169,8 +176,18 @@ function Dashboard() {
   const [applySuccess, setApplySuccess] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [sortOrder, setSortOrder] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterLocationType, setFilterLocationType] = useState("");
+  const [filterLocation, setFilterLocation] = useState("");
+  const [filterCompany, setFilterCompany] = useState("");
+  const [filterTitle, setFilterTitle] = useState("");
+  const [filterMinSalary, setFilterMinSalary] = useState("");
+  const [filterMaxSalary, setFilterMaxSalary] = useState("");
 
   const jobBoardRef = useRef(null);
+  const filterRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem("token");
@@ -193,7 +210,7 @@ function Dashboard() {
 
         // Applications, documents, and metrics require auth
         if (token) {
-          const [appRes, docRes, metricsRes] = await Promise.all([
+          const [appRes, docRes, metricsRes, meRes] = await Promise.all([
             fetch(`${API}/jobs/dashboard`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
@@ -203,10 +220,17 @@ function Dashboard() {
             fetch(`${API}/dashboard/metrics`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
+            fetch(`${API}/profile/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
           if (appRes.ok) setApplications(await appRes.json());
           if (docRes.ok) setDocuments(await docRes.json());
           if (metricsRes.ok) setMetrics(await metricsRes.json());
+          if (meRes.ok) {
+            const profile = await meRes.json();
+            setFirstName(profile.first_name || "");
+          }
         }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
@@ -305,7 +329,37 @@ function Dashboard() {
     }
   };
 
-  const filteredJobs = searchQuery.trim()
+  const uniqueLocations = [
+    ...new Map(
+      jobs
+        .filter((j) => j.location)
+        .map((j) => [
+          normalizeLocation(j.location).toLowerCase(),
+          normalizeLocation(j.location),
+        ])
+    ).values(),
+  ].sort();
+  const uniqueCompanies = [
+    ...new Set(jobs.map((j) => j.company_name).filter(Boolean)),
+  ].sort();
+  const hasActiveFilters =
+    filterLocationType ||
+    filterLocation ||
+    filterCompany ||
+    filterTitle ||
+    filterMinSalary ||
+    filterMaxSalary;
+
+  const clearFilters = () => {
+    setFilterLocationType("");
+    setFilterLocation("");
+    setFilterCompany("");
+    setFilterTitle("");
+    setFilterMinSalary("");
+    setFilterMaxSalary("");
+  };
+
+  let filteredJobs = searchQuery.trim()
     ? jobs.filter((job) => {
         const q = searchQuery.toLowerCase();
         return (
@@ -316,6 +370,66 @@ function Dashboard() {
         );
       })
     : jobs;
+
+  if (filterLocationType) {
+    filteredJobs = filteredJobs.filter(
+      (j) => j.location_type?.toLowerCase() === filterLocationType.toLowerCase()
+    );
+  }
+  if (filterLocation) {
+    filteredJobs = filteredJobs.filter(
+      (j) =>
+        normalizeLocation(j.location).toLowerCase() ===
+        filterLocation.toLowerCase()
+    );
+  }
+  if (filterCompany) {
+    filteredJobs = filteredJobs.filter((j) => j.company_name === filterCompany);
+  }
+  if (filterTitle) {
+    const t = filterTitle.toLowerCase();
+    filteredJobs = filteredJobs.filter((j) =>
+      j.title?.toLowerCase().includes(t)
+    );
+  }
+  if (filterMinSalary) {
+    filteredJobs = filteredJobs.filter(
+      (j) => j.salary && Number(j.salary) >= Number(filterMinSalary)
+    );
+  }
+  if (filterMaxSalary) {
+    filteredJobs = filteredJobs.filter(
+      (j) => j.salary && Number(j.salary) <= Number(filterMaxSalary)
+    );
+  }
+
+  if (sortOrder === "date-asc") {
+    filteredJobs = [...filteredJobs].sort(
+      (a, b) => new Date(a.listing_date) - new Date(b.listing_date)
+    );
+  } else if (sortOrder === "date-desc") {
+    filteredJobs = [...filteredJobs].sort(
+      (a, b) => new Date(b.listing_date) - new Date(a.listing_date)
+    );
+  } else if (sortOrder === "salary-asc") {
+    filteredJobs = [...filteredJobs].sort(
+      (a, b) => (Number(a.salary) || 0) - (Number(b.salary) || 0)
+    );
+  } else if (sortOrder === "salary-desc") {
+    filteredJobs = [...filteredJobs].sort(
+      (a, b) => (Number(b.salary) || 0) - (Number(a.salary) || 0)
+    );
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const scrollToJobBoard = () => {
     jobBoardRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -398,7 +512,9 @@ function Dashboard() {
           aiGenerating={aiGenerating}
         />
       )}
-      <h1 className="dashboard-welcome">Welcome</h1>
+      <h1 className="dashboard-welcome">
+        Welcome{firstName ? `, ${firstName}` : ""}
+      </h1>
       {applySuccess && <p className="apply-success-msg">{applySuccess}</p>}
 
       {token && metrics && (
@@ -516,9 +632,16 @@ function Dashboard() {
                   const pos = positionMap[app.position_id];
                   return (
                     <div key={app.job_id} className="preview-job-item">
-                      <span className="preview-job-company">
-                        {pos?.company_name || app.application_status}
-                      </span>
+                      <div className="preview-job-item-top">
+                        <span className="preview-job-company">
+                          {pos?.company_name || "—"}
+                        </span>
+                        <span
+                          className={`preview-status-badge preview-status-${app.application_status?.toLowerCase()}`}
+                        >
+                          {app.application_status}
+                        </span>
+                      </div>
                       <span className="preview-job-title">
                         {pos?.title || `Application #${app.job_id}`}
                       </span>
@@ -569,6 +692,112 @@ function Dashboard() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        <div className="job-board-controls">
+          <div className="job-board-filter-wrap" ref={filterRef}>
+            <button
+              className={`job-board-control-btn${hasActiveFilters ? " job-board-control-btn--active" : ""}`}
+              onClick={() => setFilterOpen((o) => !o)}
+            >
+              Filter{hasActiveFilters ? " ●" : ""} ▾
+            </button>
+            {filterOpen && (
+              <div className="job-board-filter-panel">
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Work Type</label>
+                  <select
+                    className="filter-panel-select"
+                    value={filterLocationType}
+                    onChange={(e) => setFilterLocationType(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Onsite">In-Person</option>
+                  </select>
+                </div>
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Location</label>
+                  <select
+                    className="filter-panel-select"
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    {uniqueLocations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Company</label>
+                  <select
+                    className="filter-panel-select"
+                    value={filterCompany}
+                    onChange={(e) => setFilterCompany(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    {uniqueCompanies.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Title</label>
+                  <input
+                    className="filter-panel-input"
+                    type="text"
+                    placeholder="Any title"
+                    value={filterTitle}
+                    onChange={(e) => setFilterTitle(e.target.value)}
+                  />
+                </div>
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Min Salary</label>
+                  <input
+                    className="filter-panel-input"
+                    type="number"
+                    placeholder="e.g. 50000"
+                    value={filterMinSalary}
+                    onChange={(e) => setFilterMinSalary(e.target.value)}
+                  />
+                </div>
+                <div className="filter-panel-row">
+                  <label className="filter-panel-label">Max Salary</label>
+                  <input
+                    className="filter-panel-input"
+                    type="number"
+                    placeholder="e.g. 150000"
+                    value={filterMaxSalary}
+                    onChange={(e) => setFilterMaxSalary(e.target.value)}
+                  />
+                </div>
+                {hasActiveFilters && (
+                  <button className="filter-clear-btn" onClick={clearFilters}>
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="job-board-sort-wrap">
+            <label className="job-board-control-label">Sort:</label>
+            <select
+              className="job-board-control-select"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
+              <option value="">Default</option>
+              <option value="date-desc">Date: Newest First</option>
+              <option value="date-asc">Date: Oldest First</option>
+              <option value="salary-desc">Salary: High to Low</option>
+              <option value="salary-asc">Salary: Low to High</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div className="job-board" ref={jobBoardRef}>
         {filteredJobs.length === 0 ? (
@@ -590,7 +819,23 @@ function Dashboard() {
                   }`}
                   onClick={() => setSelectedJob(job)}
                 >
-                  <span className="job-card-company">{job.company_name}</span>
+                  <div className="job-card-top-row">
+                    <span className="job-card-company">{job.company_name}</span>
+                    {(() => {
+                      const app = applications.find(
+                        (a) =>
+                          a.position_id === job.position_id &&
+                          a.application_status !== "Withdrawn"
+                      );
+                      return app ? (
+                        <span
+                          className={`preview-status-badge preview-status-${app.application_status?.toLowerCase()}`}
+                        >
+                          {app.application_status}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
                   <h3 className="job-card-title">{job.title}</h3>
                   {(job.location || job.location_type) && (
                     <span className="job-card-meta">
