@@ -440,7 +440,6 @@ class InterviewResponse(BaseModel):
 
 
 class FollowUpCreate(BaseModel):
-    job_id: int
     description: str
     due_date: date | None = None
 
