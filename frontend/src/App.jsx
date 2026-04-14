@@ -7,6 +7,7 @@ import Profile from "./pages/Profile.jsx";
 import DocumentLibrary from "./pages/DocumentLibrary.jsx";
 import Settings from "./pages/Settings.jsx";
 import Applications from "./pages/Applications.jsx";
+import Postings from "./pages/Postings.jsx";
 import JobForm from "./pages/JobForm";
 import SignIn from "./pages/SignIn";
 import "./App.css";
@@ -94,6 +95,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/postings" element={<Postings />} />
         </Routes>
       </main>
     </>
