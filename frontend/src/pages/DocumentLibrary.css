@@ -218,6 +218,15 @@
   background-color: #ff5252;
 }
 
+.doclibrary-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doclibrary-action-btn:disabled:hover {
+  background-color: inherit;
+}
+
 /* Modal Overlay */
 .doclibrary-modal-overlay {
   position: fixed;

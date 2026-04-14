@@ -11,6 +11,7 @@ from database.models.interview import (
     get_interviews_by_job,
     update_interview,
 )
+from database.models.job_activity import create_job_activity
 from database.models.user import User
 from schemas import InterviewCreate, InterviewResponse, InterviewUpdate
 
@@ -39,13 +40,24 @@ def create_interview_endpoint(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
-    return create_interview(
+    interview = create_interview(
         session,
         job_id=job_id,
         round_type=body.round_type,
-        date_time=body.date_time,
+        scheduled_at=body.scheduled_at,
         notes=body.notes,
     )
+    dt_str = (
+        body.scheduled_at.strftime("%b %d, %Y %I:%M %p") if body.scheduled_at else ""
+    )
+    create_job_activity(
+        session,
+        job_id=job_id,
+        stage="Interview Scheduled",
+        event_type="interview",
+        notes=f"{body.round_type} — {dt_str}",
+    )
+    return interview
 
 
 @router.get("/jobs/{job_id}/interviews", response_model=list[InterviewResponse])
@@ -92,7 +104,7 @@ def update_interview_endpoint(
         session,
         interview_id,
         round_type=body.round_type,
-        date_time=body.date_time,
+        scheduled_at=body.scheduled_at,
         notes=body.notes,
     )
     return updated

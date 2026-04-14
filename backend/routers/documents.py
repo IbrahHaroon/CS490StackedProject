@@ -367,23 +367,59 @@ def delete_document_endpoint(
     """Delete a document."""
     from database.models.documents import delete_document
 
+    print("[DELETE] ===== DELETE REQUEST START =====")
+    print(f"[DELETE] Document ID requested: {doc_id} (type: {type(doc_id).__name__})")
+    print(
+        f"[DELETE] Current user: {current_user.user_id} (type: {type(current_user.user_id).__name__})"
+    )
+
+    # Try to get document
     document = get_document(session, doc_id)
+    print(f"[DELETE] get_document() returned: {document}")
+
     if not document:
+        print(f"[DELETE] ❌ Document {doc_id} NOT found in database - returning 404")
+        print("[DELETE] ===== DELETE REQUEST FAILED =====")
         raise HTTPException(status_code=404, detail="Document not found")
+
+    print(
+        f"[DELETE] ✓ Document found - doc_id: {document.doc_id}, owner_id: {document.user_id}, name: {document.document_name}"
+    )
+
+    # Check permissions
     if document.user_id != current_user.user_id:
+        print(
+            f"[DELETE] ❌ Permission denied - doc owner: {document.user_id}, requester: {current_user.user_id}"
+        )
+        print("[DELETE] ===== DELETE REQUEST FAILED =====")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to delete this document",
         )
 
+    print("[DELETE] ✓ Permission check passed")
+
     # Delete file from disk if it exists
     if document.document_location and os.path.exists(document.document_location):
         try:
             os.remove(document.document_location)
+            print(f"[DELETE] ✓ File removed from disk: {document.document_location}")
         except Exception as e:
-            print(f"Warning: Could not delete file {document.document_location}: {e}")
+            print(
+                f"[DELETE] ⚠ Warning: Could not delete file {document.document_location}: {e}"
+            )
 
-    delete_document(session, doc_id)
+    # Delete from database
+    result = delete_document(session, doc_id)
+    if result:
+        print(f"[DELETE] ✓ Document {doc_id} deleted from database")
+        print("[DELETE] ===== DELETE REQUEST SUCCESS =====")
+    else:
+        print(f"[DELETE] ❌ Failed to delete document {doc_id} from database")
+        print("[DELETE] ===== DELETE REQUEST FAILED =====")
+        raise HTTPException(
+            status_code=500, detail="Failed to delete document from database"
+        )
 
 
 @router.post("/generate-resume")

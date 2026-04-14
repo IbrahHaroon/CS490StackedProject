@@ -13,6 +13,8 @@ function JobForm() {
     title: "",
     listing_date: new Date().toISOString().split("T")[0],
     salary: "",
+    location_type: "",
+    location: "",
     education_req: "",
     experience_req: "",
     description: "",
@@ -21,8 +23,23 @@ function JobForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
   const [message, setMessage] = useState("");
+  const [redirectCountdown, setRedirectCountdown] = useState(0);
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    if (redirectCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          navigate("/");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [redirectCountdown, navigate]);
 
   useEffect(() => {
     fetch(`${API}/company/`)
@@ -46,6 +63,8 @@ function JobForm() {
             title: pos.title,
             listing_date: pos.listing_date,
             salary: pos.salary ?? "",
+            location_type: pos.location_type ?? "",
+            location: pos.location ?? "",
             education_req: pos.education_req ?? "",
             experience_req: pos.experience_req ?? "",
             description: pos.description ?? "",
@@ -125,6 +144,8 @@ function JobForm() {
           title: formData.title,
           listing_date: formData.listing_date,
           salary: formData.salary ? Number(formData.salary) : null,
+          location_type: formData.location_type || null,
+          location: formData.location || null,
           education_req: formData.education_req || null,
           experience_req: formData.experience_req || null,
           description: formData.description || null,
@@ -147,39 +168,13 @@ function JobForm() {
           ? "Posting updated successfully."
           : "Posting created successfully."
       );
-      setTimeout(() => navigate("/"), 1500);
+      setRedirectCountdown(3);
     } catch (err) {
       setMessage("Network error. Please check that the server is running.");
     } finally {
       setIsSaving(false);
     }
 
-    const res = await fetch(`${API}/jobs/positions/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        company_id,
-        title: formData.title,
-        listing_date: formData.listing_date,
-        salary: formData.salary ? Number(formData.salary) : null,
-        education_req: formData.education_req || null,
-        experience_req: formData.experience_req || null,
-        description: formData.description || null,
-      }),
-    });
-    setIsSaving(false);
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setMessage(err.detail || "Failed to create posting.");
-      return;
-    }
-
-    setMessage("Posting created successfully.");
-    setTimeout(() => navigate("/"), 1500);
   };
 
   if (loading) {
@@ -242,6 +237,29 @@ function JobForm() {
           placeholder="e.g. 80000"
         />
 
+        <label style={styles.label}>Location Type (optional)</label>
+        <select
+          name="location_type"
+          value={formData.location_type}
+          onChange={handleChange}
+          style={styles.input}
+        >
+          <option value="">Select…</option>
+          <option value="Remote">Remote</option>
+          <option value="Hybrid">Hybrid</option>
+          <option value="Onsite">Onsite</option>
+        </select>
+
+        <label style={styles.label}>Location (optional)</label>
+        <input
+          type="text"
+          name="location"
+          value={formData.location}
+          onChange={handleChange}
+          style={styles.input}
+          placeholder="e.g. New York, NY"
+        />
+
         <label style={styles.label}>Education Requirement (optional)</label>
         <input
           type="text"
@@ -280,14 +298,36 @@ function JobForm() {
         </button>
 
         {message && (
-          <p
+          <div
             style={{
-              ...styles.message,
-              color: message.includes("Failed") ? "red" : "green",
+              ...styles.messageContainer,
+              backgroundColor: message.includes("Failed") ? "#ffe6e6" : "#e6ffe6",
+              borderColor: message.includes("Failed") ? "#ff6b6b" : "#10b981",
             }}
           >
-            {message}
-          </p>
+            <p
+              style={{
+                ...styles.message,
+                color: message.includes("Failed") ? "#d32f2f" : "#10b981",
+              }}
+            >
+              {message}
+            </p>
+            {redirectCountdown > 0 && (
+              <div style={styles.redirectInfo}>
+                <p style={styles.countdown}>
+                  Redirecting to dashboard in {redirectCountdown} second{redirectCountdown !== 1 ? "s" : ""}...
+                </p>
+                <button
+                  type="button"
+                  style={styles.backButton}
+                  onClick={() => navigate("/")}
+                >
+                  Back to Dashboard Now
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </form>
     </div>
@@ -329,7 +369,43 @@ const styles = {
     fontSize: "1rem",
   },
   error: { color: "red", fontSize: "14px", margin: 0 },
-  message: { marginTop: "10px" },
+  messageContainer: {
+    marginTop: "20px",
+    padding: "20px",
+    borderRadius: "8px",
+    border: "3px solid",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    backgroundColor: "#f0fdf4",
+  },
+  message: {
+    margin: 0,
+    marginBottom: "15px",
+    fontSize: "18px",
+    fontWeight: "700",
+  },
+  redirectInfo: {
+    marginTop: "15px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+  },
+  countdown: {
+    margin: 0,
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#059669",
+  },
+  backButton: {
+    padding: "12px 20px",
+    borderRadius: "6px",
+    border: "none",
+    backgroundColor: "#4f8ef7",
+    color: "#fff",
+    fontSize: "15px",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "background-color 0.2s",
+  },
 };
 
 export default JobForm;

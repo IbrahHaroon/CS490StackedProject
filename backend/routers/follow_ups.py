@@ -11,6 +11,7 @@ from database.models.follow_up import (
     get_follow_ups_by_job,
     update_follow_up,
 )
+from database.models.job_activity import create_job_activity
 from database.models.user import User
 from schemas import FollowUpCreate, FollowUpResponse, FollowUpUpdate
 
@@ -38,12 +39,21 @@ def create_follow_up_endpoint(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    return create_follow_up(
+    follow_up = create_follow_up(
         session,
         job_id=job_id,
         description=body.description,
         due_date=body.due_date,
     )
+    due_str = f" (due {body.due_date})" if body.due_date else ""
+    create_job_activity(
+        session,
+        job_id=job_id,
+        stage="Follow-up Added",
+        event_type="follow_up",
+        notes=f"{body.description}{due_str}",
+    )
+    return follow_up
 
 
 @router.get("/jobs/{job_id}/followups", response_model=list[FollowUpResponse])

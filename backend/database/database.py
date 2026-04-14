@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
 
     openai_api_key: str = ""
+    gemini_api_key: str = ""
 
     # Load root .env first, then backend .env — later files override earlier ones
     model_config = SettingsConfigDict(
