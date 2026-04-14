@@ -70,7 +70,17 @@ def create_document(
 
 def get_document(session: Session, doc_id: int) -> "Documents | None":
     """Return Document object by primary key, or None if not found."""
-    return session.get(Documents, doc_id)
+    print(
+        f"[DB-GET] Looking up document with doc_id={doc_id} (type: {type(doc_id).__name__})"
+    )
+    result = session.get(Documents, doc_id)
+    if result:
+        print(
+            f"[DB-GET] ✓ Found: doc_id={result.doc_id}, user_id={result.user_id}, name={result.document_name}"
+        )
+    else:
+        print(f"[DB-GET] ❌ Not found - doc_id={doc_id}")
+    return result
 
 
 def lookup_documents(session: Session, user_id: int) -> int:
@@ -113,10 +123,21 @@ def update_document(
 
 def delete_document(session: Session, doc_id: int) -> bool:
     """Delete a document by ID. Returns True if deleted, False if not found."""
+    print(f"[DB-DELETE] Attempting to delete document {doc_id}")
     document = get_document(session, doc_id)
     if document is None:
+        print(f"[DB-DELETE] ❌ Document {doc_id} not found in session.get()")
         return False
 
-    session.delete(document)
-    session.commit()
-    return True
+    try:
+        print(f"[DB-DELETE] Calling session.delete() on document {doc_id}")
+        session.delete(document)
+        print(f"[DB-DELETE] Calling session.commit() for document {doc_id}")
+        session.commit()
+        print(f"[DB-DELETE] ✓ Successfully deleted document {doc_id}")
+        return True
+    except Exception as e:
+        print(f"[DB-DELETE] ❌ Error deleting {doc_id}: {e}")
+        print("[DB-DELETE] Rolling back transaction")
+        session.rollback()
+        return False

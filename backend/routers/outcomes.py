@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from database.auth import get_current_user
 from database.models.applied_jobs import get_applied_jobs
+from database.models.job_activity import create_job_activity
 from database.models.outcome import (
     OUTCOME_STATES,
     create_outcome,
@@ -54,12 +55,21 @@ def set_job_outcome(
             detail="Outcome already exists for this job. Use PUT to update.",
         )
 
-    return create_outcome(
+    result = create_outcome(
         session,
         job_id=job_id,
         outcome_state=body.outcome_state,
         outcome_notes=body.outcome_notes,
     )
+    notes_str = f" — {body.outcome_notes}" if body.outcome_notes else ""
+    create_job_activity(
+        session,
+        job_id=job_id,
+        stage="Outcome Recorded",
+        event_type="outcome",
+        notes=f"{body.outcome_state}{notes_str}",
+    )
+    return result
 
 
 @router.get("/jobs/{job_id}/outcome", response_model=OutcomeResponse)

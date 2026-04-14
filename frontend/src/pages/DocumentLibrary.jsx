@@ -53,6 +53,7 @@ function DocumentLibrary() {
   const [genResumeError, setGenResumeError] = useState("");
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [positions, setPositions] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -62,14 +63,24 @@ function DocumentLibrary() {
       setLoadError("You must be signed in to view documents.");
       return;
     }
-    const res = await fetch(`${API}/documents/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      setLoadError("Failed to load documents. Please sign in again.");
-      return;
+    try {
+      const res = await fetch(`${API}/documents/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setLoadError("Failed to load documents. Please sign in again.");
+        return;
+      }
+      const docs = await res.json();
+      console.log(
+        "[FETCH] Documents loaded from server:",
+        docs.map((d) => ({ doc_id: d.doc_id, name: d.document_name }))
+      );
+      setDocuments(docs);
+    } catch (err) {
+      console.error("[FETCH] Error loading documents:", err);
+      setLoadError("Failed to load documents.");
     }
-    setDocuments(await res.json());
   };
 
   useEffect(() => {
@@ -218,24 +229,79 @@ function DocumentLibrary() {
     }
 
     if (!token) {
-      setEditError("You must be signed in to delete.");
+      setUploadError("You must be signed in to delete.");
+      setTimeout(() => setUploadError(""), 3000);
       return;
     }
 
-    const res = await fetch(`${API}/documents/${doc.doc_id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+    console.log(`[DELETE-FRONTEND] Attempting to delete:`, {
+      doc_id: doc.doc_id,
+      name: doc.document_name,
     });
+    setDeletingId(doc.doc_id);
+    try {
+      const deleteUrl = `${API}/documents/${doc.doc_id}`;
+      console.log(`[DELETE-FRONTEND] Making DELETE request to: ${deleteUrl}`);
+      const res = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setEditError(err.detail || "Failed to delete document.");
-      return;
+      console.log(
+        `[DELETE-FRONTEND] Response status: ${res.status} for doc_id: ${doc.doc_id}`
+      );
+
+      if (!res.ok) {
+        let errorMsg = "Failed to delete document.";
+        let responseBody = "";
+        try {
+          responseBody = await res.text();
+          console.log(`[DELETE-FRONTEND] Response body: ${responseBody}`);
+          const err = JSON.parse(responseBody);
+          errorMsg = err.detail || errorMsg;
+          console.error("[DELETE-FRONTEND] Delete error details:", err);
+        } catch (e) {
+          console.error(
+            `[DELETE-FRONTEND] Could not parse error response:`,
+            res.status,
+            res.statusText,
+            responseBody
+          );
+          if (res.status === 404) {
+            errorMsg = "Document not found. It may have already been deleted.";
+          } else if (res.status === 403) {
+            errorMsg = "You don't have permission to delete this document.";
+          }
+        }
+        console.error(`[DELETE-FRONTEND] Final error message: ${errorMsg}`);
+        setUploadError(errorMsg);
+        setTimeout(() => setUploadError(""), 4000);
+        setDeletingId(null);
+        return;
+      }
+
+      console.log(
+        "[DELETE-FRONTEND] Document deleted successfully, refreshing list..."
+      );
+      setUploadSuccess("Document deleted successfully!");
+      setTimeout(() => setUploadSuccess(""), 3000);
+      // Refresh documents after a short delay to ensure backend processed
+      setTimeout(() => {
+        console.log(
+          "[DELETE-FRONTEND] Calling fetchDocuments to refresh list..."
+        );
+        fetchDocuments();
+      }, 500);
+    } catch (err) {
+      console.error("[DELETE-FRONTEND] Network error:", err.message, err);
+      setUploadError(
+        "Network error deleting document. Please check your connection."
+      );
+      setTimeout(() => setUploadError(""), 4000);
+      setDeletingId(null);
+    } finally {
+      setDeletingId(null);
     }
-
-    setUploadSuccess("Document deleted successfully!");
-    setTimeout(() => setUploadSuccess(""), 3000);
-    fetchDocuments();
   };
 
   const onPdfLoadSuccess = ({ numPages }) => {
@@ -789,6 +855,7 @@ function DocumentLibrary() {
                       <button
                         className="doclibrary-action-btn doclibrary-view-btn"
                         onClick={() => handleView(doc)}
+                        disabled={deletingId !== null}
                         title="View Document"
                       >
                         View
@@ -796,6 +863,7 @@ function DocumentLibrary() {
                       <button
                         className="doclibrary-action-btn doclibrary-edit-btn"
                         onClick={() => handleEdit(doc)}
+                        disabled={deletingId !== null}
                         title="Edit Document"
                       >
                         Edit
@@ -803,6 +871,7 @@ function DocumentLibrary() {
                       <button
                         className="doclibrary-action-btn doclibrary-ai-btn"
                         onClick={() => handleAiImprove(doc)}
+                        disabled={deletingId !== null}
                         title="AI Improve"
                       >
                         AI Improve
@@ -810,9 +879,10 @@ function DocumentLibrary() {
                       <button
                         className="doclibrary-action-btn doclibrary-delete-btn"
                         onClick={() => handleDelete(doc)}
+                        disabled={deletingId === doc.doc_id}
                         title="Delete Document"
                       >
-                        Delete
+                        {deletingId === doc.doc_id ? "Deleting…" : "Delete"}
                       </button>
                     </div>
                   </td>

@@ -20,20 +20,20 @@ export function MyAppNav() {
 
       {token && (
         <>
-          <NavLink to="/profile" end>
-            Profile
+          <NavLink to="/applications" end>
+            Applications
           </NavLink>
 
           <NavLink to="/documents" end>
             Document Library
           </NavLink>
 
-          <NavLink to="/settings" end>
-            Settings
+          <NavLink to="/profile" end>
+            Profile
           </NavLink>
 
-          <NavLink to="/applications" end>
-            Applications
+          <NavLink to="/settings" end>
+            Settings
           </NavLink>
 
           {isRecruiter && (
@@ -45,11 +45,20 @@ export function MyAppNav() {
       )}
 
       {token ? (
-        <button className="signout-nav-btn" onClick={handleSignOut}>
+        <button
+          className="signout-nav-btn"
+          style={{ marginLeft: "auto" }}
+          onClick={handleSignOut}
+        >
           Sign Out
         </button>
       ) : (
-        <NavLink to="/signin" end className="signin-nav-btn">
+        <NavLink
+          to="/signin"
+          end
+          className="signin-nav-btn"
+          style={{ marginLeft: "auto" }}
+        >
           Sign In
         </NavLink>
       )}

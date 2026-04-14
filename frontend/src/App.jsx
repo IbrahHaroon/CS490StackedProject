@@ -11,11 +11,32 @@ import JobForm from "./pages/JobForm";
 import SignIn from "./pages/SignIn";
 import "./App.css";
 
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+
 function App() {
   useEffect(() => {
     if (localStorage.getItem("darkMode") === "false") {
       document.body.classList.add("light-mode");
     }
+  }, []);
+
+  // Validate stored token on startup — clear it if expired or invalid
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("isRecruiter");
+          window.location.reload();
+        }
+      })
+      .catch(() => {
+        // Network error — leave token alone so offline use still works
+      });
   }, []);
 
   return (

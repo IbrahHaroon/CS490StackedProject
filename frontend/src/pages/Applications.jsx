@@ -24,6 +24,13 @@ const STATUS_COLOR = {
   Withdrawn: "#374151",
 };
 
+const EVENT_TYPE_META = {
+  stage_change: { color: null, icon: "●", label: null },
+  follow_up: { color: "#06b6d4", icon: "🔔", label: "Follow-up" },
+  interview: { color: "#f59e0b", icon: "📅", label: "Interview" },
+  outcome: { color: "#22c55e", icon: "🏁", label: "Outcome" },
+};
+
 function Pipeline({ current }) {
   const isTerminal = current === "Rejected" || current === "Archived";
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
@@ -97,6 +104,35 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
   });
   const [addingFollowUp, setAddingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
+
+  // Interviews
+  const [showInterviews, setShowInterviews] = useState(false);
+  const [interviews, setInterviews] = useState([]);
+  const [interviewsLoaded, setInterviewsLoaded] = useState(false);
+  const [addingInterview, setAddingInterview] = useState(false);
+  const [newInterview, setNewInterview] = useState({
+    round_type: "",
+    scheduled_at: "",
+  });
+  const [interviewError, setInterviewError] = useState("");
+
+  // Outcome
+  const [showOutcome, setShowOutcome] = useState(false);
+  const [outcome, setOutcome] = useState(null);
+  const [outcomeLoaded, setOutcomeLoaded] = useState(false);
+  const [addingOutcome, setAddingOutcome] = useState(false);
+  const [newOutcome, setNewOutcome] = useState({
+    outcome_state: "",
+    outcome_notes: "",
+  });
+  const [outcomeError, setOutcomeError] = useState("");
+  const OUTCOME_STATES = [
+    "Applied",
+    "Rejected",
+    "Offer",
+    "Accepted",
+    "Withdrawn",
+  ];
 
   const handleStageChange = async (newStage) => {
     if (newStage === app.application_status || updatingStage) return;
@@ -291,6 +327,170 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
         setFollowUps((prev) =>
           prev.filter((f) => f.followup_id !== followup_id)
         );
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const loadInterviews = async () => {
+    if (!showInterviews && !interviewsLoaded) {
+      try {
+        const res = await fetch(`${API}/jobs/${app.job_id}/interviews`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setInterviews(await res.json());
+      } catch {
+        // leave empty on error
+      }
+      setInterviewsLoaded(true);
+    }
+    setShowInterviews((v) => !v);
+  };
+
+  const createInterview = async () => {
+    if (!newInterview.round_type.trim()) {
+      setInterviewError("Round type is required.");
+      return;
+    }
+    if (!newInterview.scheduled_at) {
+      setInterviewError("Date & time is required.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/jobs/${app.job_id}/interviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          job_id: app.job_id,
+          round_type: newInterview.round_type,
+          scheduled_at: newInterview.scheduled_at,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setInterviews((prev) => [...prev, created]);
+        setNewInterview({ round_type: "", scheduled_at: "" });
+        setInterviewError("");
+        setAddingInterview(false);
+        // Reset timeline so new event appears on next load
+        setActivity(null);
+        setActivityLoaded(false);
+      } else {
+        const detail = await res.json().catch(() => ({}));
+        setInterviewError(detail.detail || "Failed to save interview.");
+      }
+    } catch {
+      setInterviewError("Failed to save interview.");
+    }
+  };
+
+  const deleteInterview = async (interview_id) => {
+    try {
+      const res = await fetch(`${API}/interviews/${interview_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setInterviews((prev) =>
+          prev.filter((i) => i.interview_id !== interview_id)
+        );
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const loadOutcome = async () => {
+    if (!showOutcome && !outcomeLoaded) {
+      try {
+        const res = await fetch(`${API}/jobs/${app.job_id}/outcome`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setOutcome(await res.json());
+        // 404 just means no outcome yet — leave as null
+      } catch {
+        // leave empty
+      }
+      setOutcomeLoaded(true);
+    }
+    setShowOutcome((v) => !v);
+  };
+
+  const OUTCOME_TO_STAGE = {
+    Accepted: "Offer",
+    Offer: "Offer",
+    Rejected: "Rejected",
+    Withdrawn: "Withdrawn",
+    Applied: "Applied",
+  };
+
+  const saveOutcome = async () => {
+    if (!newOutcome.outcome_state) {
+      setOutcomeError("Please select an outcome.");
+      return;
+    }
+    try {
+      const method = outcome ? "PUT" : "POST";
+      const url = outcome
+        ? `${API}/outcome/${outcome.outcome_id}`
+        : `${API}/jobs/${app.job_id}/outcome`;
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          job_id: app.job_id,
+          outcome_state: newOutcome.outcome_state,
+          outcome_notes: newOutcome.outcome_notes || null,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setOutcome(saved);
+        setNewOutcome({ outcome_state: "", outcome_notes: "" });
+        setOutcomeError("");
+        setAddingOutcome(false);
+        setActivity(null);
+        setActivityLoaded(false);
+
+        // Auto-update the application stage to match the outcome
+        const targetStage = OUTCOME_TO_STAGE[newOutcome.outcome_state];
+        if (targetStage && targetStage !== app.application_status) {
+          await fetch(`${API}/jobs/applications/${app.job_id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ application_status: targetStage }),
+          });
+          onStageChange(app.job_id, targetStage);
+        }
+      } else {
+        const detail = await res.json().catch(() => ({}));
+        setOutcomeError(detail.detail || "Failed to save outcome.");
+      }
+    } catch {
+      setOutcomeError("Failed to save outcome.");
+    }
+  };
+
+  const deleteOutcome = async () => {
+    if (!outcome) return;
+    try {
+      const res = await fetch(`${API}/outcome/${outcome.outcome_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setOutcome(null);
+        setOutcomeLoaded(false);
       }
     } catch {
       // silently fail
@@ -572,6 +772,225 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
         )}
       </div>
 
+      {/* Interviews */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={loadInterviews}
+        >
+          Interviews{interviews.length > 0 ? ` (${interviews.length})` : ""}{" "}
+          {showInterviews ? "▾" : "▸"}
+        </button>
+        {showInterviews && (
+          <div className="followup-body">
+            {interviews.length === 0 ? (
+              <p className="followup-empty">No interviews scheduled yet.</p>
+            ) : (
+              <ul className="followup-list">
+                {interviews.map((iv) => (
+                  <li key={iv.interview_id} className="followup-item">
+                    <span className="followup-desc">📅 {iv.round_type}</span>
+                    <span className="followup-date">
+                      {new Date(iv.scheduled_at).toLocaleString()}
+                    </span>
+                    <button
+                      className="followup-delete-btn"
+                      onClick={() => deleteInterview(iv.interview_id)}
+                      title="Delete"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {addingInterview ? (
+              <div className="followup-add-form">
+                <input
+                  type="text"
+                  className="followup-input"
+                  placeholder="Round type (e.g. Technical, HR)"
+                  value={newInterview.round_type}
+                  onChange={(e) =>
+                    setNewInterview((prev) => ({
+                      ...prev,
+                      round_type: e.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="datetime-local"
+                  className="followup-input"
+                  value={newInterview.scheduled_at}
+                  onChange={(e) =>
+                    setNewInterview((prev) => ({
+                      ...prev,
+                      scheduled_at: e.target.value,
+                    }))
+                  }
+                />
+                {interviewError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {interviewError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button className="app-history-btn" onClick={createInterview}>
+                    Save
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setAddingInterview(false);
+                      setNewInterview({ round_type: "", scheduled_at: "" });
+                      setInterviewError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="app-history-btn"
+                style={{ marginTop: "8px" }}
+                onClick={() => setAddingInterview(true)}
+              >
+                + Schedule Interview
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Outcome */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={loadOutcome}
+        >
+          Outcome{outcome ? ` — ${outcome.outcome_state}` : ""}{" "}
+          {showOutcome ? "▾" : "▸"}
+        </button>
+        {showOutcome && (
+          <div className="followup-body">
+            {outcome && !addingOutcome ? (
+              <div
+                className="followup-item"
+                style={{
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "4px",
+                }}
+              >
+                <span className="followup-desc">
+                  🏁 {outcome.outcome_state}
+                </span>
+                {outcome.outcome_notes && (
+                  <span className="followup-date">{outcome.outcome_notes}</span>
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setNewOutcome({
+                        outcome_state: outcome.outcome_state,
+                        outcome_notes: outcome.outcome_notes || "",
+                      });
+                      setAddingOutcome(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="followup-delete-btn"
+                    onClick={deleteOutcome}
+                  >
+                    ✕ Remove
+                  </button>
+                </div>
+              </div>
+            ) : !addingOutcome ? (
+              <p className="followup-empty">No outcome recorded yet.</p>
+            ) : null}
+
+            {addingOutcome ? (
+              <div className="followup-add-form">
+                <select
+                  className="followup-input"
+                  value={newOutcome.outcome_state}
+                  onChange={(e) =>
+                    setNewOutcome((prev) => ({
+                      ...prev,
+                      outcome_state: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Select outcome…</option>
+                  {OUTCOME_STATES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  className="followup-input"
+                  placeholder="Notes (optional)"
+                  value={newOutcome.outcome_notes}
+                  onChange={(e) =>
+                    setNewOutcome((prev) => ({
+                      ...prev,
+                      outcome_notes: e.target.value,
+                    }))
+                  }
+                />
+                {outcomeError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {outcomeError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button className="app-history-btn" onClick={saveOutcome}>
+                    Save
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setAddingOutcome(false);
+                      setNewOutcome({ outcome_state: "", outcome_notes: "" });
+                      setOutcomeError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="app-history-btn"
+                style={{ marginTop: "8px" }}
+                onClick={() => setAddingOutcome(true)}
+              >
+                + Record Outcome
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {showCoverLetter && (
         <div className="cover-letter-box">
           <div className="cover-letter-header">
@@ -603,21 +1022,35 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
 
       {expanded && (
         <div className="app-activity">
-          <h4 className="app-activity-title">Stage History</h4>
+          <h4 className="app-activity-title">Activity Timeline</h4>
           {activity && activity.length > 0 ? (
             <ul className="app-activity-list">
-              {activity.map((a) => (
-                <li key={a.activity_id} className="app-activity-item">
-                  <span
-                    className="app-activity-dot"
-                    style={{ backgroundColor: STATUS_COLOR[a.stage] || "#888" }}
-                  />
-                  <span className="app-activity-stage">{a.stage}</span>
-                  <span className="app-activity-date">
-                    {new Date(a.changed_at).toLocaleString()}
-                  </span>
-                </li>
-              ))}
+              {activity.map((a) => {
+                const meta =
+                  EVENT_TYPE_META[a.event_type] || EVENT_TYPE_META.stage_change;
+                const dotColor = meta.color || STATUS_COLOR[a.stage] || "#888";
+                return (
+                  <li key={a.activity_id} className="app-activity-item">
+                    <span
+                      className="app-activity-dot"
+                      style={{ backgroundColor: dotColor }}
+                      title={meta.label || a.stage}
+                    >
+                      {meta.icon !== "●" ? meta.icon : ""}
+                    </span>
+                    <span className="app-activity-stage">
+                      {meta.label ? `${meta.label}: ` : ""}
+                      {a.stage}
+                    </span>
+                    {a.notes && (
+                      <span className="app-activity-notes">{a.notes}</span>
+                    )}
+                    <span className="app-activity-date">
+                      {new Date(a.changed_at).toLocaleString()}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p
@@ -746,14 +1179,26 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
               const showRestore =
                 (isArchivedEntry && isCurrentlyArchived) ||
                 (isWithdrawnEntry && isCurrentlyWithdrawn);
+              const meta =
+                EVENT_TYPE_META[a.event_type] || EVENT_TYPE_META.stage_change;
+              const dotColor = meta.color || STATUS_COLOR[a.stage] || "#888";
               return (
                 <li key={`${a.activity_id}-${i}`} className="history-item">
                   <span
                     className="app-activity-dot"
-                    style={{ backgroundColor: STATUS_COLOR[a.stage] || "#888" }}
-                  />
+                    style={{ backgroundColor: dotColor }}
+                    title={meta.label || a.stage}
+                  >
+                    {meta.icon !== "●" ? meta.icon : ""}
+                  </span>
                   <span className="history-job-title">{a.jobTitle}</span>
-                  <span className="app-activity-stage">{a.stage}</span>
+                  <span className="app-activity-stage">
+                    {meta.label ? `${meta.label}: ` : ""}
+                    {a.stage}
+                  </span>
+                  {a.notes && (
+                    <span className="app-activity-notes">{a.notes}</span>
+                  )}
                   <span className="app-activity-date">
                     {new Date(a.changed_at).toLocaleString()}
                   </span>

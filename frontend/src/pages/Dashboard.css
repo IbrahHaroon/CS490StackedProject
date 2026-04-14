@@ -983,3 +983,27 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Generate AI Doc Button (in apply modal) */
+.generate-ai-doc-btn {
+  background: none;
+  border: none;
+  color: #7c3aed;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.2s ease;
+  margin-left: 0.5rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.generate-ai-doc-btn:hover:not(:disabled) {
+  color: #6d28d9;
+}
+
+.generate-ai-doc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -67,7 +67,7 @@ def get_documents_for_job(
     return get_job_documents(session, job_id)
 
 
-@router.put("/documents/{document_id}", response_model=JobDocumentResponse)
+@router.put("/jobs/documents/{document_id}", response_model=JobDocumentResponse)
 def update_document(
     document_id: int,
     body: JobDocumentUpdate,
@@ -96,7 +96,7 @@ def update_document(
     return updated
 
 
-@router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/jobs/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
     document_id: int,
     session: Session = Depends(get_db),

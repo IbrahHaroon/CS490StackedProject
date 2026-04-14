@@ -4,7 +4,14 @@ import "./Dashboard.css";
 
 const API = "http://localhost:8000";
 
-function ApplyModal({ job, documents, onClose, onConfirm }) {
+function ApplyModal({
+  job,
+  documents,
+  onClose,
+  onConfirm,
+  onGenerateAIDoc,
+  aiGenerating,
+}) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedResume, setSelectedResume] = useState("");
@@ -49,12 +56,22 @@ function ApplyModal({ job, documents, onClose, onConfirm }) {
           <div className="apply-modal-field">
             <label className="apply-modal-field-label">
               Choose your resume
+              <button
+                type="button"
+                className="generate-ai-doc-btn"
+                onClick={() =>
+                  onGenerateAIDoc("Resume", job.position_id, setSelectedResume)
+                }
+                disabled={submitting || aiGenerating}
+              >
+                Generate AI Resume
+              </button>
             </label>
             <select
               className="apply-modal-select"
               value={selectedResume}
               onChange={(e) => setSelectedResume(e.target.value)}
-              disabled={submitting}
+              disabled={submitting || aiGenerating}
             >
               <option value="">— None —</option>
               {resumes.map((d) => (
@@ -68,12 +85,26 @@ function ApplyModal({ job, documents, onClose, onConfirm }) {
           <div className="apply-modal-field">
             <label className="apply-modal-field-label">
               Choose your cover letter
+              <button
+                type="button"
+                className="generate-ai-doc-btn"
+                onClick={() =>
+                  onGenerateAIDoc(
+                    "Cover Letter",
+                    job.position_id,
+                    setSelectedCoverLetter
+                  )
+                }
+                disabled={submitting || aiGenerating}
+              >
+                Generate AI Cover Letter
+              </button>
             </label>
             <select
               className="apply-modal-select"
               value={selectedCoverLetter}
               onChange={(e) => setSelectedCoverLetter(e.target.value)}
-              disabled={submitting}
+              disabled={submitting || aiGenerating}
             >
               <option value="">— None —</option>
               {coverLetters.map((d) => (
@@ -133,22 +164,10 @@ function Dashboard() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applyTarget, setApplyTarget] = useState(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [applySuccess, setApplySuccess] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Shared AI modal state
-  const [aiModal, setAiModal] = useState(null); // 'resume' | 'cover-letter' | 'improve' | null
-  const [aiInstructions, setAiInstructions] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiContent, setAiContent] = useState("");
-  const [aiDocName, setAiDocName] = useState("");
-  const [aiError, setAiError] = useState("");
-  // Improve-resume specific
-  const [improveDocId, setImproveDocId] = useState("");
-  const [improveOriginal, setImproveOriginal] = useState("");
-  const [improveImproved, setImproveImproved] = useState("");
-  const [improveApplying, setImproveApplying] = useState(false);
 
   const jobBoardRef = useRef(null);
   const navigate = useNavigate();
@@ -226,6 +245,59 @@ function Dashboard() {
     return null;
   };
 
+  const handleGenerateAIDoc = async (docType, position_id, setSelectedDoc) => {
+    if (aiGenerating) return;
+    setAiGenerating(true);
+    try {
+      const endpoint =
+        docType === "Resume"
+          ? `${API}/documents/generate-resume`
+          : `${API}/documents/generate-cover-letter`;
+
+      const body = { position_id };
+      // If the user has existing instructions, they could be added here.
+      // For now, we'll send a basic request.
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed to generate AI ${docType}.`);
+      }
+
+      const newDoc = await res.json();
+      // Update the documents list and select the new document
+      setDocuments((prevDocs) => [
+        ...prevDocs,
+        {
+          doc_id: newDoc.doc_id,
+          document_type: docType,
+          document_name: newDoc.document_name,
+          document_location: null, // AI generated docs are content-based
+          content: newDoc.content,
+          user_id: newDoc.user_id,
+        },
+      ]);
+      setSelectedDoc(newDoc.doc_id);
+      // Optionally show a success message
+      setApplySuccess(`AI ${docType} generated successfully!`);
+      setTimeout(() => setApplySuccess(""), 3000);
+    } catch (err) {
+      console.error(`Error generating AI ${docType}:`, err);
+      // Display error in the modal
+      // This would require passing a setter for error to ApplyModal
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const filteredJobs = searchQuery.trim()
     ? jobs.filter((job) => {
         const q = searchQuery.toLowerCase();
@@ -242,340 +314,6 @@ function Dashboard() {
     jobBoardRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // ── AI Modal helpers ────────────────────────────────────────────────────────
-
-  const openAiModal = (type) => {
-    setAiModal(type);
-    setAiInstructions("");
-    setAiLoading(false);
-    setAiContent("");
-    setAiDocName("");
-    setAiError("");
-    setImproveDocId("");
-    setImproveOriginal("");
-    setImproveImproved("");
-  };
-
-  const closeAiModal = () => setAiModal(null);
-
-  const refreshDocs = async () => {
-    const docRes = await fetch(`${API}/documents/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (docRes.ok) setDocuments(await docRes.json());
-  };
-
-  const handleGenResume = async () => {
-    setAiLoading(true);
-    setAiError("");
-    try {
-      const res = await fetch(`${API}/documents/generate-resume`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          position_id: selectedJob?.position_id,
-          instructions: aiInstructions,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setAiError(err.detail || "Resume generation failed.");
-        return;
-      }
-      const data = await res.json();
-      setAiContent(data.content);
-      setAiDocName(data.document_name);
-      refreshDocs();
-    } catch {
-      setAiError("Request failed. Please try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const handleGenCoverLetter = async () => {
-    setAiLoading(true);
-    setAiError("");
-    try {
-      const res = await fetch(`${API}/documents/generate-cover-letter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          position_id: selectedJob?.position_id,
-          instructions: aiInstructions,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setAiError(err.detail || "Cover letter generation failed.");
-        return;
-      }
-      const data = await res.json();
-      setAiContent(data.content);
-      setAiDocName(data.document_name);
-      refreshDocs();
-    } catch {
-      setAiError("Request failed. Please try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const handleImproveResume = async () => {
-    if (!improveDocId) {
-      setAiError("Please select a resume to improve.");
-      return;
-    }
-    setAiLoading(true);
-    setAiError("");
-    try {
-      const res = await fetch(`${API}/documents/${improveDocId}/ai-rewrite`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ instructions: aiInstructions }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setAiError(err.detail || "Resume improvement failed.");
-        return;
-      }
-      const data = await res.json();
-      setImproveOriginal(data.original);
-      setImproveImproved(data.improved);
-    } catch {
-      setAiError("Request failed. Please try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const handleImproveApply = async () => {
-    setImproveApplying(true);
-    setAiError("");
-    try {
-      const res = await fetch(`${API}/documents/${improveDocId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: improveImproved }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setAiError(err.detail || "Failed to apply changes.");
-        return;
-      }
-      closeAiModal();
-      setApplySuccess("Resume improvements saved!");
-      setTimeout(() => setApplySuccess(""), 3000);
-    } catch {
-      setAiError("Request failed. Please try again.");
-    } finally {
-      setImproveApplying(false);
-    }
-  };
-
-  const resumeDocs = documents.filter((d) => d.document_type === "Resume");
-
-  const MODAL_TITLES = {
-    resume: "Generate Resume",
-    "cover-letter": "Generate Cover Letter",
-    improve: "Improve Resume",
-  };
-
-  const renderAiModal = () => {
-    if (!aiModal) return null;
-    const title = MODAL_TITLES[aiModal];
-    const isGenerate = aiModal === "resume" || aiModal === "cover-letter";
-
-    return (
-      <div className="dash-ai-overlay" onClick={closeAiModal}>
-        <div
-          className={`dash-ai-modal${aiModal === "improve" && improveOriginal ? " dash-ai-modal--wide" : ""}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="dash-ai-header">
-            <div>
-              <h2 className="dash-ai-title">{title}</h2>
-              {selectedJob && (
-                <p className="dash-ai-subtitle">
-                  {selectedJob.title} @ {selectedJob.company_name}
-                </p>
-              )}
-            </div>
-            <button className="dash-ai-close" onClick={closeAiModal}>
-              ✕
-            </button>
-          </div>
-
-          {/* Input area */}
-          {isGenerate && !aiContent && !aiLoading && (
-            <div className="dash-ai-body">
-              <label className="dash-ai-label">
-                Additional Instructions{" "}
-                <span className="dash-ai-optional">(optional)</span>
-              </label>
-              <textarea
-                className="dash-ai-textarea"
-                value={aiInstructions}
-                onChange={(e) => setAiInstructions(e.target.value)}
-                placeholder={
-                  aiModal === "resume"
-                    ? "e.g. Emphasize backend experience, keep to one page…"
-                    : "e.g. Keep it formal, highlight leadership experience…"
-                }
-                rows={3}
-              />
-              {aiError && <p className="dash-ai-error">{aiError}</p>}
-            </div>
-          )}
-
-          {aiModal === "improve" && !improveOriginal && !aiLoading && (
-            <div className="dash-ai-body">
-              <label className="dash-ai-label">Select Resume to Improve</label>
-              {resumeDocs.length === 0 ? (
-                <p className="dash-ai-hint">
-                  No resume documents found. Upload one in the Document Library
-                  first.
-                </p>
-              ) : (
-                <select
-                  className="dash-ai-select"
-                  value={improveDocId}
-                  onChange={(e) => setImproveDocId(e.target.value)}
-                >
-                  <option value="">— Choose a resume —</option>
-                  {resumeDocs.map((d) => (
-                    <option key={d.doc_id} value={d.doc_id}>
-                      {d.document_name || `Document #${d.doc_id}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <label className="dash-ai-label" style={{ marginTop: "0.75rem" }}>
-                Instructions{" "}
-                <span className="dash-ai-optional">(optional)</span>
-              </label>
-              <textarea
-                className="dash-ai-textarea"
-                value={aiInstructions}
-                onChange={(e) => setAiInstructions(e.target.value)}
-                placeholder="e.g. Tailor for this role, strengthen action verbs…"
-                rows={3}
-              />
-              {aiError && <p className="dash-ai-error">{aiError}</p>}
-            </div>
-          )}
-
-          {/* Loading spinner */}
-          {aiLoading && (
-            <div className="dash-ai-loading">
-              <div className="dash-ai-spinner" />
-              <p>Generating…</p>
-            </div>
-          )}
-
-          {/* Generate result */}
-          {isGenerate && aiContent && !aiLoading && (
-            <div className="dash-ai-result">
-              <div className="dash-ai-result-header">
-                <span className="dash-ai-saved-badge">
-                  Saved as &ldquo;{aiDocName}&rdquo; in your Document Library
-                </span>
-              </div>
-              <textarea
-                className="dash-ai-result-text"
-                value={aiContent}
-                readOnly
-              />
-            </div>
-          )}
-
-          {/* Improve result — side-by-side */}
-          {aiModal === "improve" && improveOriginal && !aiLoading && (
-            <div className="dash-ai-compare">
-              <div className="dash-ai-col">
-                <div className="dash-ai-col-header">Original</div>
-                <pre className="dash-ai-col-text">{improveOriginal}</pre>
-              </div>
-              <div className="dash-ai-col">
-                <div className="dash-ai-col-header dash-ai-col-header--improved">
-                  AI Suggestion
-                </div>
-                <textarea
-                  className="dash-ai-col-text dash-ai-col-text--edit"
-                  value={improveImproved}
-                  onChange={(e) => setImproveImproved(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {aiError && improveOriginal && (
-            <p className="dash-ai-error dash-ai-error--inline">{aiError}</p>
-          )}
-
-          {/* Actions */}
-          <div className="dash-ai-actions">
-            <button className="dash-ai-cancel-btn" onClick={closeAiModal}>
-              {aiContent || improveOriginal ? "Close" : "Cancel"}
-            </button>
-            {isGenerate && !aiContent && !aiLoading && (
-              <button
-                className={`dash-ai-generate-btn dash-ai-generate-btn--${aiModal}`}
-                onClick={
-                  aiModal === "resume" ? handleGenResume : handleGenCoverLetter
-                }
-              >
-                {title}
-              </button>
-            )}
-            {aiModal === "improve" && !improveOriginal && !aiLoading && (
-              <button
-                className="dash-ai-generate-btn dash-ai-generate-btn--improve"
-                onClick={handleImproveResume}
-                disabled={!improveDocId || resumeDocs.length === 0}
-              >
-                Generate Improvements
-              </button>
-            )}
-            {aiModal === "improve" && improveOriginal && (
-              <>
-                <button
-                  className="dash-ai-cancel-btn"
-                  onClick={() => {
-                    setImproveOriginal("");
-                    setImproveImproved("");
-                    setAiError("");
-                  }}
-                >
-                  Try Again
-                </button>
-                <button
-                  className="dash-ai-save-btn"
-                  onClick={handleImproveApply}
-                  disabled={improveApplying}
-                >
-                  {improveApplying ? "Applying…" : "Apply Changes"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ── Action buttons row (shared between inline detail and expanded overlay) ──
 
   const renderActionButtons = (job) => {
@@ -589,19 +327,22 @@ function Dashboard() {
         <div className="job-action-row">
           <button
             className="job-ai-btn job-ai-btn--resume"
-            onClick={() => openAiModal("resume")}
+            onClick={() => setApplyTarget(job)}
+            title="Generate AI-powered resume tailored to this job"
           >
             Generate Resume
           </button>
           <button
             className="job-ai-btn job-ai-btn--cover"
-            onClick={() => openAiModal("cover-letter")}
+            onClick={() => setApplyTarget(job)}
+            title="Generate AI-powered cover letter tailored to this job"
           >
             Generate Cover Letter
           </button>
           <button
             className="job-ai-btn job-ai-btn--improve"
-            onClick={() => openAiModal("improve")}
+            onClick={() => navigate("/documents")}
+            title="Improve existing resume or cover letter"
           >
             Improve Resume
           </button>
@@ -646,10 +387,10 @@ function Dashboard() {
           documents={documents}
           onClose={() => setApplyTarget(null)}
           onConfirm={handleApply}
+          onGenerateAIDoc={handleGenerateAIDoc}
+          aiGenerating={aiGenerating}
         />
       )}
-      {renderAiModal()}
-
       <h1 className="dashboard-welcome">Welcome</h1>
       {applySuccess && <p className="apply-success-msg">{applySuccess}</p>}
 
@@ -838,6 +579,14 @@ function Dashboard() {
                 >
                   <span className="job-card-company">{job.company_name}</span>
                   <h3 className="job-card-title">{job.title}</h3>
+                  {(job.location || job.location_type) && (
+                    <span className="job-card-meta">
+                      📍{" "}
+                      {[job.location_type, job.location]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
                   <span className="job-card-meta">
                     {job.salary
                       ? `$${Number(job.salary).toLocaleString()}`
@@ -859,6 +608,14 @@ function Dashboard() {
                 <h2 className="job-detail-title">
                   {selectedJob.title} @ {selectedJob.company_name}
                 </h2>
+                {(selectedJob.location || selectedJob.location_type) && (
+                  <p className="job-detail-meta">
+                    📍{" "}
+                    {[selectedJob.location_type, selectedJob.location]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 <p className="job-detail-meta">
                   {selectedJob.salary
                     ? `$${Number(selectedJob.salary).toLocaleString()}`
@@ -920,6 +677,14 @@ function Dashboard() {
                   <h2 className="job-detail-title">
                     {selectedJob.title} @ {selectedJob.company_name}
                   </h2>
+                  {(selectedJob.location || selectedJob.location_type) && (
+                    <p className="job-detail-meta">
+                      📍{" "}
+                      {[selectedJob.location_type, selectedJob.location]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   <p className="job-detail-meta">
                     {selectedJob.salary
                       ? `$${Number(selectedJob.salary).toLocaleString()}`
