@@ -1,7 +1,5 @@
 """Tests for /jobs/positions/ and /jobs/applications/ endpoints."""
 
-from database.models.user import create_user
-
 JOBS_URL = "/jobs"
 
 ADDRESS_PAYLOAD = {"address": "1 Corp Way", "state": "CA", "zip_code": 94105}
@@ -20,9 +18,9 @@ def _create_company(client):
     return client.post("/company/", json=COMPANY_PAYLOAD).json()
 
 
-def _create_position(client, company_id):
+def _create_position(client, company_id, headers=None):
     payload = {**POSITION_PAYLOAD_BASE, "company_id": company_id}
-    return client.post(f"{JOBS_URL}/positions/", json=payload).json()
+    return client.post(f"{JOBS_URL}/positions/", json=payload, headers=headers).json()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,44 +29,50 @@ def _create_position(client, company_id):
 
 
 class TestCreatePosition:
-    def test_returns_201_on_success(self, client):
+    def test_returns_201_on_success(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
         payload = {**POSITION_PAYLOAD_BASE, "company_id": company["company_id"]}
-        response = client.post(f"{JOBS_URL}/positions/", json=payload)
+        response = client.post(f"{JOBS_URL}/positions/", json=payload, headers=headers)
         assert response.status_code == 201
 
-    def test_response_contains_position_id(self, client):
+    def test_response_contains_position_id(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         assert "position_id" in position
 
-    def test_title_stored_correctly(self, client):
+    def test_title_stored_correctly(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         assert position["title"] == "Software Engineer"
 
-    def test_salary_stored_correctly(self, client):
+    def test_salary_stored_correctly(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         assert float(position["salary"]) == 95000.00
 
-    def test_optional_fields_can_be_omitted(self, client):
+    def test_optional_fields_can_be_omitted(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
         payload = {
             "company_id": company["company_id"],
             "title": "Intern",
             "listing_date": "2025-06-01",
         }
-        response = client.post(f"{JOBS_URL}/positions/", json=payload)
+        response = client.post(f"{JOBS_URL}/positions/", json=payload, headers=headers)
         assert response.status_code == 201
         body = response.json()
         assert body["salary"] is None
         assert body["description"] is None
 
-    def test_missing_title_returns_422(self, client):
+    def test_missing_title_returns_422(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
         payload = {"company_id": company["company_id"], "listing_date": "2025-01-01"}
-        response = client.post(f"{JOBS_URL}/positions/", json=payload)
+        response = client.post(f"{JOBS_URL}/positions/", json=payload, headers=headers)
         assert response.status_code == 422
 
 
@@ -78,15 +82,17 @@ class TestCreatePosition:
 
 
 class TestReadPosition:
-    def test_returns_200_for_existing_position(self, client):
+    def test_returns_200_for_existing_position(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         response = client.get(f"{JOBS_URL}/positions/{position['position_id']}")
         assert response.status_code == 200
 
-    def test_returns_correct_position(self, client):
+    def test_returns_correct_position(self, client, user_with_auth):
+        _, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         response = client.get(f"{JOBS_URL}/positions/{position['position_id']}")
         assert response.json()["title"] == "Software Engineer"
 
@@ -101,47 +107,48 @@ class TestReadPosition:
 
 
 class TestApplyForJob:
-    def test_returns_201_on_success(self, client, session):
-        user = create_user(session, "applicant@example.com")
+    def test_returns_201_on_success(self, client, user_with_auth):
+        user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         payload = {
-            "user_id": user.user_id,
             "position_id": position["position_id"],
             "years_of_experience": 3,
         }
-        response = client.post(f"{JOBS_URL}/applications/", json=payload)
+        response = client.post(
+            f"{JOBS_URL}/applications/", json=payload, headers=headers
+        )
         assert response.status_code == 201
 
-    def test_response_contains_job_id(self, client, session):
-        user = create_user(session, "applicant@example.com")
+    def test_response_contains_job_id(self, client, user_with_auth):
+        user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         payload = {
-            "user_id": user.user_id,
             "position_id": position["position_id"],
             "years_of_experience": 3,
         }
-        application = client.post(f"{JOBS_URL}/applications/", json=payload).json()
+        application = client.post(
+            f"{JOBS_URL}/applications/", json=payload, headers=headers
+        ).json()
         assert "job_id" in application
 
-    def test_application_status_initialized_to_applied(self, client, session):
-        user = create_user(session, "applicant@example.com")
+    def test_application_status_initialized_to_applied(self, client, user_with_auth):
+        user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         payload = {
-            "user_id": user.user_id,
             "position_id": position["position_id"],
             "years_of_experience": 3,
         }
-        application = client.post(f"{JOBS_URL}/applications/", json=payload).json()
+        application = client.post(
+            f"{JOBS_URL}/applications/", json=payload, headers=headers
+        ).json()
         assert application["application_status"] == "Applied"
 
-    def test_missing_field_returns_422(self, client, session):
-        user = create_user(session, "applicant@example.com")
-        response = client.post(
-            f"{JOBS_URL}/applications/", json={"user_id": user.user_id}
-        )
+    def test_missing_field_returns_422(self, client, user_with_auth):
+        _, headers = user_with_auth
+        response = client.post(f"{JOBS_URL}/applications/", json={}, headers=headers)
         assert response.status_code == 422
 
 
@@ -151,59 +158,77 @@ class TestApplyForJob:
 
 
 class TestReadApplications:
-    def test_returns_empty_list_for_user_with_no_applications(self, client, session):
-        user = create_user(session, "noapps@example.com")
-        response = client.get(f"{JOBS_URL}/applications/{user.user_id}")
+    def test_returns_empty_list_for_user_with_no_applications(
+        self, client, user_with_auth
+    ):
+        user_id, headers = user_with_auth
+        response = client.get(f"{JOBS_URL}/applications/{user_id}", headers=headers)
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_returns_correct_number_of_applications(self, client, session):
-        user = create_user(session, "manyapps@example.com")
+    def test_returns_correct_number_of_applications(self, client, user_with_auth):
+        user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
         for yoe in [1, 2, 3]:
             client.post(
                 f"{JOBS_URL}/applications/",
                 json={
-                    "user_id": user.user_id,
                     "position_id": position["position_id"],
                     "years_of_experience": yoe,
                 },
+                headers=headers,
             )
-        response = client.get(f"{JOBS_URL}/applications/{user.user_id}")
+        response = client.get(f"{JOBS_URL}/applications/{user_id}", headers=headers)
         assert len(response.json()) == 3
 
-    def test_returns_only_applications_for_correct_user(self, client, session):
-        u1 = create_user(session, "apps1@example.com")
-        u2 = create_user(session, "apps2@example.com")
+    def test_returns_only_applications_for_correct_user(
+        self, client, user_with_auth, other_user_with_auth
+    ):
+        u1_id, u1_headers = user_with_auth
+        u2_id, u2_headers = other_user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
+        position = _create_position(client, company["company_id"], headers=u1_headers)
         client.post(
             f"{JOBS_URL}/applications/",
             json={
-                "user_id": u1.user_id,
                 "position_id": position["position_id"],
                 "years_of_experience": 1,
             },
+            headers=u1_headers,
         )
         client.post(
             f"{JOBS_URL}/applications/",
             json={
-                "user_id": u2.user_id,
                 "position_id": position["position_id"],
                 "years_of_experience": 2,
             },
+            headers=u2_headers,
         )
         client.post(
             f"{JOBS_URL}/applications/",
             json={
-                "user_id": u2.user_id,
                 "position_id": position["position_id"],
                 "years_of_experience": 3,
             },
+            headers=u2_headers,
         )
-        assert len(client.get(f"{JOBS_URL}/applications/{u1.user_id}").json()) == 1
-        assert len(client.get(f"{JOBS_URL}/applications/{u2.user_id}").json()) == 2
+        assert (
+            len(
+                client.get(
+                    f"{JOBS_URL}/applications/{u1_id}", headers=u1_headers
+                ).json()
+            )
+            == 1
+        )
+        assert (
+            len(
+                client.get(
+                    f"{JOBS_URL}/applications/{u2_id}", headers=u2_headers
+                ).json()
+            )
+            == 2
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -211,14 +236,14 @@ class TestReadApplications:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _create_application(client, user_id, position_id):
+def _create_application(client, position_id, headers=None):
     return client.post(
         f"{JOBS_URL}/applications/",
         json={
-            "user_id": user_id,
             "position_id": position_id,
             "years_of_experience": 2,
         },
+        headers=headers,
     ).json()
 
 
@@ -226,8 +251,8 @@ class TestUpdateApplicationStage:
     def test_valid_stage_change_returns_200(self, client, user_with_auth):
         user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
-        app = _create_application(client, user_id, position["position_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
+        app = _create_application(client, position["position_id"], headers=headers)
         response = client.put(
             f"{JOBS_URL}/applications/{app['job_id']}",
             json={"application_status": "Interview"},
@@ -239,8 +264,8 @@ class TestUpdateApplicationStage:
     def test_invalid_stage_returns_422(self, client, user_with_auth):
         user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
-        app = _create_application(client, user_id, position["position_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
+        app = _create_application(client, position["position_id"], headers=headers)
         response = client.put(
             f"{JOBS_URL}/applications/{app['job_id']}",
             json={"application_status": "NotAStage"},
@@ -251,8 +276,8 @@ class TestUpdateApplicationStage:
     def test_stage_change_updates_stage_changed_at(self, client, user_with_auth):
         user_id, headers = user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
-        app = _create_application(client, user_id, position["position_id"])
+        position = _create_position(client, company["company_id"], headers=headers)
+        app = _create_application(client, position["position_id"], headers=headers)
         original_ts = app.get("stage_changed_at")
         response = client.put(
             f"{JOBS_URL}/applications/{app['job_id']}",
@@ -273,11 +298,11 @@ class TestUpdateApplicationStage:
     def test_other_users_application_returns_403(
         self, client, user_with_auth, other_user_with_auth
     ):
-        user_id, _ = user_with_auth
+        user_id, user_headers = user_with_auth
         _, other_headers = other_user_with_auth
         company = _create_company(client)
-        position = _create_position(client, company["company_id"])
-        app = _create_application(client, user_id, position["position_id"])
+        position = _create_position(client, company["company_id"], headers=user_headers)
+        app = _create_application(client, position["position_id"], headers=user_headers)
         response = client.put(
             f"{JOBS_URL}/applications/{app['job_id']}",
             json={"application_status": "Interview"},

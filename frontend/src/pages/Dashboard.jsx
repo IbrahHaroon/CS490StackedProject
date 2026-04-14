@@ -157,7 +157,8 @@ function ApplyModal({
 }
 
 function Dashboard() {
-  const [jobs, setJobs] = useState([]);
+  const [jobs, setJobs] = useState([]); // recruiter-posted only (job board)
+  const [positionMap, setPositionMap] = useState({}); // all positions keyed by id (for lookup)
   const [selectedJob, setSelectedJob] = useState(null);
   const [applications, setApplications] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -177,11 +178,17 @@ function Dashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const posRes = await fetch(`${API}/jobs/positions/`);
+        const posRes = await fetch(
+          `${API}/jobs/positions/?include_manual=true`
+        );
         if (posRes.ok) {
           const data = await posRes.json();
-          setJobs(data);
-          if (data.length > 0) setSelectedJob(data[0]);
+          const boardJobs = data.filter((p) => !p.is_manual);
+          setJobs(boardJobs);
+          if (boardJobs.length > 0) setSelectedJob(boardJobs[0]);
+          const map = {};
+          for (const p of data) map[p.position_id] = p;
+          setPositionMap(map);
         }
 
         // Applications, documents, and metrics require auth
@@ -502,16 +509,22 @@ function Dashboard() {
             {applications.length === 0 ? (
               <p className="preview-placeholder">No applications yet.</p>
             ) : (
-              applications.slice(0, 2).map((app) => (
-                <div key={app.job_id} className="preview-job-item">
-                  <span className="preview-job-company">
-                    {app.application_status}
-                  </span>
-                  <span className="preview-job-title">
-                    Application #{app.job_id}
-                  </span>
-                </div>
-              ))
+              [...applications]
+                .sort((a, b) => b.job_id - a.job_id)
+                .slice(0, 3)
+                .map((app) => {
+                  const pos = positionMap[app.position_id];
+                  return (
+                    <div key={app.job_id} className="preview-job-item">
+                      <span className="preview-job-company">
+                        {pos?.company_name || app.application_status}
+                      </span>
+                      <span className="preview-job-title">
+                        {pos?.title || `Application #${app.job_id}`}
+                      </span>
+                    </div>
+                  );
+                })
             )}
           </div>
         </div>

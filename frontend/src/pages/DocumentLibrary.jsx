@@ -53,6 +53,13 @@ function DocumentLibrary() {
   const [genResumeError, setGenResumeError] = useState("");
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [positions, setPositions] = useState([]);
+  const [genCoverOpen, setGenCoverOpen] = useState(false);
+  const [genCoverJobId, setGenCoverJobId] = useState("");
+  const [genCoverInstructions, setGenCoverInstructions] = useState("");
+  const [genCoverLoading, setGenCoverLoading] = useState(false);
+  const [genCoverContent, setGenCoverContent] = useState("");
+  const [genCoverDocName, setGenCoverDocName] = useState("");
+  const [genCoverError, setGenCoverError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -459,6 +466,77 @@ function DocumentLibrary() {
     setGenResumeError("");
   };
 
+  const handleOpenGenCover = async () => {
+    setGenCoverOpen(true);
+    setGenCoverJobId("");
+    setGenCoverInstructions("");
+    setGenCoverContent("");
+    setGenCoverDocName("");
+    setGenCoverError("");
+
+    try {
+      const [jobsRes, posRes] = await Promise.all([
+        fetch(`${API}/jobs/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API}/jobs/positions/`),
+      ]);
+      if (jobsRes.ok) setAppliedJobs(await jobsRes.json());
+      if (posRes.ok) setPositions(await posRes.json());
+    } catch {
+      // dropdown will just be empty; not fatal
+    }
+  };
+
+  const handleGenCoverGenerate = async () => {
+    if (!token) {
+      setGenCoverError("You must be signed in.");
+      return;
+    }
+    setGenCoverLoading(true);
+    setGenCoverError("");
+
+    try {
+      const res = await fetch(`${API}/documents/generate-cover-letter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          job_id: genCoverJobId ? parseInt(genCoverJobId) : null,
+          instructions: genCoverInstructions,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setGenCoverError(
+          err.detail || "Cover letter generation failed. Please try again."
+        );
+        return;
+      }
+
+      const data = await res.json();
+      setGenCoverContent(data.content);
+      setGenCoverDocName(data.document_name);
+      fetchDocuments();
+    } catch {
+      setGenCoverError("Request failed. Check console for details.");
+    } finally {
+      setGenCoverLoading(false);
+    }
+  };
+
+  const handleGenCoverClose = () => {
+    setGenCoverOpen(false);
+    setGenCoverJobId("");
+    setGenCoverInstructions("");
+    setGenCoverContent("");
+    setGenCoverDocName("");
+    setGenCoverError("");
+  };
+
   // Build a position lookup map for the job dropdown
   const positionMap = Object.fromEntries(
     positions.map((p) => [p.position_id, p])
@@ -468,12 +546,21 @@ function DocumentLibrary() {
     <div className="doclibrary">
       <div className="doclibrary-header">
         <h1>Document Library</h1>
-        <button
-          className="doclibrary-gen-resume-btn"
-          onClick={handleOpenGenResume}
-        >
-          Generate AI Resume
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            className="doclibrary-gen-resume-btn"
+            onClick={handleOpenGenResume}
+          >
+            Generate AI Resume
+          </button>
+          <button
+            className="doclibrary-gen-resume-btn"
+            style={{ background: "#a855f7" }}
+            onClick={handleOpenGenCover}
+          >
+            Generate AI Cover Letter
+          </button>
+        </div>
       </div>
 
       {viewingDoc && (
@@ -781,6 +868,111 @@ function DocumentLibrary() {
                   disabled={genResumeLoading}
                 >
                   {genResumeLoading ? "Generating…" : "Generate Resume"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {genCoverOpen && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal doclibrary-ai-modal">
+            <div className="doclibrary-modal-header">
+              <h2>Generate AI Cover Letter</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={handleGenCoverClose}
+              >
+                ✕
+              </button>
+            </div>
+
+            {!genCoverContent && (
+              <div className="doclibrary-ai-prompt">
+                <label className="doclibrary-ai-label">
+                  Target Job{" "}
+                  <span className="doclibrary-ai-optional">(optional)</span>
+                </label>
+                <select
+                  className="doclibrary-gen-select"
+                  value={genCoverJobId}
+                  onChange={(e) => setGenCoverJobId(e.target.value)}
+                  disabled={genCoverLoading}
+                >
+                  <option value="">
+                    — General cover letter (no specific job) —
+                  </option>
+                  {appliedJobs.map((job) => {
+                    const pos = positionMap[job.position_id];
+                    const label = pos
+                      ? `${pos.title} at ${pos.company_name} (${job.application_status})`
+                      : `Application #${job.job_id} (${job.application_status})`;
+                    return (
+                      <option key={job.job_id} value={job.job_id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                <label
+                  className="doclibrary-ai-label"
+                  style={{ marginTop: "0.75rem" }}
+                >
+                  Additional Instructions{" "}
+                  <span className="doclibrary-ai-optional">(optional)</span>
+                </label>
+                <textarea
+                  className="doclibrary-ai-instructions"
+                  value={genCoverInstructions}
+                  onChange={(e) => setGenCoverInstructions(e.target.value)}
+                  placeholder="e.g. Emphasize leadership experience, keep it under one page, formal tone…"
+                  rows={3}
+                  disabled={genCoverLoading}
+                />
+                {genCoverError && (
+                  <p className="doclibrary-error">{genCoverError}</p>
+                )}
+              </div>
+            )}
+
+            {genCoverLoading && (
+              <div className="doclibrary-ai-loading">
+                <div className="doclibrary-ai-spinner" />
+                <p>Generating your cover letter…</p>
+              </div>
+            )}
+
+            {genCoverContent && !genCoverLoading && (
+              <div className="doclibrary-gen-result">
+                <div className="doclibrary-gen-result-header">
+                  <span className="doclibrary-gen-saved-badge">
+                    Saved as &ldquo;{genCoverDocName}&rdquo;
+                  </span>
+                </div>
+                <textarea
+                  className="doclibrary-gen-textarea"
+                  value={genCoverContent}
+                  readOnly
+                />
+              </div>
+            )}
+
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={handleGenCoverClose}
+              >
+                {genCoverContent ? "Close" : "Cancel"}
+              </button>
+              {!genCoverContent && (
+                <button
+                  className="doclibrary-ai-generate-btn"
+                  onClick={handleGenCoverGenerate}
+                  disabled={genCoverLoading}
+                >
+                  {genCoverLoading ? "Generating…" : "Generate Cover Letter"}
                 </button>
               )}
             </div>

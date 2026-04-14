@@ -82,6 +82,7 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
   const [showCoverLetter, setShowCoverLetter] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [genError, setGenError] = useState("");
   const token = localStorage.getItem("token");
 
   // S2-007 — Deadline & Recruiter Notes
@@ -193,26 +194,29 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
   };
 
   const generateCoverLetter = async () => {
+    setIsGenerating(true);
+    setGenError("");
     try {
-      setIsGenerating(true);
-
-      const title = position?.title || "this role";
-      const company = position?.company_name || "your company";
-
-      const generated = `Dear Hiring Manager,
-
-I am excited to apply for the ${title} position at ${company}. My background and experience make me a strong candidate for this opportunity.
-
-Through my previous work and projects, I have developed relevant technical and problem-solving skills that align with the responsibilities of this role. I am especially interested in contributing to ${company} and continuing to grow in a position like ${title}.
-
-I am eager to bring my motivation, adaptability, and willingness to learn to your team. Thank you for your time and consideration. I would welcome the opportunity to discuss how my experience and interests align with this position.
-
-`;
-
-      setCoverLetter(generated);
+      const res = await fetch(`${API}/documents/generate-cover-letter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ job_id: app.job_id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setGenError(err.detail || "Failed to generate cover letter.");
+        setShowCoverLetter(true);
+        return;
+      }
+      const data = await res.json();
+      setCoverLetter(data.content || "");
       setShowCoverLetter(true);
-    } catch (err) {
-      console.error("Failed to generate cover letter:", err);
+    } catch {
+      setGenError("Network error — could not reach the server.");
+      setShowCoverLetter(true);
     } finally {
       setIsGenerating(false);
     }
@@ -994,7 +998,7 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
       {showCoverLetter && (
         <div className="cover-letter-box">
           <div className="cover-letter-header">
-            <h4 className="cover-letter-title">Cover Letter Draft</h4>
+            <h4 className="cover-letter-title">AI Cover Letter</h4>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 className="app-history-btn"
@@ -1005,18 +1009,39 @@ I am eager to bring my motivation, adaptability, and willingness to learn to you
               </button>
               <button
                 className="app-history-btn"
-                onClick={() => setShowCoverLetter((prev) => !prev)}
+                onClick={() => {
+                  setShowCoverLetter(false);
+                  setGenError("");
+                }}
               >
-                {showCoverLetter ? "Hide Draft" : "Show Draft"}
+                Hide
               </button>
             </div>
           </div>
-
-          <textarea
-            className="cover-letter-textarea"
-            value={coverLetter}
-            onChange={(e) => setCoverLetter(e.target.value)}
-          />
+          {genError ? (
+            <p
+              style={{ color: "#ef4444", fontSize: "13px", margin: "8px 0 0" }}
+            >
+              {genError}
+            </p>
+          ) : (
+            <>
+              <p
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: "12px",
+                  margin: "4px 0 8px",
+                }}
+              >
+                Saved to your Document Library.
+              </p>
+              <textarea
+                className="cover-letter-textarea"
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -1221,6 +1246,178 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
   );
 }
 
+function AddJobModal({ onClose, onAdded }) {
+  const [form, setForm] = useState({
+    company_name: "",
+    title: "",
+    location: "",
+    salary: "",
+    description: "",
+    application_status: "Interested",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const token = localStorage.getItem("token");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.company_name.trim() || !form.title.trim()) {
+      setError("Company name and job title are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const body = {
+        company_name: form.company_name.trim(),
+        title: form.title.trim(),
+        location: form.location.trim() || null,
+        salary: form.salary ? parseFloat(form.salary) : null,
+        description: form.description.trim() || null,
+        application_status: form.application_status,
+      };
+      const res = await fetch(`${API}/jobs/manual`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        setError(detail.detail || "Failed to save job.");
+        return;
+      }
+      const newApp = await res.json();
+      onAdded(newApp);
+      onClose();
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="history-overlay" onClick={onClose}>
+      <div
+        className="history-modal"
+        style={{ maxWidth: "480px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button className="history-close-btn" onClick={onClose}>
+          &times;
+        </button>
+        <h2 className="history-modal-title">Add Job to Track</h2>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+        >
+          <div>
+            <label className="details-label">Company Name *</label>
+            <input
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.company_name}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, company_name: e.target.value }))
+              }
+              placeholder="e.g. Google"
+            />
+          </div>
+          <div>
+            <label className="details-label">Job Title *</label>
+            <input
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.title}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, title: e.target.value }))
+              }
+              placeholder="e.g. Software Engineer"
+            />
+          </div>
+          <div>
+            <label className="details-label">Location</label>
+            <input
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.location}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, location: e.target.value }))
+              }
+              placeholder="e.g. New York, NY"
+            />
+          </div>
+          <div>
+            <label className="details-label">Salary</label>
+            <input
+              type="number"
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.salary}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, salary: e.target.value }))
+              }
+              placeholder="e.g. 120000"
+              min="0"
+            />
+          </div>
+          <div>
+            <label className="details-label">Notes / Description</label>
+            <textarea
+              className="details-textarea"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.description}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, description: e.target.value }))
+              }
+              rows={3}
+              placeholder="Any notes about the job..."
+            />
+          </div>
+          <div>
+            <label className="details-label">Initial Status</label>
+            <select
+              className="app-stage-select"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.application_status}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, application_status: e.target.value }))
+              }
+            >
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          {error && (
+            <p style={{ color: "#ef4444", fontSize: "13px", margin: "0" }}>
+              {error}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <button
+              type="submit"
+              className="app-history-btn"
+              disabled={saving}
+              style={{ background: "#4f8ef7", color: "#fff", border: "none" }}
+            >
+              {saving ? "Saving…" : "Save Job"}
+            </button>
+            <button type="button" className="app-history-btn" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Applications() {
   const [applications, setApplications] = useState([]);
   const [positions, setPositions] = useState({});
@@ -1231,6 +1428,7 @@ function Applications() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAddJob, setShowAddJob] = useState(false);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -1254,17 +1452,20 @@ function Applications() {
         const safeApps = apps || [];
         setApplications(safeApps);
 
-        const uniqueIds = [...new Set(safeApps.map((a) => a.position_id))];
+        // Fetch all positions in one request to avoid exhausting the DB connection pool
         const posMap = {};
-
-        await Promise.all(
-          uniqueIds.map(async (id) => {
-            const r = await fetch(`${API}/jobs/positions/${id}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
-            if (r.ok) posMap[id] = await r.json();
-          })
-        );
+        if (safeApps.length > 0) {
+          const pr = await fetch(`${API}/jobs/positions/?include_manual=true`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (pr.ok) {
+            const allPositions = await pr.json();
+            const neededIds = new Set(safeApps.map((a) => a.position_id));
+            for (const p of allPositions) {
+              if (neededIds.has(p.position_id)) posMap[p.position_id] = p;
+            }
+          }
+        }
 
         setPositions(posMap);
         setError("");
@@ -1281,24 +1482,26 @@ function Applications() {
     load();
   }, [token]);
 
-  const filtered = applications.filter((a) => {
-    const matchesStage =
-      filter === "All"
-        ? a.application_status !== "Withdrawn" &&
-          a.application_status !== "Archived"
-        : a.application_status === filter;
+  const filtered = applications
+    .filter((a) => {
+      const matchesStage =
+        filter === "All"
+          ? a.application_status !== "Withdrawn" &&
+            a.application_status !== "Archived"
+          : a.application_status === filter;
 
-    const positionTitle = positions[a.position_id]?.title || "";
-    const companyName = positions[a.position_id]?.company_name || "";
-    const query = search.toLowerCase().trim();
+      const positionTitle = positions[a.position_id]?.title || "";
+      const companyName = positions[a.position_id]?.company_name || "";
+      const query = search.toLowerCase().trim();
 
-    const matchesSearch =
-      query === "" ||
-      positionTitle.toLowerCase().includes(query) ||
-      companyName.toLowerCase().includes(query);
+      const matchesSearch =
+        query === "" ||
+        positionTitle.toLowerCase().includes(query) ||
+        companyName.toLowerCase().includes(query);
 
-    return matchesStage && matchesSearch;
-  });
+      return matchesStage && matchesSearch;
+    })
+    .sort((a, b) => b.job_id - a.job_id);
 
   const handleDeleteApplication = async () => {
     if (!deleteTarget) return;
@@ -1333,8 +1536,27 @@ function Applications() {
     }
   };
 
+  const handleJobAdded = async (newApp) => {
+    // Fetch the position info for the new app so the card renders correctly
+    const r = await fetch(`${API}/jobs/positions/${newApp.position_id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (r.ok) {
+      const pos = await r.json();
+      setPositions((prev) => ({ ...prev, [newApp.position_id]: pos }));
+    }
+    setApplications((prev) => [newApp, ...prev]);
+  };
+
   return (
     <div className="applications-page">
+      {showAddJob && (
+        <AddJobModal
+          onClose={() => setShowAddJob(false)}
+          onAdded={handleJobAdded}
+        />
+      )}
+
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
         title="Delete this application?"
@@ -1367,12 +1589,21 @@ function Applications() {
 
       <div className="app-page-header">
         <h1>My Applications</h1>
-        <button
-          className="app-history-global-btn"
-          onClick={() => setShowHistory(true)}
-        >
-          History
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            className="app-history-global-btn"
+            style={{ background: "#4f8ef7", color: "#fff", border: "none" }}
+            onClick={() => setShowAddJob(true)}
+          >
+            + Add Job
+          </button>
+          <button
+            className="app-history-global-btn"
+            onClick={() => setShowHistory(true)}
+          >
+            History
+          </button>
+        </div>
       </div>
 
       {error && <p className="applications-error">{error}</p>}

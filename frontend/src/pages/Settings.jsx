@@ -117,7 +117,9 @@ function ChangePasswordModal({ onCancel }) {
 function Settings() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
-  const [modal, setModal] = useState(null); // null | "name" | "contact" | "password"
+  const [userId, setUserId] = useState(null);
+  const [prefs, setPrefs] = useState(null);
+  const [modal, setModal] = useState(null); // null | "name" | "contact" | "career" | "password"
   const [statusMessage, setStatusMessage] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(
     () => localStorage.getItem("emailNotifications") !== "false"
@@ -146,7 +148,16 @@ function Settings() {
 
     fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => setEmail(d.email || ""));
+      .then((d) => {
+        setEmail(d.email || "");
+        setUserId(d.user_id);
+        return fetch(`${API}/career-preferences/user/${d.user_id}`);
+      })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setPrefs(d);
+      })
+      .catch(() => {});
 
     fetch(`${API}/profile/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -156,6 +167,35 @@ function Settings() {
         if (d) setProfile(d);
       });
   }, []);
+
+  const savePrefs = async (values) => {
+    const url = prefs
+      ? `${API}/career-preferences/user/${userId}`
+      : `${API}/career-preferences/`;
+    const method = prefs ? "PUT" : "POST";
+    const body = prefs ? values : { user_id: userId, ...values };
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return err.detail || "Failed to save.";
+    }
+
+    const updated = await res.json();
+    setPrefs(updated);
+    setModal(null);
+    setStatusMessage("Career goals saved.");
+    setTimeout(() => setStatusMessage(""), 3000);
+    return null;
+  };
 
   const saveProfile = async (values) => {
     const res = await fetch(`${API}/profile/${profile.profile_id}`, {
@@ -204,6 +244,14 @@ function Settings() {
         </Section>
 
         <hr style={styles.divider} />
+
+        {/* Career Goals */}
+        <Section title="Career Goals" onEdit={() => setModal("career")}>
+          <Field label="Target Roles" value={prefs?.target_roles} />
+          <Field label="Locations" value={prefs?.location_preferences} />
+          <Field label="Work Mode" value={prefs?.work_mode} />
+          <Field label="Salary Goal" value={prefs?.salary_preference} />
+        </Section>
 
         <hr style={styles.divider} />
 
@@ -291,6 +339,40 @@ function Settings() {
 
       {modal === "password" && (
         <ChangePasswordModal onCancel={() => setModal(null)} />
+      )}
+
+      {modal === "career" && (
+        <EditModal
+          title="Edit Career Goals"
+          fields={[
+            {
+              name: "target_roles",
+              label: "Target Roles",
+              value: prefs?.target_roles || "",
+              placeholder: "e.g. Software Engineer, Data Scientist",
+            },
+            {
+              name: "location_preferences",
+              label: "Preferred Locations",
+              value: prefs?.location_preferences || "",
+              placeholder: "e.g. New York, Remote",
+            },
+            {
+              name: "work_mode",
+              label: "Work Mode",
+              value: prefs?.work_mode || "",
+              placeholder: "e.g. Remote, Hybrid, Onsite",
+            },
+            {
+              name: "salary_preference",
+              label: "Salary Goal",
+              value: prefs?.salary_preference || "",
+              placeholder: "e.g. $100,000+",
+            },
+          ]}
+          onSave={savePrefs}
+          onCancel={() => setModal(null)}
+        />
       )}
 
       {/* Name edit modal */}
