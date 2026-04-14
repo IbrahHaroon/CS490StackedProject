@@ -46,7 +46,13 @@ settings = get_settings()
 # Create a synchronous connection URL by removing the async driver if present
 sync_url = settings.database_url.replace("+asyncpg", "").replace("+aiosqlite", "")
 
-engine = create_engine(sync_url, echo=True)
+engine = create_engine(
+    sync_url,
+    echo=True,
+    pool_size=20,  # Base pool connections
+    max_overflow=10,  # Extra connections when pool exhausted
+    pool_pre_ping=True,  # Test connections before using
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
