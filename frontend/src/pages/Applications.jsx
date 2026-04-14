@@ -239,7 +239,11 @@ function ApplicationCard({ app, position, onRemove, onStageChange }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(detailValues),
+        body: JSON.stringify({
+          ...detailValues,
+          deadline: detailValues.deadline || null,
+          recruiter_notes: detailValues.recruiter_notes || null,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
