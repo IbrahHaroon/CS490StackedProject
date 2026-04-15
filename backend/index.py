@@ -9,13 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # `schemas` are always importable regardless of where the process is launched from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from logging_config import setup_logging
-from middleware.request_logger import RequestLoggingMiddleware
-
-setup_logging()
-
-# from database import Base, engine
-from routers import (
+from logging_config import setup_logging  # noqa: E402, I001
+from middleware.request_logger import RequestLoggingMiddleware  # noqa: E402
+from routers import (  # noqa: E402
     auth,
     career_preferences,
     company,
@@ -34,6 +30,8 @@ from routers import (
     skills,
     users,
 )
+
+setup_logging()
 
 
 @asynccontextmanager

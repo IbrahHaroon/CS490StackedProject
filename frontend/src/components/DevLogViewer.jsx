@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getLogs } from "../lib/apiClient";
+import { getLogs, clearLogs } from "../lib/apiClient";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -188,7 +188,7 @@ function DevLogViewer() {
 
   // --- Open state: full panel ---
   const clearAll = () => {
-    apiLogs.length = 0;
+    clearLogs();
     setBackendLogs([]);
     setBackendClearedAfter(new Date().toISOString());
     setTick((t) => t + 1);

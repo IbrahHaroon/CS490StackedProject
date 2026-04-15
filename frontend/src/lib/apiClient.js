@@ -18,6 +18,11 @@ export function getLogs() {
   return logs;
 }
 
+export function clearLogs() {
+  logs.length = 0;
+  _lastFlushedApiIndex = 0;
+}
+
 function pushLog(entry) {
   logs.push(entry);
   if (logs.length > LOG_BUFFER_SIZE) logs.shift();
@@ -101,7 +106,7 @@ let _lastFlushedApiIndex = 0;
 
 function startLogFlushing() {
   if (_flushTimer) return;
-  _flushTimer = setInterval(() => flushLogs(), 10_000);
+  _flushTimer = setInterval(() => flushLogs(), 10000);
 }
 
 async function flushLogs() {
