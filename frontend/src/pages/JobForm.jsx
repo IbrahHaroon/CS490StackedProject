@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 function JobForm() {
   const { id } = useParams();
@@ -42,7 +42,8 @@ function JobForm() {
   }, [redirectCountdown, navigate]);
 
   useEffect(() => {
-    fetch(`${API}/company/`)
+    api
+      .get("/company/", { caller: "JobForm.loadCompanies", action: "load_companies" })
       .then((r) => r.json())
       .then((data) => {
         setCompanies(data);
@@ -51,7 +52,10 @@ function JobForm() {
       .then(async (data) => {
         if (!isEditMode) return;
         try {
-          const res = await fetch(`${API}/jobs/positions/${id}`);
+          const res = await api.get(`/jobs/positions/${id}`, {
+            caller: "JobForm.loadPosition",
+            action: "load_position",
+          });
           if (!res.ok) {
             setMessage("Failed to load job posting.");
             return;
@@ -96,17 +100,14 @@ function JobForm() {
     if (match) return match.company_id;
 
     // Company doesn't exist — create it with a placeholder address
-    const res = await fetch(`${API}/company/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    const res = await api.post(
+      "/company/",
+      {
         name: formData.company_name.trim(),
         address: { address: "TBD", state: "N/A", zip_code: 0 },
-      }),
-    });
+      },
+      { caller: "JobForm.createCompany", action: "create_company" }
+    );
     if (!res.ok) return null;
     const created = await res.json();
     return created.company_id;
@@ -120,6 +121,7 @@ function JobForm() {
     if (Object.keys(errs).length > 0) return;
 
     setIsSaving(true);
+    logAction("form_submit", { component: "JobForm", action: isEditMode ? "edit_position" : "create_position" });
 
     try {
       const company_id = await resolveCompanyId();
@@ -128,29 +130,27 @@ function JobForm() {
         return;
       }
 
-      const url = isEditMode
-        ? `${API}/jobs/positions/${id}`
-        : `${API}/jobs/positions/`;
-      const method = isEditMode ? "PUT" : "POST";
+      const positionBody = {
+        company_id,
+        title: formData.title,
+        listing_date: formData.listing_date,
+        salary: formData.salary ? Number(formData.salary) : null,
+        location_type: formData.location_type || null,
+        location: formData.location || null,
+        education_req: formData.education_req || null,
+        experience_req: formData.experience_req || null,
+        description: formData.description || null,
+      };
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          company_id,
-          title: formData.title,
-          listing_date: formData.listing_date,
-          salary: formData.salary ? Number(formData.salary) : null,
-          location_type: formData.location_type || null,
-          location: formData.location || null,
-          education_req: formData.education_req || null,
-          experience_req: formData.experience_req || null,
-          description: formData.description || null,
-        }),
-      });
+      const res = isEditMode
+        ? await api.put(`/jobs/positions/${id}`, positionBody, {
+            caller: "JobForm.updatePosition",
+            action: "update_position",
+          })
+        : await api.post("/jobs/positions/", positionBody, {
+            caller: "JobForm.createPosition",
+            action: "create_position",
+          });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Document, Page, pdfjs } from "react-pdf";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 import "./DocumentLibrary.css";
 
 // Set up PDF.js worker
@@ -8,8 +10,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
 ).href;
-
-const API = "http://localhost:8000";
 
 const DOCUMENT_TYPES = [
   "Resume",
@@ -73,21 +73,16 @@ function DocumentLibrary() {
       return;
     }
     try {
-      const res = await fetch(`${API}/documents/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get("/documents/me", { caller: "DocumentLibrary.fetchDocuments", action: "load_documents" });
       if (!res.ok) {
         setLoadError("Failed to load documents. Please sign in again.");
         return;
       }
       const docs = await res.json();
-      console.log(
-        "[FETCH] Documents loaded from server:",
-        docs.map((d) => ({ doc_id: d.doc_id, name: d.document_name }))
-      );
+      logAction("DocumentLibrary.fetchDocuments", "documents_loaded", { count: docs.length });
       setDocuments(docs);
     } catch (err) {
-      console.error("[FETCH] Error loading documents:", err);
+      logAction("DocumentLibrary.fetchDocuments", "load_documents_error", { error: err.message });
       setLoadError("Failed to load documents.");
     }
   };
@@ -96,10 +91,8 @@ function DocumentLibrary() {
     fetchDocuments();
     if (token) {
       Promise.all([
-        fetch(`${API}/jobs/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API}/jobs/positions/?include_manual=true`),
+        api.get("/jobs/dashboard", { caller: "DocumentLibrary.useEffect", action: "load_applied_jobs" }),
+        api.get("/jobs/positions/?include_manual=true", { caller: "DocumentLibrary.useEffect", action: "load_positions" }),
       ]).then(([jobsRes, posRes]) => {
         if (jobsRes.ok) jobsRes.json().then(setAppliedJobs);
         if (posRes.ok) posRes.json().then(setPositions);
@@ -127,11 +120,7 @@ function DocumentLibrary() {
     form.append("document_type", docType);
 
     setUploading(true);
-    const res = await fetch(`${API}/documents/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
+    const res = await api.post("/documents/upload", form, { caller: "DocumentLibrary.handleUpload", action: "upload_document" });
     setUploading(false);
 
     if (!res.ok) {
@@ -154,9 +143,7 @@ function DocumentLibrary() {
     }
 
     try {
-      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get(`/documents/${doc.doc_id}/content`, { caller: "DocumentLibrary.handleView", action: "view_document" });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -172,8 +159,8 @@ function DocumentLibrary() {
       setViewEditable(data.editable || false);
       setPdfNumPages(0);
     } catch (err) {
-      console.error("Error:", err);
-      setEditError("Failed to load document. Check console for details.");
+      logAction("DocumentLibrary.handleView", "view_document_error", { error: err.message });
+      setEditError("Failed to load document.");
     }
   };
 
@@ -185,9 +172,7 @@ function DocumentLibrary() {
     }
 
     try {
-      const res = await fetch(`${API}/documents/${doc.doc_id}/content`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get(`/documents/${doc.doc_id}/content`, { caller: "DocumentLibrary.handleEdit", action: "load_document_for_edit" });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -207,8 +192,8 @@ function DocumentLibrary() {
       setEditContent(data.content || "");
       setEditFormat(data.format || "text");
     } catch (err) {
-      console.error("Error:", err);
-      setEditError("Failed to load document. Check console for details.");
+      logAction("DocumentLibrary.handleEdit", "edit_document_error", { error: err.message });
+      setEditError("Failed to load document.");
     }
   };
 
@@ -220,14 +205,7 @@ function DocumentLibrary() {
 
     setSaving(true);
     setEditError("");
-    const res = await fetch(`${API}/documents/${editingDoc.doc_id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ content: editContent }),
-    });
+    const res = await api.put(`/documents/${editingDoc.doc_id}`, { content: editContent }, { caller: "DocumentLibrary.handleSave", action: "save_document" });
     setSaving(false);
 
     if (!res.ok) {
@@ -254,66 +232,42 @@ function DocumentLibrary() {
       return;
     }
 
-    console.log(`[DELETE-FRONTEND] Attempting to delete:`, {
-      doc_id: doc.doc_id,
-      name: doc.document_name,
-    });
+    logAction("DocumentLibrary.handleDelete", "delete_document_attempt", { doc_id: doc.doc_id, name: doc.document_name });
     setDeletingId(doc.doc_id);
     try {
-      const deleteUrl = `${API}/documents/${doc.doc_id}`;
-      console.log(`[DELETE-FRONTEND] Making DELETE request to: ${deleteUrl}`);
-      const res = await fetch(deleteUrl, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      console.log(
-        `[DELETE-FRONTEND] Response status: ${res.status} for doc_id: ${doc.doc_id}`
-      );
+      const res = await api.delete(`/documents/${doc.doc_id}`, { caller: "DocumentLibrary.handleDelete", action: "delete_document" });
 
       if (!res.ok) {
         let errorMsg = "Failed to delete document.";
         let responseBody = "";
         try {
           responseBody = await res.text();
-          console.log(`[DELETE-FRONTEND] Response body: ${responseBody}`);
           const err = JSON.parse(responseBody);
           errorMsg = err.detail || errorMsg;
-          console.error("[DELETE-FRONTEND] Delete error details:", err);
+          logAction("DocumentLibrary.handleDelete", "delete_error", { doc_id: doc.doc_id, detail: err.detail });
         } catch (e) {
-          console.error(
-            `[DELETE-FRONTEND] Could not parse error response:`,
-            res.status,
-            res.statusText,
-            responseBody
-          );
           if (res.status === 404) {
             errorMsg = "Document not found. It may have already been deleted.";
           } else if (res.status === 403) {
             errorMsg = "You don't have permission to delete this document.";
           }
+          logAction("DocumentLibrary.handleDelete", "delete_error_unparsed", { status: res.status });
         }
-        console.error(`[DELETE-FRONTEND] Final error message: ${errorMsg}`);
         setUploadError(errorMsg);
         setTimeout(() => setUploadError(""), 4000);
         setDeletingId(null);
         return;
       }
 
-      console.log(
-        "[DELETE-FRONTEND] Document deleted successfully, refreshing list..."
-      );
+      logAction("DocumentLibrary.handleDelete", "delete_success", { doc_id: doc.doc_id });
       setUploadSuccess("Document deleted successfully!");
       setTimeout(() => setUploadSuccess(""), 3000);
       // Refresh documents after a short delay to ensure backend processed
       setTimeout(() => {
-        console.log(
-          "[DELETE-FRONTEND] Calling fetchDocuments to refresh list..."
-        );
         fetchDocuments();
       }, 500);
     } catch (err) {
-      console.error("[DELETE-FRONTEND] Network error:", err.message, err);
+      logAction("DocumentLibrary.handleDelete", "delete_network_error", { error: err.message });
       setUploadError(
         "Network error deleting document. Please check your connection."
       );
@@ -347,14 +301,7 @@ function DocumentLibrary() {
     setAiImproved("");
 
     try {
-      const res = await fetch(`${API}/documents/${aiDoc.doc_id}/ai-rewrite`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ instructions: aiInstructions }),
-      });
+      const res = await api.post(`/documents/${aiDoc.doc_id}/ai-rewrite`, { instructions: aiInstructions }, { caller: "DocumentLibrary.handleAiGenerate", action: "ai_rewrite" });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -366,8 +313,8 @@ function DocumentLibrary() {
       setAiOriginal(data.original);
       setAiImproved(data.improved);
     } catch (err) {
-      console.error("AI rewrite error:", err);
-      setAiError("Request failed. Check console for details.");
+      logAction("DocumentLibrary.handleAiGenerate", "ai_rewrite_error", { error: err.message });
+      setAiError("Request failed.");
     } finally {
       setAiLoading(false);
     }
@@ -378,14 +325,7 @@ function DocumentLibrary() {
     setAiApplying(true);
     setAiError("");
 
-    const res = await fetch(`${API}/documents/${aiDoc.doc_id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ content: aiImproved }),
-    });
+    const res = await api.put(`/documents/${aiDoc.doc_id}`, { content: aiImproved }, { caller: "DocumentLibrary.handleAiApply", action: "apply_ai_improvements" });
     setAiApplying(false);
 
     if (!res.ok) {
@@ -418,10 +358,8 @@ function DocumentLibrary() {
 
     try {
       const [jobsRes, posRes] = await Promise.all([
-        fetch(`${API}/jobs/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API}/jobs/positions/`),
+        api.get("/jobs/dashboard", { caller: "DocumentLibrary.handleOpenGenResume", action: "load_applied_jobs" }),
+        api.get("/jobs/positions/", { caller: "DocumentLibrary.handleOpenGenResume", action: "load_positions" }),
       ]);
       if (jobsRes.ok) setAppliedJobs(await jobsRes.json());
       if (posRes.ok) setPositions(await posRes.json());
@@ -439,17 +377,10 @@ function DocumentLibrary() {
     setGenResumeError("");
 
     try {
-      const res = await fetch(`${API}/documents/generate-resume`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await api.post("/documents/generate-resume", {
           job_id: genResumeJobId ? parseInt(genResumeJobId) : null,
           instructions: genResumeInstructions,
-        }),
-      });
+        }, { caller: "DocumentLibrary.handleGenResumeGenerate", action: "generate_resume" });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -489,10 +420,8 @@ function DocumentLibrary() {
 
     try {
       const [jobsRes, posRes] = await Promise.all([
-        fetch(`${API}/jobs/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API}/jobs/positions/`),
+        api.get("/jobs/dashboard", { caller: "DocumentLibrary.handleOpenGenCover", action: "load_applied_jobs" }),
+        api.get("/jobs/positions/", { caller: "DocumentLibrary.handleOpenGenCover", action: "load_positions" }),
       ]);
       if (jobsRes.ok) setAppliedJobs(await jobsRes.json());
       if (posRes.ok) setPositions(await posRes.json());
@@ -510,17 +439,10 @@ function DocumentLibrary() {
     setGenCoverError("");
 
     try {
-      const res = await fetch(`${API}/documents/generate-cover-letter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await api.post("/documents/generate-cover-letter", {
           job_id: genCoverJobId ? parseInt(genCoverJobId) : null,
           instructions: genCoverInstructions,
-        }),
-      });
+        }, { caller: "DocumentLibrary.handleGenCoverGenerate", action: "generate_cover_letter" });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

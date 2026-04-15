@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import EditModal from "../components/EditModal";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 function Section({ title, children, onEdit }) {
   return (
@@ -44,14 +44,12 @@ function ChangePasswordModal({ onCancel }) {
       return setError("New password must be at least 6 characters.");
     if (newPw !== confirm) return setError("Passwords do not match.");
 
-    const res = await fetch(`${API}/auth/change-password`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ current_password: current, new_password: newPw }),
-    });
+    logAction("form_submit", { component: "Settings", element: "change_password" });
+    const res = await api.post(
+      "/auth/change-password",
+      { current_password: current, new_password: newPw },
+      { caller: "Settings.changePassword", action: "change_password" }
+    );
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -146,22 +144,25 @@ function Settings() {
   useEffect(() => {
     if (!token) return;
 
-    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+    api
+      .get("/auth/me", { caller: "Settings.loadUser", action: "load_user" })
       .then((r) => r.json())
-      .then((d) => {
+      .then(async (d) => {
         setEmail(d.email || "");
         setUserId(d.user_id);
-        return fetch(`${API}/career-preferences/user/${d.user_id}`);
-      })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d) setPrefs(d);
+        const prefsRes = await api.get(`/career-preferences/user/${d.user_id}`, {
+          caller: "Settings.loadPrefs",
+          action: "load_career_prefs",
+        });
+        if (prefsRes.ok) {
+          const prefsData = await prefsRes.json();
+          setPrefs(prefsData);
+        }
       })
       .catch(() => {});
 
-    fetch(`${API}/profile/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    api
+      .get("/profile/me", { caller: "Settings.loadProfile", action: "load_profile" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setProfile(d);
@@ -169,20 +170,15 @@ function Settings() {
   }, []);
 
   const savePrefs = async (values) => {
-    const url = prefs
-      ? `${API}/career-preferences/user/${userId}`
-      : `${API}/career-preferences/`;
-    const method = prefs ? "PUT" : "POST";
+    logAction("form_submit", { component: "Settings", element: "save_career_prefs" });
+    const path = prefs
+      ? `/career-preferences/user/${userId}`
+      : `/career-preferences/`;
     const body = prefs ? values : { user_id: userId, ...values };
 
-    const res = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const res = prefs
+      ? await api.put(path, body, { caller: "Settings.updatePrefs", action: "update_career_prefs" })
+      : await api.post(path, body, { caller: "Settings.createPrefs", action: "create_career_prefs" });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -198,13 +194,10 @@ function Settings() {
   };
 
   const saveProfile = async (values) => {
-    const res = await fetch(`${API}/profile/${profile.profile_id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(values),
+    logAction("form_submit", { component: "Settings", element: "save_profile" });
+    const res = await api.put(`/profile/${profile.profile_id}`, values, {
+      caller: "Settings.saveProfile",
+      action: "update_profile",
     });
 
     if (!res.ok) {

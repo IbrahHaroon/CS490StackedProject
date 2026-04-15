@@ -1,5 +1,5 @@
-import { Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { MyAppNav } from "./components/Navbar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -10,11 +10,23 @@ import Applications from "./pages/Applications.jsx";
 import Postings from "./pages/Postings.jsx";
 import JobForm from "./pages/JobForm";
 import SignIn from "./pages/SignIn";
+import DevLogViewer from "./components/DevLogViewer.jsx";
+import { api } from "./lib/apiClient";
+import { logNavigation } from "./lib/actionLogger";
 import "./App.css";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-
 function App() {
+  const location = useLocation();
+  const prevPath = useRef(location.pathname);
+
+  // Log route navigations
+  useEffect(() => {
+    if (prevPath.current !== location.pathname) {
+      logNavigation(prevPath.current, location.pathname);
+      prevPath.current = location.pathname;
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     if (localStorage.getItem("darkMode") === "false") {
       document.body.classList.add("light-mode");
@@ -25,9 +37,8 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    fetch(`${API}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    api
+      .get("/auth/me", { caller: "App.validateToken", action: "validate_token" })
       .then((res) => {
         if (res.status === 401 || res.status === 403) {
           localStorage.removeItem("token");
@@ -98,6 +109,7 @@ function App() {
           <Route path="/postings" element={<Postings />} />
         </Routes>
       </main>
+      {import.meta.env.DEV && <DevLogViewer />}
     </>
   );
 }

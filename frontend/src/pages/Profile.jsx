@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import EditModal from "../components/EditModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 function Profile() {
   const [email, setEmail] = useState("");
@@ -35,19 +35,13 @@ function Profile() {
     const safe = (p) => p.catch(() => null);
     Promise.all([
       safe(
-        fetch(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : null))
+        api.get("/auth/me", { caller: "Profile.loadAuth", action: "fetch_current_user" }).then((r) => (r.ok ? r.json() : null))
       ),
       safe(
-        fetch(`${API}/profile/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : null))
+        api.get("/profile/me", { caller: "Profile.loadProfile", action: "fetch_profile" }).then((r) => (r.ok ? r.json() : null))
       ),
       safe(
-        fetch(`${API}/documents/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : []))
+        api.get("/documents/me", { caller: "Profile.loadDocuments", action: "fetch_documents" }).then((r) => (r.ok ? r.json() : []))
       ),
     ]).then(([me, prof, docs]) => {
       setEmail(me?.email || "");
@@ -62,18 +56,10 @@ function Profile() {
   useEffect(() => {
     if (!userId) return;
     Promise.all([
-      fetch(`${API}/experience/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch(`${API}/education/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch(`${API}/skills/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      fetch(`${API}/career-preferences/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
+      api.get(`/experience/user/${userId}`, { caller: "Profile.loadExperience", action: "fetch_experience" }),
+      api.get(`/education/user/${userId}`, { caller: "Profile.loadEducation", action: "fetch_education" }),
+      api.get(`/skills/user/${userId}`, { caller: "Profile.loadSkills", action: "fetch_skills" }),
+      api.get(`/career-preferences/user/${userId}`, { caller: "Profile.loadCareerPrefs", action: "fetch_career_preferences" }),
     ]).then(async ([expRes, eduRes, skillRes, prefRes]) => {
       if (expRes.ok) setExperiences(await expRes.json());
       if (eduRes.ok) setEducations(await eduRes.json());
@@ -90,33 +76,20 @@ function Profile() {
 
     let res;
     if (!profile) {
-      res = await fetch(`${API}/profile/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          first_name: values.first_name || "",
-          last_name: values.last_name || "",
-          dob: values.dob || "2000-01-01",
-          address: { address: "", state: "", zip_code: 0 },
-          phone_number: values.phone_number || null,
-          summary: values.summary || null,
-        }),
-      });
+      res = await api.post("/profile/", {
+        user_id: userId,
+        first_name: values.first_name || "",
+        last_name: values.last_name || "",
+        dob: values.dob || "2000-01-01",
+        address: { address: "", state: "", zip_code: 0 },
+        phone_number: values.phone_number || null,
+        summary: values.summary || null,
+      }, { caller: "Profile.saveProfile", action: "create_profile" });
     } else {
-      res = await fetch(`${API}/profile/${profile.profile_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(
-          Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ""))
-        ),
-      });
+      res = await api.put(`/profile/${profile.profile_id}`,
+        Object.fromEntries(Object.entries(values).filter(([, v]) => v !== "")),
+        { caller: "Profile.saveProfile", action: "update_profile" }
+      );
     }
 
     if (!res.ok) {
@@ -146,38 +119,24 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/experience/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          company: values.company,
-          title: values.title,
-          start_date: values.start_date,
-          end_date: values.end_date || null,
-          description: values.description || null,
-          sort_order: experiences.length,
-        }),
-      });
+      res = await api.post("/experience/", {
+        user_id: userId,
+        company: values.company,
+        title: values.title,
+        start_date: values.start_date,
+        end_date: values.end_date || null,
+        description: values.description || null,
+        sort_order: experiences.length,
+      }, { caller: "Profile.saveExperience", action: "create_experience" });
     } else {
-      res = await fetch(`${API}/experience/${activeRecord.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          company: values.company,
-          title: values.title,
-          start_date: values.start_date,
-          end_date: values.end_date || null,
-          clear_end_date: !values.end_date,
-          description: values.description || null,
-        }),
-      });
+      res = await api.put(`/experience/${activeRecord.experience_id}`, {
+        company: values.company,
+        title: values.title,
+        start_date: values.start_date,
+        end_date: values.end_date || null,
+        clear_end_date: !values.end_date,
+        description: values.description || null,
+      }, { caller: "Profile.saveExperience", action: "update_experience" });
     }
 
     if (!res.ok) {
@@ -207,10 +166,7 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/experience/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.delete(`/experience/${deleteTarget.id}`, { caller: "Profile.deleteExperience", action: "delete_experience" });
       if (res.ok) {
         setExperiences((prev) =>
           prev.filter((e) => e.experience_id !== deleteTarget.id)
@@ -228,22 +184,8 @@ function Profile() {
     const a = experiences[index];
     const b = experiences[swapIndex];
     await Promise.all([
-      fetch(`${API}/experience/${a.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: b.sort_order }),
-      }),
-      fetch(`${API}/experience/${b.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: a.sort_order }),
-      }),
+      api.put(`/experience/${a.experience_id}`, { sort_order: b.sort_order }, { caller: "Profile.moveExperience", action: "reorder_experience" }),
+      api.put(`/experience/${b.experience_id}`, { sort_order: a.sort_order }, { caller: "Profile.moveExperience", action: "reorder_experience" }),
     ]);
     setExperiences((prev) => {
       const updated = [...prev];
@@ -266,45 +208,31 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/education/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      res = await api.post("/education/", {
+        user_id: userId,
+        highest_education: values.highest_education,
+        degree: values.degree,
+        school_or_college: values.school_or_college,
+        address: {
+          address: values.address_street || "",
+          state: values.address_state || "",
+          zip_code: parseInt(values.address_zip) || 0,
         },
-        body: JSON.stringify({
-          user_id: userId,
-          highest_education: values.highest_education,
-          degree: values.degree,
-          school_or_college: values.school_or_college,
-          address: {
-            address: values.address_street || "",
-            state: values.address_state || "",
-            zip_code: parseInt(values.address_zip) || 0,
-          },
-          field_of_study: values.field_of_study,
-          start_date: values.start_date,
-          end_date: values.end_date || null,
-          gpa: values.gpa || null,
-        }),
-      });
+        field_of_study: values.field_of_study,
+        start_date: values.start_date,
+        end_date: values.end_date || null,
+        gpa: values.gpa || null,
+      }, { caller: "Profile.saveEducation", action: "create_education" });
     } else {
-      res = await fetch(`${API}/education/${activeRecord.education_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          highest_education: values.highest_education,
-          degree: values.degree,
-          school_or_college: values.school_or_college,
-          field_of_study: values.field_of_study,
-          start_date: values.start_date,
-          end_date: values.end_date || null,
-          gpa: values.gpa || null,
-        }),
-      });
+      res = await api.put(`/education/${activeRecord.education_id}`, {
+        highest_education: values.highest_education,
+        degree: values.degree,
+        school_or_college: values.school_or_college,
+        field_of_study: values.field_of_study,
+        start_date: values.start_date,
+        end_date: values.end_date || null,
+        gpa: values.gpa || null,
+      }, { caller: "Profile.saveEducation", action: "update_education" });
     }
 
     if (!res.ok) {
@@ -334,10 +262,7 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/education/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.delete(`/education/${deleteTarget.id}`, { caller: "Profile.deleteEducation", action: "delete_education" });
       if (res.ok) {
         setEducations((prev) =>
           prev.filter((e) => e.education_id !== deleteTarget.id)
@@ -356,33 +281,19 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/skills/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          name: values.name,
-          category: values.category || null,
-          proficiency: values.proficiency || null,
-          sort_order: skills.length,
-        }),
-      });
+      res = await api.post("/skills/", {
+        user_id: userId,
+        name: values.name,
+        category: values.category || null,
+        proficiency: values.proficiency || null,
+        sort_order: skills.length,
+      }, { caller: "Profile.saveSkill", action: "create_skill" });
     } else {
-      res = await fetch(`${API}/skills/${activeRecord.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: values.name,
-          category: values.category || null,
-          proficiency: values.proficiency || null,
-        }),
-      });
+      res = await api.put(`/skills/${activeRecord.skill_id}`, {
+        name: values.name,
+        category: values.category || null,
+        proficiency: values.proficiency || null,
+      }, { caller: "Profile.saveSkill", action: "update_skill" });
     }
 
     if (!res.ok) {
@@ -410,10 +321,7 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/skills/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.delete(`/skills/${deleteTarget.id}`, { caller: "Profile.deleteSkill", action: "delete_skill" });
       if (res.ok) {
         setSkills((prev) => prev.filter((s) => s.skill_id !== deleteTarget.id));
       }
@@ -429,22 +337,8 @@ function Profile() {
     const a = skills[index];
     const b = skills[swapIndex];
     await Promise.all([
-      fetch(`${API}/skills/${a.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: b.sort_order }),
-      }),
-      fetch(`${API}/skills/${b.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: a.sort_order }),
-      }),
+      api.put(`/skills/${a.skill_id}`, { sort_order: b.sort_order }, { caller: "Profile.moveSkill", action: "reorder_skill" }),
+      api.put(`/skills/${b.skill_id}`, { sort_order: a.sort_order }, { caller: "Profile.moveSkill", action: "reorder_skill" }),
     ]);
     setSkills((prev) => {
       const updated = [...prev];
@@ -457,19 +351,12 @@ function Profile() {
   // ── Career Preferences ─────────────────────────────────────────────────────
 
   const saveCareerPrefs = async (values) => {
-    const res = await fetch(`${API}/career-preferences/user/${userId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        target_roles: values.target_roles || null,
-        location_preferences: values.location_preferences || null,
-        work_mode: values.work_mode || null,
-        salary_preference: values.salary_preference || null,
-      }),
-    });
+    const res = await api.put(`/career-preferences/user/${userId}`, {
+      target_roles: values.target_roles || null,
+      location_preferences: values.location_preferences || null,
+      work_mode: values.work_mode || null,
+      salary_preference: values.salary_preference || null,
+    }, { caller: "Profile.saveCareerPrefs", action: "update_career_preferences" });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 import "./Postings.css";
-
-const API = "http://localhost:8000";
 
 function PostingFormModal({ posting, onClose, onSaved }) {
   const token = localStorage.getItem("token");
@@ -26,7 +26,8 @@ function PostingFormModal({ posting, onClose, onSaved }) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`${API}/company/`)
+    api
+      .get("/company/", { caller: "Postings.loadCompanies", action: "load_companies" })
       .then((r) => r.json())
       .then(setCompanies)
       .catch(() => {});
@@ -52,17 +53,14 @@ function PostingFormModal({ posting, onClose, onSaved }) {
     );
     if (match) return match.company_id;
 
-    const res = await fetch(`${API}/company/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    const res = await api.post(
+      "/company/",
+      {
         name: formData.company_name.trim(),
         address: { address: "TBD", state: "N/A", zip_code: 0 },
-      }),
-    });
+      },
+      { caller: "Postings.createCompany", action: "create_company" }
+    );
     if (!res.ok) return null;
     const created = await res.json();
     return created.company_id;
@@ -76,6 +74,7 @@ function PostingFormModal({ posting, onClose, onSaved }) {
     if (Object.keys(errs).length > 0) return;
 
     setIsSaving(true);
+    logAction("form_submit", { component: "Postings", action: isEditMode ? "edit_posting" : "create_posting" });
     try {
       const company_id = await resolveCompanyId();
       if (!company_id) {
@@ -83,30 +82,28 @@ function PostingFormModal({ posting, onClose, onSaved }) {
         return;
       }
 
-      const url = isEditMode
-        ? `${API}/jobs/positions/${posting.position_id}`
-        : `${API}/jobs/positions/`;
-      const method = isEditMode ? "PUT" : "POST";
+      const positionBody = {
+        company_id,
+        title: formData.title,
+        listing_date: formData.listing_date,
+        deadline: formData.deadline || null,
+        salary: formData.salary ? Number(formData.salary) : null,
+        location_type: formData.location_type || null,
+        location: formData.location || null,
+        education_req: formData.education_req || null,
+        experience_req: formData.experience_req || null,
+        description: formData.description || null,
+      };
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          company_id,
-          title: formData.title,
-          listing_date: formData.listing_date,
-          deadline: formData.deadline || null,
-          salary: formData.salary ? Number(formData.salary) : null,
-          location_type: formData.location_type || null,
-          location: formData.location || null,
-          education_req: formData.education_req || null,
-          experience_req: formData.experience_req || null,
-          description: formData.description || null,
-        }),
-      });
+      const res = isEditMode
+        ? await api.put(`/jobs/positions/${posting.position_id}`, positionBody, {
+            caller: "Postings.updatePosting",
+            action: "update_posting",
+          })
+        : await api.post("/jobs/positions/", positionBody, {
+            caller: "Postings.createPosting",
+            action: "create_posting",
+          });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -286,14 +283,17 @@ function Postings() {
 
   const fetchJobs = async () => {
     try {
-      const res = await fetch(`${API}/jobs/positions/`);
+      const res = await api.get("/jobs/positions/", {
+        caller: "Postings.fetchJobs",
+        action: "load_postings",
+      });
       if (res.ok) {
         const data = await res.json();
         setJobs(data);
         if (data.length > 0 && !selectedJob) setSelectedJob(data[0]);
       }
-    } catch (err) {
-      console.error("Postings fetch error:", err);
+    } catch {
+      // Network error handled by apiClient logging
     } finally {
       setLoading(false);
     }

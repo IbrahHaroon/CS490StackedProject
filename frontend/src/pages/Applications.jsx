@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 const STAGES = [
   "Interested",
@@ -141,14 +141,11 @@ function ApplicationCard({
     setStageError("");
     onStageChange(app.job_id, newStage);
     try {
-      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ application_status: newStage }),
-      });
+      const res = await api.put(
+        `/jobs/applications/${app.job_id}`,
+        { application_status: newStage },
+        { caller: "Applications.handleStageChange", action: "update_application_stage" }
+      );
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         setStageError(
@@ -174,18 +171,16 @@ function ApplicationCard({
     }
 
     try {
-      const res = await fetch(
-        `${API}/jobs/applications/${app.job_id}/activity`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+      const res = await api.get(
+        `/jobs/applications/${app.job_id}/activity`,
+        { caller: "Applications.loadActivity", action: "fetch_application_activity" }
       );
 
       if (res.ok) {
         setActivity(await res.json());
       }
-    } catch (err) {
-      console.error("Failed to load activity:", err);
+    } catch {
+      // handled by api client logging
     }
 
     setActivityLoaded(true);
@@ -196,14 +191,11 @@ function ApplicationCard({
     setIsGenerating(true);
     setGenError("");
     try {
-      const res = await fetch(`${API}/documents/generate-cover-letter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ job_id: app.job_id }),
-      });
+      const res = await api.post(
+        "/documents/generate-cover-letter",
+        { job_id: app.job_id },
+        { caller: "Applications.generateCoverLetter", action: "generate_cover_letter" }
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setGenError(err.detail || "Failed to generate cover letter.");
@@ -232,18 +224,15 @@ function ApplicationCard({
     setDetailSaving(true);
     setDetailError("");
     try {
-      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await api.put(
+        `/jobs/applications/${app.job_id}`,
+        {
           ...detailValues,
           deadline: detailValues.deadline || null,
           recruiter_notes: detailValues.recruiter_notes || null,
-        }),
-      });
+        },
+        { caller: "Applications.saveDetails", action: "save_deadline_and_notes" }
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setDetailError(err.detail || "Failed to save.");
@@ -261,9 +250,10 @@ function ApplicationCard({
   const loadFollowUps = async () => {
     if (!showFollowUps && !followUpsLoaded) {
       try {
-        const res = await fetch(`${API}/jobs/${app.job_id}/followups`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get(
+          `/jobs/${app.job_id}/followups`,
+          { caller: "Applications.loadFollowUps", action: "fetch_follow_ups" }
+        );
         if (res.ok) setFollowUps(await res.json());
       } catch {
         // leave empty on error
@@ -279,18 +269,15 @@ function ApplicationCard({
       return;
     }
     try {
-      const res = await fetch(`${API}/jobs/${app.job_id}/followups`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await api.post(
+        `/jobs/${app.job_id}/followups`,
+        {
           job_id: app.job_id,
           description: newFollowUp.description,
           due_date: newFollowUp.due_date || null,
-        }),
-      });
+        },
+        { caller: "Applications.createFollowUp", action: "create_follow_up" }
+      );
       if (res.ok) {
         const created = await res.json();
         setFollowUps((prev) => [...prev, created]);
@@ -305,14 +292,11 @@ function ApplicationCard({
 
   const toggleComplete = async (fu) => {
     try {
-      const res = await fetch(`${API}/followups/${fu.followup_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ completed: !fu.completed }),
-      });
+      const res = await api.put(
+        `/followups/${fu.followup_id}`,
+        { completed: !fu.completed },
+        { caller: "Applications.toggleComplete", action: "toggle_follow_up_complete" }
+      );
       if (res.ok) {
         const updated = await res.json();
         setFollowUps((prev) =>
@@ -326,10 +310,10 @@ function ApplicationCard({
 
   const deleteFollowUp = async (followup_id) => {
     try {
-      const res = await fetch(`${API}/followups/${followup_id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.delete(
+        `/followups/${followup_id}`,
+        { caller: "Applications.deleteFollowUp", action: "delete_follow_up" }
+      );
       if (res.ok) {
         setFollowUps((prev) =>
           prev.filter((f) => f.followup_id !== followup_id)
@@ -343,9 +327,10 @@ function ApplicationCard({
   const loadInterviews = async () => {
     if (!showInterviews && !interviewsLoaded) {
       try {
-        const res = await fetch(`${API}/jobs/${app.job_id}/interviews`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await api.get(
+          `/jobs/${app.job_id}/interviews`,
+          { caller: "Applications.loadInterviews", action: "fetch_interviews" }
+        );
         if (res.ok) setInterviews(await res.json());
       } catch {
         // leave empty on error
@@ -365,18 +350,15 @@ function ApplicationCard({
       return;
     }
     try {
-      const res = await fetch(`${API}/jobs/${app.job_id}/interviews`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await api.post(
+        `/jobs/${app.job_id}/interviews`,
+        {
           job_id: app.job_id,
           round_type: newInterview.round_type,
           scheduled_at: newInterview.scheduled_at,
-        }),
-      });
+        },
+        { caller: "Applications.createInterview", action: "create_interview" }
+      );
       if (res.ok) {
         const created = await res.json();
         setInterviews((prev) => [...prev, created]);
@@ -397,10 +379,10 @@ function ApplicationCard({
 
   const deleteInterview = async (interview_id) => {
     try {
-      const res = await fetch(`${API}/interviews/${interview_id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.delete(
+        `/interviews/${interview_id}`,
+        { caller: "Applications.deleteInterview", action: "delete_interview" }
+      );
       if (res.ok) {
         setInterviews((prev) =>
           prev.filter((i) => i.interview_id !== interview_id)
@@ -415,14 +397,11 @@ function ApplicationCard({
     setNotesSaving(true);
     setNotesError("");
     try {
-      const res = await fetch(`${API}/jobs/applications/${app.job_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ outcome_notes: notesValue }),
-      });
+      const res = await api.put(
+        `/jobs/applications/${app.job_id}`,
+        { outcome_notes: notesValue },
+        { caller: "Applications.saveNotes", action: "save_outcome_notes" }
+      );
       if (res.ok) {
         setEditingNotes(false);
       } else {
@@ -1045,11 +1024,9 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
       await Promise.all(
         applications.map(async (app) => {
           try {
-            const res = await fetch(
-              `${API}/jobs/applications/${app.job_id}/activity`,
-              {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-              }
+            const res = await api.get(
+              `/jobs/applications/${app.job_id}/activity`,
+              { caller: "Applications.HistoryOverlay", action: "fetch_all_activity" }
             );
             if (res.ok) {
               const activities = await res.json();
@@ -1092,25 +1069,17 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
     const targetStage = previous?.stage || "Applied";
 
     try {
-      const res = await fetch(`${API}/jobs/applications/${jobId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ application_status: targetStage }),
-      });
+      const res = await api.put(
+        `/jobs/applications/${jobId}`,
+        { application_status: targetStage },
+        { caller: "Applications.handleRestore", action: "restore_application" }
+      );
       if (!res.ok) {
-        const detail = await res.text();
-        console.error(
-          `Restore failed (${res.status}) for job ${jobId}:`,
-          detail
-        );
         return;
       }
       onRestore(jobId, targetStage);
-    } catch (err) {
-      console.error("Restore request errored:", err);
+    } catch {
+      // handled by api client logging
     } finally {
       setRestoringJobId(null);
     }
@@ -1213,14 +1182,11 @@ function AddJobModal({ onClose, onAdded }) {
         description: form.description.trim() || null,
         application_status: form.application_status,
       };
-      const res = await fetch(`${API}/jobs/manual`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = await api.post(
+        "/jobs/manual",
+        body,
+        { caller: "Applications.AddJobModal", action: "create_manual_job" }
+      );
       if (!res.ok) {
         const detail = await res.json().catch(() => ({}));
         setError(detail.detail || "Failed to save job.");
@@ -1372,13 +1338,12 @@ function Applications() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API}/jobs/dashboard`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await api.get(
+          "/jobs/dashboard",
+          { caller: "Applications.load", action: "fetch_dashboard" }
+        );
 
         if (!res.ok) {
-          const detail = await res.text();
-          console.error(`Dashboard load failed (${res.status}):`, detail);
           setApplications([]);
           setPositions({});
           setError("Could not load applications. Please sign in again.");
@@ -1393,9 +1358,10 @@ function Applications() {
         // Fetch all positions in one request to avoid exhausting the DB connection pool
         const posMap = {};
         if (safeApps.length > 0) {
-          const pr = await fetch(`${API}/jobs/positions/?include_manual=true`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
+          const pr = await api.get(
+            "/jobs/positions/?include_manual=true",
+            { caller: "Applications.load", action: "fetch_positions" }
+          );
           if (pr.ok) {
             const allPositions = await pr.json();
             const neededIds = new Set(safeApps.map((a) => a.position_id));
@@ -1408,16 +1374,16 @@ function Applications() {
         setPositions(posMap);
 
         if (token) {
-          const docRes = await fetch(`${API}/documents/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const docRes = await api.get(
+            "/documents/me",
+            { caller: "Applications.load", action: "fetch_user_documents" }
+          );
           if (docRes.ok) setDocuments(await docRes.json());
         }
 
         setError("");
         setLoading(false);
-      } catch (err) {
-        console.error("Dashboard load errored:", err);
+      } catch {
         setApplications([]);
         setPositions({});
         setError("Could not reach the server.");
@@ -1454,16 +1420,10 @@ function Applications() {
 
     try {
       setIsDeleting(true);
-      const res = await fetch(
-        `${API}/jobs/applications/${deleteTarget.job_id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ application_status: "Withdrawn" }),
-        }
+      const res = await api.put(
+        `/jobs/applications/${deleteTarget.job_id}`,
+        { application_status: "Withdrawn" },
+        { caller: "Applications.handleDeleteApplication", action: "withdraw_application" }
       );
       if (res.ok) {
         setApplications((prev) =>
@@ -1475,8 +1435,8 @@ function Applications() {
         );
       }
       setDeleteTarget(null);
-    } catch (err) {
-      console.error("Failed to remove application:", err);
+    } catch {
+      // handled by api client logging
     } finally {
       setIsDeleting(false);
     }
@@ -1484,9 +1444,10 @@ function Applications() {
 
   const handleJobAdded = async (newApp) => {
     // Fetch the position info for the new app so the card renders correctly
-    const r = await fetch(`${API}/jobs/positions/${newApp.position_id}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    const r = await api.get(
+      `/jobs/positions/${newApp.position_id}`,
+      { caller: "Applications.handleJobAdded", action: "fetch_new_position" }
+    );
     if (r.ok) {
       const pos = await r.json();
       setPositions((prev) => ({ ...prev, [newApp.position_id]: pos }));

@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m pytest backend/tests/ -v --tb=short)"
+      "Bash(python -m pytest backend/tests/ -v --tb=short)",
+      "Bash(npx vite:*)",
+      "Bash(python -c \"from logging_config import setup_logging; setup_logging\\(\\); print\\('logging_config OK'\\)\")",
+      "Bash(python3 -c \"from logging_config import setup_logging; setup_logging\\(\\); print\\('logging_config OK'\\)\")",
+      "Bash(python3 -c \"from middleware.request_logger import RequestLoggingMiddleware; print\\('middleware OK'\\)\")",
+      "Bash(python3 -c ':*)",
+      "Bash(./backend/venv/bin/python -m pytest backend/tests/ -v)"
     ]
   }
 }
