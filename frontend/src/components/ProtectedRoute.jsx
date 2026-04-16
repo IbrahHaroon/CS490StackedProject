@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
@@ -12,9 +11,11 @@ function ProtectedRoute({ children }) {
       setValid(false);
       return;
     }
-    fetch(`${API}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    api
+      .get("/auth/me", {
+        caller: "ProtectedRoute.validate",
+        action: "validate_token",
+      })
       .then((res) => {
         if (res.ok) {
           setValid(true);

@@ -27,6 +27,7 @@ from schemas import (
     ApplicationResponse,
     ApplicationUpdate,
     JobActivityResponse,
+    ManualJobCreate,
     PositionCreate,
     PositionResponse,
     PositionUpdate,
@@ -44,6 +45,7 @@ router = APIRouter()
 @router.get("/positions/", response_model=list[PositionWithCompanyResponse])
 def read_all_positions(
     location_type: str | None = None,
+    include_manual: bool = False,
     session: Session = Depends(get_db),
 ):
     if location_type is not None and location_type not in LOCATION_TYPES:
@@ -51,7 +53,7 @@ def read_all_positions(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid location_type. Must be one of: {LOCATION_TYPES}",
         )
-    positions = get_all_positions(session)
+    positions = get_all_positions(session, exclude_manual=not include_manual)
     if location_type is not None:
         positions = [p for p in positions if p.location_type == location_type]
     result = []
@@ -69,6 +71,7 @@ def read_all_positions(
                 description=p.description,
                 location_type=p.location_type,
                 location=p.location,
+                is_manual=p.is_manual,
             )
         )
     return result
@@ -77,7 +80,11 @@ def read_all_positions(
 @router.post(
     "/positions/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED
 )
-def create_position_endpoint(body: PositionCreate, session: Session = Depends(get_db)):
+def create_position_endpoint(
+    body: PositionCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return create_position(
         session,
         company_id=body.company_id,
@@ -119,6 +126,7 @@ def update_position_endpoint(
     position_id: int,
     body: PositionUpdate,
     session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     position = get_position(session, position_id)
     if not position:
@@ -166,7 +174,15 @@ def get_dashboard(
 
 
 @router.get("/applications/{user_id}", response_model=list[ApplicationResponse])
-def read_applications(user_id: int, session: Session = Depends(get_db)):
+def read_applications(
+    user_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
     return list(get_all_applied_jobs(session, user_id))
 
 
@@ -175,15 +191,70 @@ def read_applications(user_id: int, session: Session = Depends(get_db)):
     response_model=ApplicationResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def apply_for_job(body: ApplicationCreate, session: Session = Depends(get_db)):
+def apply_for_job(
+    body: ApplicationCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     job = create_applied_jobs(
-        session, body.user_id, body.position_id, body.years_of_experience
+        session, current_user.user_id, body.position_id, body.years_of_experience
     )
     create_job_activity(session, job.job_id, "Applied")
     job = update_applied_job(session, job.job_id, application_status="Applied")
     return job
 
 
+@router.post(
+    "/manual",
+    response_model=ApplicationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_manual_job(
+    body: ManualJobCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a company, position, and application in one shot for a manually tracked job."""
+    from datetime import date
+
+    from database.models.address import create_address
+    from database.models.company import Company
+    from database.models.position import create_position as _create_position
+
+    # Create a placeholder address for the company
+    address = create_address(session, address="N/A", state="N/A", zip_code=0)
+
+    # Create the company
+    company = Company(name=body.company_name, address_id=address.address_id)
+    session.add(company)
+    session.commit()
+    session.refresh(company)
+
+    # Create the position (flagged so it stays off the public job board)
+    position = _create_position(
+        session,
+        company_id=company.company_id,
+        title=body.title,
+        salary=body.salary,
+        education_req=None,
+        experience_req=None,
+        description=body.description,
+        listing_date=date.today(),
+        location=body.location,
+        location_type=None,
+        is_manual=True,
+    )
+
+    # Create the application
+    job = create_applied_jobs(session, current_user.user_id, position.position_id, 0)
+    create_job_activity(session, job.job_id, body.application_status)
+    job = update_applied_job(
+        session, job.job_id, application_status=body.application_status
+    )
+    return job
+
+
+# Single endpoint that handles every stage change.
 @router.put("/applications/{job_id}", response_model=ApplicationResponse)
 def update_application(
     job_id: int,
@@ -191,15 +262,18 @@ def update_application(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 404 check — verify the job exists before doing anything.
     job = get_applied_jobs(session, job_id)
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
         )
+    # 403 check — verify the logged-in user owns this job; another user can't change your application.
     if job.user_id != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
+    # Stage validation — reject any stage not in the allowed pipeline list with a 422.
     if (
         body.application_status is not None
         and body.application_status not in PIPELINE_STAGES
@@ -208,8 +282,10 @@ def update_application(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid stage. Must be one of: {PIPELINE_STAGES}",
         )
+    # Write a record to job_activity — this powers the timeline.
     if body.application_status is not None:
         create_job_activity(session, job_id, body.application_status)
+    # Update the job status and timestamp together — both happen or neither happens.
     updated = update_applied_job(
         session,
         job_id,

@@ -72,7 +72,9 @@ class AppliedJobs(Base):
     job_documents: Mapped[list["JobDocument"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
-    follow_ups: Mapped[list["FollowUp"]] = relationship(back_populates="job")
+    follow_ups: Mapped[list["FollowUp"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     documents: Mapped[list["Documents"]] = relationship(back_populates="job")
 
 
@@ -173,6 +175,18 @@ def lookup_applied_jobs(session: Session, user_id: int) -> int:
         ).scalar()
         or 0
     )
+
+
+def get_applied_job_by_position(
+    session: Session, user_id: int, position_id: int
+) -> "AppliedJobs | None":
+    """Return the first application a user has for a given position, or None."""
+    return session.execute(
+        select(AppliedJobs).where(
+            AppliedJobs.user_id == user_id,
+            AppliedJobs.position_id == position_id,
+        )
+    ).scalar_one_or_none()
 
 
 def get_all_applied_jobs(session: Session, user_id: int) -> tuple["AppliedJobs", ...]:

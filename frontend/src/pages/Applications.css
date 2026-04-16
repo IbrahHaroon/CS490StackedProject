@@ -68,15 +68,15 @@
   width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   outline: none;
 }
 
 .app-search::placeholder {
-  color: #9aa3c7;
+  color: var(--text-muted);
 }
 
 .app-search:focus {
@@ -87,16 +87,16 @@
 .app-clear-btn {
   padding: 10px 16px;
   border-radius: 10px;
-  border: 1px solid #3b3b5c;
+  border: 1px solid var(--border);
   background: transparent;
-  color: #cbd5f5;
+  color: var(--text);
   cursor: pointer;
   font-size: 14px;
   transition: 0.2s ease;
 }
 
 .app-clear-btn:hover:not(:disabled) {
-  background: #1e293b;
+  background: var(--surface-3);
 }
 
 .app-clear-btn:disabled {
@@ -107,9 +107,9 @@
 .app-filter-dropdown {
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   cursor: pointer;
   outline: none;
@@ -337,10 +337,15 @@
 }
 
 .app-activity-dot {
-  width: 8px;
-  height: 8px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  line-height: 1;
 }
 
 .app-activity-stage {
@@ -351,6 +356,17 @@
 .app-activity-date {
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+.app-activity-notes {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-style: italic;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
 }
 
 /* History overlay */
@@ -583,9 +599,9 @@
 .details-input {
   padding: 7px 10px;
   border-radius: 8px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   outline: none;
   width: 100%;
@@ -600,9 +616,9 @@
 .details-textarea {
   padding: 7px 10px;
   border-radius: 8px;
-  border: 1px solid #394264;
-  background: #151a33;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-strong);
   font-size: 14px;
   outline: none;
   width: 100%;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import EditModal from "../components/EditModal";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 function Section({ title, children, onEdit }) {
   return (
@@ -44,32 +44,22 @@ function ChangePasswordModal({ onCancel }) {
       return setError("New password must be at least 6 characters.");
     if (newPw !== confirm) return setError("Passwords do not match.");
 
-    // Verify current password by attempting login
-    const meRes = await fetch(`${API}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+    logAction("form_submit", {
+      component: "Settings",
+      element: "change_password",
     });
-    const me = await meRes.json();
-
-    const checkRes = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        username: me.email,
-        password: current,
-      }).toString(),
-    });
-    if (!checkRes.ok) return setError("Current password is incorrect.");
-
-    const forgotRes = await fetch(`${API}/auth/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: me.email }),
-    });
-
-    if (!forgotRes.ok) return setError("Failed to initiate password change.");
-    setSuccess(
-      "A password reset email has been sent. Please check your inbox."
+    const res = await api.post(
+      "/auth/change-password",
+      { current_password: current, new_password: newPw },
+      { caller: "Settings.changePassword", action: "change_password" }
     );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return setError(err.detail || "Failed to update password.");
+    }
+
+    setSuccess("Password updated successfully.");
   };
 
   return (
@@ -112,7 +102,7 @@ function ChangePasswordModal({ onCancel }) {
         )}
         <div style={styles.modalActions}>
           <button style={styles.cancelBtn} onClick={onCancel}>
-            Cancel
+            {success ? "Close" : "Cancel"}
           </button>
           {!success && (
             <button style={styles.saveBtn} onClick={handleSave}>
@@ -128,7 +118,9 @@ function ChangePasswordModal({ onCancel }) {
 function Settings() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
-  const [modal, setModal] = useState(null); // null | "name" | "contact" | "password"
+  const [userId, setUserId] = useState(null);
+  const [prefs, setPrefs] = useState(null);
+  const [modal, setModal] = useState(null); // null | "name" | "contact" | "career" | "password"
   const [statusMessage, setStatusMessage] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(
     () => localStorage.getItem("emailNotifications") !== "false"
@@ -155,27 +147,78 @@ function Settings() {
   useEffect(() => {
     if (!token) return;
 
-    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+    api
+      .get("/auth/me", { caller: "Settings.loadUser", action: "load_user" })
       .then((r) => r.json())
-      .then((d) => setEmail(d.email || ""));
+      .then(async (d) => {
+        setEmail(d.email || "");
+        setUserId(d.user_id);
+        const prefsRes = await api.get(
+          `/career-preferences/user/${d.user_id}`,
+          {
+            caller: "Settings.loadPrefs",
+            action: "load_career_prefs",
+          }
+        );
+        if (prefsRes.ok) {
+          const prefsData = await prefsRes.json();
+          setPrefs(prefsData);
+        }
+      })
+      .catch(() => {});
 
-    fetch(`${API}/profile/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    api
+      .get("/profile/me", {
+        caller: "Settings.loadProfile",
+        action: "load_profile",
+      })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setProfile(d);
       });
   }, []);
 
+  const savePrefs = async (values) => {
+    logAction("form_submit", {
+      component: "Settings",
+      element: "save_career_prefs",
+    });
+    const path = prefs
+      ? `/career-preferences/user/${userId}`
+      : `/career-preferences/`;
+    const body = prefs ? values : { user_id: userId, ...values };
+
+    const res = prefs
+      ? await api.put(path, body, {
+          caller: "Settings.updatePrefs",
+          action: "update_career_prefs",
+        })
+      : await api.post(path, body, {
+          caller: "Settings.createPrefs",
+          action: "create_career_prefs",
+        });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return err.detail || "Failed to save.";
+    }
+
+    const updated = await res.json();
+    setPrefs(updated);
+    setModal(null);
+    setStatusMessage("Career goals saved.");
+    setTimeout(() => setStatusMessage(""), 3000);
+    return null;
+  };
+
   const saveProfile = async (values) => {
-    const res = await fetch(`${API}/profile/${profile.profile_id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(values),
+    logAction("form_submit", {
+      component: "Settings",
+      element: "save_profile",
+    });
+    const res = await api.put(`/profile/${profile.profile_id}`, values, {
+      caller: "Settings.saveProfile",
+      action: "update_profile",
     });
 
     if (!res.ok) {
@@ -215,6 +258,14 @@ function Settings() {
         </Section>
 
         <hr style={styles.divider} />
+
+        {/* Career Goals */}
+        <Section title="Career Goals" onEdit={() => setModal("career")}>
+          <Field label="Target Roles" value={prefs?.target_roles} />
+          <Field label="Locations" value={prefs?.location_preferences} />
+          <Field label="Work Mode" value={prefs?.work_mode} />
+          <Field label="Salary Goal" value={prefs?.salary_preference} />
+        </Section>
 
         <hr style={styles.divider} />
 
@@ -304,6 +355,40 @@ function Settings() {
         <ChangePasswordModal onCancel={() => setModal(null)} />
       )}
 
+      {modal === "career" && (
+        <EditModal
+          title="Edit Career Goals"
+          fields={[
+            {
+              name: "target_roles",
+              label: "Target Roles",
+              value: prefs?.target_roles || "",
+              placeholder: "e.g. Software Engineer, Data Scientist",
+            },
+            {
+              name: "location_preferences",
+              label: "Preferred Locations",
+              value: prefs?.location_preferences || "",
+              placeholder: "e.g. New York, Remote",
+            },
+            {
+              name: "work_mode",
+              label: "Work Mode",
+              value: prefs?.work_mode || "",
+              placeholder: "e.g. Remote, Hybrid, Onsite",
+            },
+            {
+              name: "salary_preference",
+              label: "Salary Goal",
+              value: prefs?.salary_preference || "",
+              placeholder: "e.g. $100,000+",
+            },
+          ]}
+          onSave={savePrefs}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
       {/* Name edit modal */}
       {modal === "name" && (
         <EditModal
@@ -359,12 +444,12 @@ const styles = {
     fontFamily: "Arial, sans-serif",
   },
   title: { fontSize: "32px", marginBottom: "8px" },
-  subtitle: { color: "#555", marginBottom: "24px" },
+  subtitle: { color: "var(--text-muted)", marginBottom: "24px" },
   formCard: {
-    border: "1px solid #ddd",
+    border: "1px solid var(--border)",
     borderRadius: "12px",
     padding: "24px",
-    backgroundColor: "#fff",
+    backgroundColor: "var(--surface)",
     display: "flex",
     flexDirection: "column",
     gap: "0",
@@ -376,15 +461,15 @@ const styles = {
     alignItems: "center",
     marginBottom: "12px",
   },
-  sectionTitle: { fontSize: "18px", margin: 0, color: "#444" },
+  sectionTitle: { fontSize: "18px", margin: 0, color: "var(--text-strong)" },
   editBtn: {
     padding: "4px 14px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     borderRadius: "6px",
     background: "none",
     cursor: "pointer",
     fontSize: "14px",
-    color: "#333",
+    color: "var(--text)",
   },
   field: {
     display: "flex",
@@ -392,30 +477,36 @@ const styles = {
     padding: "6px 0",
     fontSize: "15px",
   },
-  fieldLabel: { color: "#555", width: "140px", flexShrink: 0 },
-  fieldValue: { color: "#222" },
-  divider: { border: "none", borderTop: "1px solid #eee", margin: 0 },
+  fieldLabel: { color: "var(--text-muted)", width: "140px", flexShrink: 0 },
+  fieldValue: { color: "var(--text-strong)" },
+  divider: {
+    border: "none",
+    borderTop: "1px solid var(--border-light)",
+    margin: 0,
+  },
   secondaryButton: {
     padding: "8px 16px",
     borderRadius: "8px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     cursor: "pointer",
     fontSize: "14px",
-    color: "#333",
+    color: "var(--text)",
+    background: "none",
   },
-  status: { color: "green", fontSize: "14px", marginBottom: "12px" },
+  status: { color: "#22c55e", fontSize: "14px", marginBottom: "12px" },
   // Modal
   overlay: {
     position: "fixed",
     inset: 0,
-    background: "rgba(0,0,0,0.4)",
+    background: "rgba(0,0,0,0.6)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1000,
   },
   modal: {
-    background: "#fff",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
     borderRadius: "12px",
     padding: "28px",
     width: "100%",
@@ -424,14 +515,16 @@ const styles = {
     flexDirection: "column",
     gap: "12px",
   },
-  modalTitle: { margin: 0, fontSize: "18px" },
+  modalTitle: { margin: 0, fontSize: "18px", color: "var(--text-strong)" },
   modalField: { display: "flex", flexDirection: "column", gap: "4px" },
-  modalLabel: { fontSize: "14px", fontWeight: "600" },
+  modalLabel: { fontSize: "14px", fontWeight: "600", color: "var(--text)" },
   modalInput: {
     padding: "8px 10px",
     borderRadius: "6px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     fontSize: "14px",
+    background: "var(--surface-2)",
+    color: "var(--text)",
   },
   modalActions: {
     display: "flex",
@@ -442,9 +535,10 @@ const styles = {
   cancelBtn: {
     padding: "8px 16px",
     borderRadius: "6px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     background: "none",
     cursor: "pointer",
+    color: "var(--text)",
   },
   saveBtn: {
     padding: "8px 16px",
@@ -454,7 +548,7 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
   },
-  error: { color: "red", fontSize: "13px", margin: 0 },
+  error: { color: "#ef4444", fontSize: "13px", margin: 0 },
   toggleRow: {
     display: "flex",
     justifyContent: "space-between",

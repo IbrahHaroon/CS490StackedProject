@@ -18,15 +18,15 @@
 }
 
 body.light-mode {
-  --bg: #f5f6fa;
+  --bg: #f0f4f8;
   --surface: #ffffff;
-  --surface-2: #eef1f7;
-  --surface-3: #e2e8f0;
-  --text: #1a1a2e;
-  --text-muted: #64748b;
-  --text-strong: #0f0f23;
-  --border: #d1d5db;
-  --border-light: #e5e7eb;
+  --surface-2: #e8edf5;
+  --surface-3: #dce3ee;
+  --text: #2d3f5e;
+  --text-muted: #526480;
+  --text-strong: #0f1f3d;
+  --border: #c8d3e3;
+  --border-light: #dce3ee;
 }
 
 body {

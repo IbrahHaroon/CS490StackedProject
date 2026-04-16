@@ -3,9 +3,83 @@
   color: var(--text);
 }
 
+.doclibrary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.doclibrary-header h1 {
+  margin: 0;
+  color: var(--text-strong);
+}
+
 .doclibrary h1 {
   color: var(--text-strong);
   margin-bottom: 2rem;
+}
+
+.doclibrary-gen-resume-btn {
+  padding: 0.6rem 1.2rem;
+  background-color: #059669;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.doclibrary-gen-resume-btn:hover {
+  background-color: #047857;
+}
+
+.doclibrary-gen-select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.doclibrary-gen-result {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.doclibrary-gen-result-header {
+  padding: 0.5rem 1rem;
+  background-color: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.doclibrary-gen-saved-badge {
+  font-size: 0.85rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.doclibrary-gen-textarea {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  resize: none;
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 0.85rem;
+  background-color: var(--surface);
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  min-height: 350px;
+  max-height: 450px;
+  overflow-y: auto;
 }
 
 .doclibrary h2 {
@@ -142,6 +216,15 @@
 
 .doclibrary-delete-btn:hover {
   background-color: #ff5252;
+}
+
+.doclibrary-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doclibrary-action-btn:disabled:hover {
+  background-color: inherit;
 }
 
 /* Modal Overlay */
@@ -306,6 +389,166 @@
   border: 1px solid var(--border);
 }
 
+/* AI Improve Button */
+.doclibrary-ai-btn {
+  background-color: #7c3aed;
+  color: #fff;
+}
+
+.doclibrary-ai-btn:hover {
+  background-color: #6d28d9;
+}
+
+/* AI Modal */
+.doclibrary-ai-modal {
+  max-width: 1000px;
+  width: 95%;
+}
+
+.doclibrary-ai-prompt {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.doclibrary-ai-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.doclibrary-ai-optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.doclibrary-ai-instructions {
+  padding: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 0.95rem;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.doclibrary-ai-instructions:disabled {
+  opacity: 0.6;
+}
+
+.doclibrary-ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.doclibrary-ai-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: #7c3aed;
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.doclibrary-ai-compare {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.doclibrary-ai-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.doclibrary-ai-col:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.doclibrary-ai-col-header {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.doclibrary-ai-col-header--improved {
+  color: #7c3aed;
+}
+
+.doclibrary-ai-text {
+  flex: 1;
+  padding: 1rem;
+  margin: 0;
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+  overflow-y: auto;
+  background-color: var(--surface);
+  color: var(--text);
+  min-height: 300px;
+  max-height: 400px;
+}
+
+.doclibrary-ai-text--editable {
+  border: none;
+  resize: none;
+  outline: none;
+  background-color: var(--surface);
+}
+
+.doclibrary-ai-generate-btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  background-color: #7c3aed;
+  color: #fff;
+  transition: background-color 0.2s ease;
+}
+
+.doclibrary-ai-generate-btn:hover:not(:disabled) {
+  background-color: #6d28d9;
+}
+
+.doclibrary-ai-generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.doclibrary-ai-error-inline {
+  padding: 0 1.5rem;
+}
+
 /* DOCX Viewer Styles */
 .doclibrary-docx-content {
   flex: 1;
@@ -323,4 +566,29 @@
   white-space: pre-wrap;
   word-wrap: break-word;
   line-height: 1.5;
+}
+
+.doclibrary-linked-job {
+  color: #a78bfa;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.doclibrary-linked-job-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: left;
+}
+
+.doclibrary-linked-job-btn:hover {
+  color: #c4b5fd;
+}
+
+.doclibrary-unlinked {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.82rem;
 }

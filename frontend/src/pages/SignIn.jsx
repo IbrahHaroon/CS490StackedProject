@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 import "./SignIn.css";
-
-const API = "http://localhost:8000";
 
 const EMPTY_SIGNUP = {
   firstName: "",
@@ -33,13 +33,15 @@ function SignIn() {
     setError("");
     setSuccess("");
 
+    logAction("form_submit", { component: "SignIn", action: mode });
+
     if (mode === "signup") {
       // 1. Register
-      const regRes = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const regRes = await api.post(
+        "/auth/register",
+        { email, password },
+        { caller: "SignIn.register", action: "user_register" }
+      );
 
       if (!regRes.ok) {
         const err = await regRes.json().catch(() => ({}));
@@ -53,22 +55,18 @@ function SignIn() {
       const form = new URLSearchParams();
       form.append("username", email);
       form.append("password", password);
-      const loginRes = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
+      const loginRes = await api.post("/auth/login", form, {
+        caller: "SignIn.loginAfterRegister",
+        action: "user_login",
       });
       const loginData = await loginRes.json();
       const token = loginData.access_token;
 
       // 3. Create profile
-      const profileRes = await fetch(`${API}/profile/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      localStorage.setItem("token", token);
+      const profileRes = await api.post(
+        "/profile/",
+        {
           user_id: newUser.user_id,
           first_name: signup.firstName,
           last_name: signup.lastName,
@@ -78,8 +76,9 @@ function SignIn() {
             state: signup.state,
             zip_code: parseInt(signup.zipCode, 10),
           },
-        }),
-      });
+        },
+        { caller: "SignIn.createProfile", action: "create_profile" }
+      );
 
       if (!profileRes.ok) {
         const err = await profileRes.json().catch(() => ({}));
@@ -88,7 +87,6 @@ function SignIn() {
       }
 
       setSuccess("Account created! Signing you in…");
-      localStorage.setItem("token", token);
       navigate("/");
       return;
     }
@@ -98,14 +96,11 @@ function SignIn() {
     form.append("username", email);
     form.append("password", password);
 
-    const endpoint = isRecruiter
-      ? `${API}/auth/recruiter/login`
-      : `${API}/auth/login`;
+    const endpoint = isRecruiter ? "/auth/recruiter/login" : "/auth/login";
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
+    const res = await api.post(endpoint, form, {
+      caller: "SignIn.login",
+      action: isRecruiter ? "recruiter_login" : "user_login",
     });
 
     if (!res.ok) {

@@ -34,6 +34,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # --------------------------------------------------------------------------- #
 #  User                                                                         #
 # --------------------------------------------------------------------------- #
@@ -337,6 +342,7 @@ class PositionWithCompanyResponse(BaseModel):
     education_req: str | None
     experience_req: str | None
     description: str | None
+    is_manual: bool | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -345,9 +351,18 @@ class PositionWithCompanyResponse(BaseModel):
 
 
 class ApplicationCreate(BaseModel):
-    user_id: int
+    user_id: int | None = None  # ignored server-side; auth token determines the user
     position_id: int
     years_of_experience: int = 0
+
+
+class ManualJobCreate(BaseModel):
+    company_name: str
+    title: str
+    location: str | None = None
+    salary: Decimal | None = None
+    description: str | None = None
+    application_status: str = "Interested"
 
 
 class ApplicationUpdate(BaseModel):
@@ -425,7 +440,6 @@ class InterviewResponse(BaseModel):
 
 
 class FollowUpCreate(BaseModel):
-    job_id: int
     description: str
     due_date: date | None = None
 

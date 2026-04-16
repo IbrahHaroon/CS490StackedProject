@@ -1,8 +1,18 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+# Resolve the project root (two levels up from this file: database/ -> backend/ -> root)
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+_ROOT_ENV = os.path.join(_PROJECT_ROOT, ".env")
+_BACKEND_ENV = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
+)
 
 
 class Settings(BaseSettings):
@@ -17,7 +27,13 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     frontend_url: str = "http://localhost:3000"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    openai_api_key: str = ""
+    gemini_api_key: str = ""
+
+    # Load root .env first, then backend .env — later files override earlier ones
+    model_config = SettingsConfigDict(
+        env_file=[_ROOT_ENV, _BACKEND_ENV], extra="ignore"
+    )
 
 
 @lru_cache()
@@ -30,7 +46,20 @@ settings = get_settings()
 # Create a synchronous connection URL by removing the async driver if present
 sync_url = settings.database_url.replace("+asyncpg", "").replace("+aiosqlite", "")
 
-engine = create_engine(sync_url, echo=True)
+# Build engine with appropriate pool settings (PostgreSQL needs them, SQLite doesn't)
+engine_kwargs = {"echo": True}
+if "postgresql" in sync_url:
+    engine_kwargs.update(
+        {
+            # Supabase Session Mode restricts client connections, so keep the pool very small.
+            "pool_size": 1,
+            "max_overflow": 0,
+            "pool_timeout": 30,
+            "pool_pre_ping": True,
+        }
+    )
+
+engine = create_engine(sync_url, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from utils.email import send_password_reset_email
 
 from database import get_db
 from database.auth import (
@@ -24,6 +23,7 @@ from database.models.recruiter_credentials import RecruiterCredentials
 from database.models.token_blacklist import TokenBlacklist
 from database.models.user import User
 from schemas import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     RecruiterRegisterRequest,
     RecruiterResponse,
@@ -141,7 +141,6 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     )
     db.commit()
 
-    send_password_reset_email(user.email, raw_token)
     return {"message": "If that email is registered, a reset token has been issued."}
 
 
@@ -180,6 +179,33 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     record.used = True
     db.commit()
 
+    return {"message": "Password updated successfully"}
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change password directly — verifies current password then updates the hash."""
+    creds = (
+        db.query(Credentials)
+        .filter(Credentials.user_id == current_user.user_id)
+        .first()
+    )
+    if not creds or not verify_password(body.current_password, creds.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+    if len(body.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters.",
+        )
+    creds.hashed_password = get_password_hash(body.new_password)
+    db.commit()
     return {"message": "Password updated successfully"}
 
 

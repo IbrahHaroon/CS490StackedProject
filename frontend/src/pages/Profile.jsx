@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import EditModal from "../components/EditModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
-
-const API = "http://localhost:8000";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 
 function Profile() {
   const [email, setEmail] = useState("");
@@ -35,19 +35,28 @@ function Profile() {
     const safe = (p) => p.catch(() => null);
     Promise.all([
       safe(
-        fetch(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : null))
+        api
+          .get("/auth/me", {
+            caller: "Profile.loadAuth",
+            action: "fetch_current_user",
+          })
+          .then((r) => (r.ok ? r.json() : null))
       ),
       safe(
-        fetch(`${API}/profile/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : null))
+        api
+          .get("/profile/me", {
+            caller: "Profile.loadProfile",
+            action: "fetch_profile",
+          })
+          .then((r) => (r.ok ? r.json() : null))
       ),
       safe(
-        fetch(`${API}/documents/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => (r.ok ? r.json() : []))
+        api
+          .get("/documents/me", {
+            caller: "Profile.loadDocuments",
+            action: "fetch_documents",
+          })
+          .then((r) => (r.ok ? r.json() : []))
       ),
     ]).then(([me, prof, docs]) => {
       setEmail(me?.email || "");
@@ -62,17 +71,21 @@ function Profile() {
   useEffect(() => {
     if (!userId) return;
     Promise.all([
-      fetch(`${API}/experience/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get(`/experience/user/${userId}`, {
+        caller: "Profile.loadExperience",
+        action: "fetch_experience",
       }),
-      fetch(`${API}/education/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get(`/education/user/${userId}`, {
+        caller: "Profile.loadEducation",
+        action: "fetch_education",
       }),
-      fetch(`${API}/skills/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get(`/skills/user/${userId}`, {
+        caller: "Profile.loadSkills",
+        action: "fetch_skills",
       }),
-      fetch(`${API}/career-preferences/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get(`/career-preferences/user/${userId}`, {
+        caller: "Profile.loadCareerPrefs",
+        action: "fetch_career_preferences",
       }),
     ]).then(async ([expRes, eduRes, skillRes, prefRes]) => {
       if (expRes.ok) setExperiences(await expRes.json());
@@ -90,13 +103,9 @@ function Profile() {
 
     let res;
     if (!profile) {
-      res = await fetch(`${API}/profile/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      res = await api.post(
+        "/profile/",
+        {
           user_id: userId,
           first_name: values.first_name || "",
           last_name: values.last_name || "",
@@ -104,19 +113,15 @@ function Profile() {
           address: { address: "", state: "", zip_code: 0 },
           phone_number: values.phone_number || null,
           summary: values.summary || null,
-        }),
-      });
-    } else {
-      res = await fetch(`${API}/profile/${profile.profile_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(
-          Object.fromEntries(Object.entries(values).filter(([, v]) => v !== ""))
-        ),
-      });
+        { caller: "Profile.saveProfile", action: "create_profile" }
+      );
+    } else {
+      res = await api.put(
+        `/profile/${profile.profile_id}`,
+        Object.fromEntries(Object.entries(values).filter(([, v]) => v !== "")),
+        { caller: "Profile.saveProfile", action: "update_profile" }
+      );
     }
 
     if (!res.ok) {
@@ -146,13 +151,9 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/experience/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      res = await api.post(
+        "/experience/",
+        {
           user_id: userId,
           company: values.company,
           title: values.title,
@@ -160,24 +161,22 @@ function Profile() {
           end_date: values.end_date || null,
           description: values.description || null,
           sort_order: experiences.length,
-        }),
-      });
-    } else {
-      res = await fetch(`${API}/experience/${activeRecord.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
+        { caller: "Profile.saveExperience", action: "create_experience" }
+      );
+    } else {
+      res = await api.put(
+        `/experience/${activeRecord.experience_id}`,
+        {
           company: values.company,
           title: values.title,
           start_date: values.start_date,
           end_date: values.end_date || null,
           clear_end_date: !values.end_date,
           description: values.description || null,
-        }),
-      });
+        },
+        { caller: "Profile.saveExperience", action: "update_experience" }
+      );
     }
 
     if (!res.ok) {
@@ -207,9 +206,9 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/experience/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await api.delete(`/experience/${deleteTarget.id}`, {
+        caller: "Profile.deleteExperience",
+        action: "delete_experience",
       });
       if (res.ok) {
         setExperiences((prev) =>
@@ -228,22 +227,16 @@ function Profile() {
     const a = experiences[index];
     const b = experiences[swapIndex];
     await Promise.all([
-      fetch(`${API}/experience/${a.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: b.sort_order }),
-      }),
-      fetch(`${API}/experience/${b.experience_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: a.sort_order }),
-      }),
+      api.put(
+        `/experience/${a.experience_id}`,
+        { sort_order: b.sort_order },
+        { caller: "Profile.moveExperience", action: "reorder_experience" }
+      ),
+      api.put(
+        `/experience/${b.experience_id}`,
+        { sort_order: a.sort_order },
+        { caller: "Profile.moveExperience", action: "reorder_experience" }
+      ),
     ]);
     setExperiences((prev) => {
       const updated = [...prev];
@@ -266,13 +259,9 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/education/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      res = await api.post(
+        "/education/",
+        {
           user_id: userId,
           highest_education: values.highest_education,
           degree: values.degree,
@@ -286,16 +275,13 @@ function Profile() {
           start_date: values.start_date,
           end_date: values.end_date || null,
           gpa: values.gpa || null,
-        }),
-      });
-    } else {
-      res = await fetch(`${API}/education/${activeRecord.education_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
+        { caller: "Profile.saveEducation", action: "create_education" }
+      );
+    } else {
+      res = await api.put(
+        `/education/${activeRecord.education_id}`,
+        {
           highest_education: values.highest_education,
           degree: values.degree,
           school_or_college: values.school_or_college,
@@ -303,8 +289,9 @@ function Profile() {
           start_date: values.start_date,
           end_date: values.end_date || null,
           gpa: values.gpa || null,
-        }),
-      });
+        },
+        { caller: "Profile.saveEducation", action: "update_education" }
+      );
     }
 
     if (!res.ok) {
@@ -334,9 +321,9 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/education/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await api.delete(`/education/${deleteTarget.id}`, {
+        caller: "Profile.deleteEducation",
+        action: "delete_education",
       });
       if (res.ok) {
         setEducations((prev) =>
@@ -356,33 +343,27 @@ function Profile() {
 
     let res;
     if (!activeRecord) {
-      res = await fetch(`${API}/skills/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      res = await api.post(
+        "/skills/",
+        {
           user_id: userId,
           name: values.name,
           category: values.category || null,
           proficiency: values.proficiency || null,
           sort_order: skills.length,
-        }),
-      });
-    } else {
-      res = await fetch(`${API}/skills/${activeRecord.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
+        { caller: "Profile.saveSkill", action: "create_skill" }
+      );
+    } else {
+      res = await api.put(
+        `/skills/${activeRecord.skill_id}`,
+        {
           name: values.name,
           category: values.category || null,
           proficiency: values.proficiency || null,
-        }),
-      });
+        },
+        { caller: "Profile.saveSkill", action: "update_skill" }
+      );
     }
 
     if (!res.ok) {
@@ -410,9 +391,9 @@ function Profile() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`${API}/skills/${deleteTarget.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await api.delete(`/skills/${deleteTarget.id}`, {
+        caller: "Profile.deleteSkill",
+        action: "delete_skill",
       });
       if (res.ok) {
         setSkills((prev) => prev.filter((s) => s.skill_id !== deleteTarget.id));
@@ -429,22 +410,16 @@ function Profile() {
     const a = skills[index];
     const b = skills[swapIndex];
     await Promise.all([
-      fetch(`${API}/skills/${a.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: b.sort_order }),
-      }),
-      fetch(`${API}/skills/${b.skill_id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ sort_order: a.sort_order }),
-      }),
+      api.put(
+        `/skills/${a.skill_id}`,
+        { sort_order: b.sort_order },
+        { caller: "Profile.moveSkill", action: "reorder_skill" }
+      ),
+      api.put(
+        `/skills/${b.skill_id}`,
+        { sort_order: a.sort_order },
+        { caller: "Profile.moveSkill", action: "reorder_skill" }
+      ),
     ]);
     setSkills((prev) => {
       const updated = [...prev];
@@ -457,19 +432,16 @@ function Profile() {
   // ── Career Preferences ─────────────────────────────────────────────────────
 
   const saveCareerPrefs = async (values) => {
-    const res = await fetch(`${API}/career-preferences/user/${userId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+    const res = await api.put(
+      `/career-preferences/user/${userId}`,
+      {
         target_roles: values.target_roles || null,
         location_preferences: values.location_preferences || null,
         work_mode: values.work_mode || null,
         salary_preference: values.salary_preference || null,
-      }),
-    });
+      },
+      { caller: "Profile.saveCareerPrefs", action: "update_career_preferences" }
+    );
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -1191,17 +1163,17 @@ const styles = {
     fontFamily: "Arial, sans-serif",
   },
   title: { fontSize: "32px", marginBottom: "8px" },
-  subtitle: { color: "#555", marginBottom: "24px" },
-  status: { color: "green", fontSize: "14px", marginBottom: "12px" },
+  subtitle: { color: "var(--text-muted)", marginBottom: "24px" },
+  status: { color: "#22c55e", fontSize: "14px", marginBottom: "12px" },
   sectionStatus: {
-    color: "green",
+    color: "#22c55e",
     fontSize: "13px",
     marginTop: "8px",
     marginBottom: 0,
   },
   card: {
-    backgroundColor: "#fff",
-    border: "1px solid #ddd",
+    backgroundColor: "var(--surface)",
+    border: "1px solid var(--border)",
     borderRadius: "12px",
     padding: "24px",
     marginBottom: "20px",
@@ -1212,15 +1184,15 @@ const styles = {
     alignItems: "center",
     marginBottom: "12px",
   },
-  cardTitle: { fontSize: "22px", margin: 0, color: "#444" },
+  cardTitle: { fontSize: "22px", margin: 0, color: "var(--text-strong)" },
   editBtn: {
     padding: "4px 14px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     borderRadius: "6px",
     background: "none",
     cursor: "pointer",
     fontSize: "14px",
-    color: "#333",
+    color: "var(--text)",
   },
   addBtn: {
     padding: "4px 14px",
@@ -1242,36 +1214,44 @@ const styles = {
   },
   reorderBtn: {
     padding: "2px 7px",
-    border: "1px solid #ccc",
+    border: "1px solid var(--border)",
     borderRadius: "4px",
     background: "none",
     cursor: "pointer",
     fontSize: "13px",
-    color: "#555",
+    color: "var(--text-muted)",
     lineHeight: 1,
   },
-  emptyText: { color: "#aaa", fontSize: "14px", margin: 0 },
+  emptyText: { color: "var(--text-muted)", fontSize: "14px", margin: 0 },
   itemRow: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     padding: "10px 0",
-    borderBottom: "1px solid #f0f0f0",
+    borderBottom: "1px solid var(--border-light)",
   },
   itemInfo: { flex: 1, marginRight: "12px" },
   itemPrimary: {
     margin: 0,
     fontSize: "15px",
     fontWeight: "600",
-    color: "#222",
+    color: "var(--text-strong)",
   },
-  itemSecondary: { margin: "3px 0 0", fontSize: "13px", color: "#666" },
+  itemSecondary: {
+    margin: "3px 0 0",
+    fontSize: "13px",
+    color: "var(--text-muted)",
+  },
   itemActions: { display: "flex", gap: "8px", flexShrink: 0 },
-  percentageText: { fontSize: "24px", fontWeight: "700", color: "#333" },
+  percentageText: {
+    fontSize: "24px",
+    fontWeight: "700",
+    color: "var(--text-strong)",
+  },
   progressBar: {
     width: "100%",
     height: "14px",
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "var(--surface-3)",
     borderRadius: "999px",
     overflow: "hidden",
     margin: "10px 0",
@@ -1281,23 +1261,23 @@ const styles = {
     backgroundColor: "#22c55e",
     transition: "width 0.3s ease",
   },
-  helperText: { fontSize: "14px", color: "#555" },
+  helperText: { fontSize: "14px", color: "var(--text-muted)" },
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "16px",
   },
-  summaryLabel: { fontSize: "13px", color: "#555", margin: 0 },
+  summaryLabel: { fontSize: "13px", color: "var(--text-muted)", margin: 0 },
   summaryValue: {
     fontSize: "15px",
     fontWeight: "600",
-    color: "#222",
+    color: "var(--text-strong)",
     wordBreak: "break-word",
     margin: "4px 0 0",
   },
-  summaryText: { fontSize: "15px", color: "#333", lineHeight: "1.6" },
+  summaryText: { fontSize: "15px", color: "var(--text)", lineHeight: "1.6" },
   missingList: { paddingLeft: "20px" },
-  missingItem: { marginBottom: "8px", color: "#333" },
+  missingItem: { marginBottom: "8px", color: "var(--text)" },
 };
 
 export default Profile;

@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, Sequence, String
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, Sequence, String
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
@@ -36,6 +36,13 @@ class Position(Base):
     experience_req: Mapped[str] = mapped_column(String(255), nullable=True)
     description: Mapped[str] = mapped_column(String(2000), nullable=True)
     listing_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # nullable=True so existing rows (before migration) don't break.
+    # Run this in Supabase SQL editor before deploying:
+    #   ALTER TABLE position ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE;
+    #   UPDATE position p SET is_manual = TRUE
+    #     FROM company c JOIN address a ON c.address_id = a.address_id
+    #     WHERE p.company_id = c.company_id AND a.address = 'N/A';
+    is_manual: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     # Relationships
     company: Mapped["Company"] = relationship(back_populates="positions")
@@ -58,6 +65,7 @@ def create_position(
     listing_date: date,
     location: str | None = None,
     location_type: str | None = None,
+    is_manual: bool = False,
 ) -> "Position":
     """Create a new Position row and return the persisted object."""
     new_position = Position(
@@ -70,6 +78,7 @@ def create_position(
         experience_req=experience_req,
         description=description,
         listing_date=listing_date,
+        is_manual=is_manual,
     )
     session.add(new_position)
     session.commit()
@@ -82,11 +91,20 @@ def get_position(session: Session, position_id: int) -> "Position | None":
     return session.get(Position, position_id)
 
 
-def get_all_positions(session: Session) -> list["Position"]:
-    """Return all positions."""
+def get_all_positions(
+    session: Session, exclude_manual: bool = False
+) -> list["Position"]:
+    """Return all positions. When exclude_manual=True, positions with
+    is_manual=True are omitted so they don't appear on the public job board.
+    Requires the migration SQL in the is_manual column comment above to have
+    been run in Supabase first."""
     from sqlalchemy import select
 
-    return session.execute(select(Position)).scalars().all()
+    stmt = select(Position)
+    if exclude_manual:
+        # is_manual IS NOT TRUE covers both FALSE and NULL (pre-migration rows)
+        stmt = stmt.where(Position.is_manual.is_not(True))
+    return session.execute(stmt).scalars().all()
 
 
 def update_position(session: Session, updated_position: "Position") -> bool:
