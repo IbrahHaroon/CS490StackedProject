@@ -3,6 +3,8 @@ from database.models.applied_jobs import AppliedJobs
 from database.models.career_preferences import CareerPreferences
 from database.models.company import Company
 from database.models.credentials import Credentials
+from database.models.document_job_link import DocumentJobLink
+from database.models.document_version import DocumentVersion
 from database.models.documents import Documents
 from database.models.education import Education
 from database.models.experience import Experience
