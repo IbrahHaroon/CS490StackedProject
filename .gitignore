@@ -44,3 +44,7 @@ build/
 # Temp repo for manual code sharing
 temprepo/
 backend/uploads/
+.claude/
+
+# Local-only notes
+PURPOSE.md

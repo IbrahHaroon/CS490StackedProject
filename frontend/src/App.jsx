@@ -112,7 +112,7 @@ function App() {
           <Route path="/postings" element={<Postings />} />
         </Routes>
       </main>
-      {import.meta.env.DEV && <DevLogViewer />}
+      {import.meta.env.VITE_SHOW_CONSOLE === "true" && <DevLogViewer />}
     </>
   );
 }

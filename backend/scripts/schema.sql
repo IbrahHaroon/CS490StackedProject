@@ -227,8 +227,38 @@ CREATE TABLE documents (
     doc_id            SERIAL PRIMARY KEY,
     user_id           INTEGER      NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
     job_id            INTEGER      NULL     REFERENCES applied_jobs(job_id) ON DELETE SET NULL,
+    document_name     VARCHAR(255),
     document_type     VARCHAR(100) NOT NULL,
-    document_location VARCHAR(500)
+    document_location VARCHAR(500),
+    content           TEXT,
+    status            VARCHAR(50)  DEFAULT 'Draft',
+    tags              VARCHAR(500),
+    created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_archived       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+-- -----------------------------------------------------------------------------
+-- document_version  (PRD §6 — DocumentVersion)
+-- doc_id ON DELETE CASCADE: versions are owned by the parent document
+-- -----------------------------------------------------------------------------
+CREATE TABLE document_version (
+    version_id        SERIAL PRIMARY KEY,
+    doc_id            INTEGER      NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
+    version_number    INTEGER      NOT NULL,
+    content           TEXT,
+    document_location VARCHAR(500),
+    created_at        TIMESTAMP    NOT NULL
+);
+
+-- -----------------------------------------------------------------------------
+-- document_job_link  (PRD §6 — JobDocumentLink, N:N between jobs and docs)
+-- -----------------------------------------------------------------------------
+CREATE TABLE document_job_link (
+    link_id    SERIAL PRIMARY KEY,
+    doc_id     INTEGER   NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
+    job_id     INTEGER   NOT NULL REFERENCES applied_jobs(job_id) ON DELETE CASCADE,
+    linked_at  TIMESTAMP NOT NULL
 );
 
 -- -----------------------------------------------------------------------------
