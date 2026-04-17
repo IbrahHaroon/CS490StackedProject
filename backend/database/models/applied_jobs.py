@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     Sequence,
     String,
+    Text,
     func,
     select,
 )
@@ -60,6 +61,8 @@ class AppliedJobs(Base):
     deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     recruiter_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     outcome_notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    company_research_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    interview_prep_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="applied_jobs")
@@ -121,6 +124,8 @@ def update_applied_job(
     deadline: date | None = None,
     recruiter_notes: str | None = None,
     outcome_notes: str | None = None,
+    company_research_notes: str | None = None,
+    interview_prep_notes: str | None = None,
 ) -> "AppliedJobs | None":
     """Update mutable fields on an existing application. Returns None if not found."""
     job = get_applied_jobs(session, job_id)
@@ -137,6 +142,10 @@ def update_applied_job(
         job.recruiter_notes = recruiter_notes
     if outcome_notes is not None:
         job.outcome_notes = outcome_notes
+    if company_research_notes is not None:
+        job.company_research_notes = company_research_notes
+    if interview_prep_notes is not None:
+        job.interview_prep_notes = interview_prep_notes
     session.commit()
     session.refresh(job)
     return job

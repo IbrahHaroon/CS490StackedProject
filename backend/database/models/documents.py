@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, Sequence, String, Text, func, select
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Sequence,
+    String,
+    Text,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
 
 if TYPE_CHECKING:
     from database.models.applied_jobs import AppliedJobs
+    from database.models.document_version import DocumentVersion
     from database.models.user import User
 
 
@@ -29,10 +41,24 @@ class Documents(Base):
     document_type: Mapped[str] = mapped_column(String(100), nullable=False)
     document_location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, default="Draft"
+    )
+    tags: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents")
     job: Mapped["Optional[AppliedJobs]"] = relationship(back_populates="documents")
+    versions: Mapped[list["DocumentVersion"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -48,12 +74,15 @@ def create_document(
     job_id: int | None = None,
     document_name: str | None = None,
     content: str | None = None,
+    status: str | None = None,
+    tags: str | None = None,
 ) -> "Documents":
     """Create a new Document row and return the persisted object.
 
     For uploaded files, provide document_location (file path/URL).
     For AI-generated drafts, provide content (raw text) instead.
     """
+    now = datetime.utcnow()
     new_doc = Documents(
         user_id=user_id,
         job_id=job_id,
@@ -61,6 +90,11 @@ def create_document(
         document_type=document_type,
         document_location=document_location,
         content=content,
+        status=status or "Draft",
+        tags=tags,
+        created_at=now,
+        updated_at=now,
+        is_archived=False,
     )
     session.add(new_doc)
     session.commit()
@@ -106,16 +140,31 @@ def get_all_documents(session: Session, user_id: int) -> tuple["Documents", ...]
 
 
 def update_document(
-    session: Session, doc_id: int, content: str | None = None
+    session: Session,
+    doc_id: int,
+    content: str | None = None,
+    document_name: str | None = None,
+    status: str | None = None,
+    tags: str | None = None,
+    is_archived: bool | None = None,
 ) -> "Documents | None":
-    """Update document content. Returns updated document or None if not found."""
+    """Update document fields. Returns updated document or None if not found."""
     document = get_document(session, doc_id)
     if document is None:
         return None
 
     if content is not None:
         document.content = content
+    if document_name is not None:
+        document.document_name = document_name
+    if status is not None:
+        document.status = status
+    if tags is not None:
+        document.tags = tags
+    if is_archived is not None:
+        document.is_archived = is_archived
 
+    document.updated_at = datetime.utcnow()
     session.commit()
     session.refresh(document)
     return document

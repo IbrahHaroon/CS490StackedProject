@@ -1,5 +1,6 @@
 """Tests for documents.py — create_document, get_document, lookup_documents, get_all_documents."""
 
+import time
 from datetime import date as _date
 
 import pytest
@@ -11,6 +12,7 @@ from database.models.documents import (
     get_all_documents,
     get_document,
     lookup_documents,
+    update_document,
 )
 from database.models.position import create_position
 from database.models.user import create_user
@@ -178,6 +180,85 @@ class TestGetAllDocuments:
     def test_returns_empty_tuple_for_nonexistent_user(self, session):
         result = get_all_documents(session, 99999)
         assert result == ()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestDocumentMetadata — S3-002 new fields
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestDocumentMetadata:
+    def test_default_status_is_draft(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.status == "Draft"
+
+    def test_custom_status(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf", status="Final")
+        assert doc.status == "Final"
+
+    def test_tags_stored(self, session, user):
+        doc = create_document(
+            session, user.user_id, "Resume", "/r.pdf", tags="python,backend"
+        )
+        assert doc.tags == "python,backend"
+
+    def test_tags_default_none(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.tags is None
+
+    def test_created_at_set(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.created_at is not None
+
+    def test_updated_at_set(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.updated_at is not None
+
+    def test_is_archived_defaults_false(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", "/r.pdf")
+        assert doc.is_archived is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestUpdateDocument — S3-002/S3-007/S3-008 update fields
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestUpdateDocument:
+    def test_update_content(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", content="old")
+        updated = update_document(session, doc.doc_id, content="new")
+        assert updated.content == "new"
+
+    def test_update_document_name(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", document_name="old_name")
+        updated = update_document(session, doc.doc_id, document_name="new_name")
+        assert updated.document_name == "new_name"
+
+    def test_update_status(self, session, user):
+        doc = create_document(session, user.user_id, "Resume")
+        updated = update_document(session, doc.doc_id, status="Final")
+        assert updated.status == "Final"
+
+    def test_update_tags(self, session, user):
+        doc = create_document(session, user.user_id, "Resume")
+        updated = update_document(session, doc.doc_id, tags="java,spring")
+        assert updated.tags == "java,spring"
+
+    def test_update_is_archived(self, session, user):
+        doc = create_document(session, user.user_id, "Resume")
+        updated = update_document(session, doc.doc_id, is_archived=True)
+        assert updated.is_archived is True
+
+    def test_update_bumps_updated_at(self, session, user):
+        doc = create_document(session, user.user_id, "Resume", content="v1")
+        original_updated = doc.updated_at
+        time.sleep(0.05)
+        updated = update_document(session, doc.doc_id, content="v2")
+        assert updated.updated_at > original_updated
+
+    def test_update_returns_none_for_missing_doc(self, session):
+        assert update_document(session, 99999, content="x") is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
