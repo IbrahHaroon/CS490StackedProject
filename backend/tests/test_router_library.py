@@ -4,7 +4,6 @@ import io
 
 import pytest
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _UPLOAD_URL = "/library/upload"
