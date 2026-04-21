@@ -24,6 +24,7 @@ from routers import (  # noqa: E402
     job_documents,
     jobs,
     jobs_sorter,
+    library,
     outcomes,
     profile,
     recruiter,
@@ -74,6 +75,7 @@ app.include_router(
 )
 app.include_router(follow_ups.router, prefix="", tags=["Follow-Ups"])
 app.include_router(frontend_logs.router, prefix="/logs", tags=["Logs"])
+app.include_router(library.router, prefix="/library", tags=["Library"])
 
 
 @app.get("/")

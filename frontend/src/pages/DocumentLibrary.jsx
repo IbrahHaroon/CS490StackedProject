@@ -151,7 +151,7 @@ function DocumentLibrary() {
     form.append("document_type", docType);
 
     setUploading(true);
-    const res = await api.post("/documents/upload", form, {
+    const res = await api.post("/library/upload", form, {
       caller: "DocumentLibrary.handleUpload",
       action: "upload_document",
     });
