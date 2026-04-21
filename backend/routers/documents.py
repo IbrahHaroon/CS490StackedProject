@@ -272,7 +272,6 @@ def archive_document(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     document = get_document(session, doc_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -294,6 +293,7 @@ def archive_document(
     if new_location != document.document_location:
         document.document_location = new_location
     from datetime import datetime as _dt
+
     document.updated_at = _dt.utcnow()
     session.commit()
     session.refresh(document)
@@ -306,7 +306,6 @@ def restore_document(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
     document = get_document(session, doc_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -328,6 +327,7 @@ def restore_document(
     if new_location != document.document_location:
         document.document_location = new_location
     from datetime import datetime as _dt
+
     document.updated_at = _dt.utcnow()
     session.commit()
     session.refresh(document)
