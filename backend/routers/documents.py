@@ -272,7 +272,6 @@ def archive_document(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from database.models.documents import update_document
 
     document = get_document(session, doc_id)
     if not document:
@@ -307,7 +306,6 @@ def restore_document(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from database.models.documents import update_document
 
     document = get_document(session, doc_id)
     if not document:

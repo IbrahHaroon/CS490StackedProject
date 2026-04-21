@@ -1159,7 +1159,9 @@ function DocumentLibrary() {
                       : null;
                     return (
                       <tr key={doc.doc_id}>
-                        <td>{doc.document_name || `Document #${doc.doc_id}`}</td>
+                        <td>
+                          {doc.document_name || `Document #${doc.doc_id}`}
+                        </td>
                         <td>{doc.document_type}</td>
                         <td>
                           {jobLabel && linkedPos ? (
@@ -1208,7 +1210,9 @@ function DocumentLibrary() {
                               disabled={archivingId === doc.doc_id}
                               title="Archive Document"
                             >
-                              {archivingId === doc.doc_id ? "Archiving…" : "Archive"}
+                              {archivingId === doc.doc_id
+                                ? "Archiving…"
+                                : "Archive"}
                             </button>
                           </div>
                         </td>
@@ -1249,11 +1253,15 @@ function DocumentLibrary() {
                       : null;
                     return (
                       <tr key={doc.doc_id} className="doclibrary-archived-row">
-                        <td>{doc.document_name || `Document #${doc.doc_id}`}</td>
+                        <td>
+                          {doc.document_name || `Document #${doc.doc_id}`}
+                        </td>
                         <td>{doc.document_type}</td>
                         <td>
                           {jobLabel && linkedPos ? (
-                            <span className="doclibrary-unlinked">{jobLabel}</span>
+                            <span className="doclibrary-unlinked">
+                              {jobLabel}
+                            </span>
                           ) : (
                             <span className="doclibrary-unlinked">—</span>
                           )}
@@ -1263,18 +1271,28 @@ function DocumentLibrary() {
                             <button
                               className="doclibrary-action-btn doclibrary-restore-btn"
                               onClick={() => handleRestore(doc)}
-                              disabled={restoringId === doc.doc_id || deletingId === doc.doc_id}
+                              disabled={
+                                restoringId === doc.doc_id ||
+                                deletingId === doc.doc_id
+                              }
                               title="Restore to Library"
                             >
-                              {restoringId === doc.doc_id ? "Restoring…" : "Restore"}
+                              {restoringId === doc.doc_id
+                                ? "Restoring…"
+                                : "Restore"}
                             </button>
                             <button
                               className="doclibrary-action-btn doclibrary-delete-btn"
                               onClick={() => handleDelete(doc)}
-                              disabled={deletingId === doc.doc_id || restoringId === doc.doc_id}
+                              disabled={
+                                deletingId === doc.doc_id ||
+                                restoringId === doc.doc_id
+                              }
                               title="Permanently Delete"
                             >
-                              {deletingId === doc.doc_id ? "Deleting…" : "Delete"}
+                              {deletingId === doc.doc_id
+                                ? "Deleting…"
+                                : "Delete"}
                             </button>
                           </div>
                         </td>
