@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 from database import get_db
 from database.auth import get_current_user
 from database.database import get_settings
-from database.models.documents import create_document, get_all_documents, get_document
+from database.models.documents import (
+    create_document,
+    get_all_documents,
+    get_archived_documents,
+    get_document,
+)
 from database.models.profile import get_profile_by_user_id
 from database.models.user import User
 from schemas import DocumentCreate, DocumentResponse
@@ -20,6 +25,7 @@ router = APIRouter()
 _ROUTERS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_ROUTERS_DIR)
 UPLOAD_BASE = os.path.join(_BACKEND_DIR, "uploads")
+ARCHIVE_BASE = os.path.join(UPLOAD_BASE, "archive")
 
 
 def _extract_pdf_content(file_path: str) -> str:
@@ -177,6 +183,18 @@ def _build_upload_path(
     )
 
 
+def _to_archive_path(normal_path: str) -> str:
+    """Rebase a normal upload path under ARCHIVE_BASE."""
+    rel = os.path.relpath(normal_path, UPLOAD_BASE)
+    return os.path.join(ARCHIVE_BASE, rel)
+
+
+def _from_archive_path(archive_path: str) -> str:
+    """Rebase an archive path back under UPLOAD_BASE."""
+    rel = os.path.relpath(archive_path, ARCHIVE_BASE)
+    return os.path.join(UPLOAD_BASE, rel)
+
+
 def _build_position_context(pos) -> str:
     """Build a job context string from a Position ORM object."""
     company_name = pos.company.name if pos.company else "Unknown"
@@ -238,6 +256,84 @@ def read_my_documents(
     current_user: User = Depends(get_current_user),
 ):
     return list(get_all_documents(session, current_user.user_id))
+
+
+@router.get("/archived", response_model=list[DocumentResponse])
+def read_archived_documents(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list(get_archived_documents(session, current_user.user_id))
+
+
+@router.post("/{doc_id}/archive", response_model=DocumentResponse)
+def archive_document(
+    doc_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from database.models.documents import update_document
+
+    document = get_document(session, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if document.is_archived:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document is already archived",
+        )
+
+    new_location = document.document_location
+    if document.document_location and os.path.exists(document.document_location):
+        new_location = _to_archive_path(document.document_location)
+        os.makedirs(os.path.dirname(new_location), exist_ok=True)
+        os.rename(document.document_location, new_location)
+
+    document.is_archived = True
+    if new_location != document.document_location:
+        document.document_location = new_location
+    from datetime import datetime as _dt
+    document.updated_at = _dt.utcnow()
+    session.commit()
+    session.refresh(document)
+    return document
+
+
+@router.post("/{doc_id}/restore", response_model=DocumentResponse)
+def restore_document(
+    doc_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from database.models.documents import update_document
+
+    document = get_document(session, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if not document.is_archived:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document is not archived",
+        )
+
+    new_location = document.document_location
+    if document.document_location and os.path.exists(document.document_location):
+        new_location = _from_archive_path(document.document_location)
+        os.makedirs(os.path.dirname(new_location), exist_ok=True)
+        os.rename(document.document_location, new_location)
+
+    document.is_archived = False
+    if new_location != document.document_location:
+        document.document_location = new_location
+    from datetime import datetime as _dt
+    document.updated_at = _dt.utcnow()
+    session.commit()
+    session.refresh(document)
+    return document
 
 
 @router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)

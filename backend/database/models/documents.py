@@ -130,9 +130,27 @@ def lookup_documents(session: Session, user_id: int) -> int:
 
 
 def get_all_documents(session: Session, user_id: int) -> tuple["Documents", ...]:
-    """Return all documents belonging to a user as a tuple."""
+    """Return all non-archived documents belonging to a user."""
     rows = (
-        session.execute(select(Documents).where(Documents.user_id == user_id))
+        session.execute(
+            select(Documents)
+            .where(Documents.user_id == user_id)
+            .where(Documents.is_archived == False)  # noqa: E712
+        )
+        .scalars()
+        .all()
+    )
+    return tuple(rows)
+
+
+def get_archived_documents(session: Session, user_id: int) -> tuple["Documents", ...]:
+    """Return all archived documents belonging to a user."""
+    rows = (
+        session.execute(
+            select(Documents)
+            .where(Documents.user_id == user_id)
+            .where(Documents.is_archived == True)  # noqa: E712
+        )
         .scalars()
         .all()
     )
