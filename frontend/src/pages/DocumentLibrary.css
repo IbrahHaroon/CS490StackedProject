@@ -177,6 +177,57 @@
   font-weight: 600;
 }
 
+/* Section tabs */
+.doclibrary-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.doclibrary-tab {
+  padding: 0.55rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: color 0.15s ease;
+}
+
+.doclibrary-tab:hover {
+  color: var(--text);
+}
+
+.doclibrary-tab--active {
+  color: var(--text-strong);
+  border-bottom-color: #4f8ef7;
+  font-weight: 600;
+}
+
+.doclibrary-tab-count {
+  background-color: var(--surface-3);
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  font-weight: 600;
+}
+
+.doclibrary-tab-count--archive {
+  background-color: #78350f22;
+  color: #b45309;
+}
+
+.doclibrary-archived-row td {
+  opacity: 0.75;
+}
+
 .doclibrary-actions {
   display: flex;
   gap: 0.5rem;
@@ -397,6 +448,24 @@
 
 .doclibrary-ai-btn:hover {
   background-color: #6d28d9;
+}
+
+.doclibrary-archive-btn {
+  background-color: #d97706;
+  color: #fff;
+}
+
+.doclibrary-archive-btn:hover:not(:disabled) {
+  background-color: #b45309;
+}
+
+.doclibrary-restore-btn {
+  background-color: #059669;
+  color: #fff;
+}
+
+.doclibrary-restore-btn:hover:not(:disabled) {
+  background-color: #047857;
 }
 
 /* AI Modal */

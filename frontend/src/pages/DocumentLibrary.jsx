@@ -63,6 +63,10 @@ function DocumentLibrary() {
   const [genCoverDocName, setGenCoverDocName] = useState("");
   const [genCoverError, setGenCoverError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [activeSection, setActiveSection] = useState("library");
+  const [archivedDocuments, setArchivedDocuments] = useState([]);
+  const [archivingId, setArchivingId] = useState(null);
+  const [restoringId, setRestoringId] = useState(null);
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -94,8 +98,22 @@ function DocumentLibrary() {
     }
   };
 
+  const fetchArchivedDocuments = async () => {
+    if (!token) return;
+    try {
+      const res = await api.get("/documents/archived", {
+        caller: "DocumentLibrary.fetchArchivedDocuments",
+        action: "load_archived_documents",
+      });
+      if (res.ok) setArchivedDocuments(await res.json());
+    } catch {
+      // non-fatal
+    }
+  };
+
   useEffect(() => {
     fetchDocuments();
+    fetchArchivedDocuments();
     if (token) {
       Promise.all([
         api.get("/jobs/dashboard", {
@@ -251,6 +269,60 @@ function DocumentLibrary() {
     fetchDocuments();
   };
 
+  const handleArchive = async (doc) => {
+    if (!token) return;
+    setArchivingId(doc.doc_id);
+    try {
+      const res = await api.post(
+        `/documents/${doc.doc_id}/archive`,
+        {},
+        { caller: "DocumentLibrary.handleArchive", action: "archive_document" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err.detail || "Failed to archive document.");
+        setTimeout(() => setUploadError(""), 4000);
+      } else {
+        setUploadSuccess("Document archived.");
+        setTimeout(() => setUploadSuccess(""), 3000);
+        fetchDocuments();
+        fetchArchivedDocuments();
+      }
+    } catch {
+      setUploadError("Network error. Please try again.");
+      setTimeout(() => setUploadError(""), 4000);
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const handleRestore = async (doc) => {
+    if (!token) return;
+    setRestoringId(doc.doc_id);
+    try {
+      const res = await api.post(
+        `/documents/${doc.doc_id}/restore`,
+        {},
+        { caller: "DocumentLibrary.handleRestore", action: "restore_document" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err.detail || "Failed to restore document.");
+        setTimeout(() => setUploadError(""), 4000);
+      } else {
+        setUploadSuccess("Document restored to library.");
+        setTimeout(() => setUploadSuccess(""), 3000);
+        fetchDocuments();
+        fetchArchivedDocuments();
+      }
+    } catch {
+      setUploadError("Network error. Please try again.");
+      setTimeout(() => setUploadError(""), 4000);
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const handleDelete = async (doc) => {
     if (!window.confirm(`Delete ${doc.document_name}?`)) {
       return;
@@ -305,9 +377,9 @@ function DocumentLibrary() {
       });
       setUploadSuccess("Document deleted successfully!");
       setTimeout(() => setUploadSuccess(""), 3000);
-      // Refresh documents after a short delay to ensure backend processed
       setTimeout(() => {
         fetchDocuments();
+        fetchArchivedDocuments();
       }, 500);
     } catch (err) {
       logAction("DocumentLibrary.handleDelete", "delete_network_error", {
@@ -1035,95 +1107,202 @@ function DocumentLibrary() {
       </section>
 
       <section className="doclibrary-list">
-        <h2>Your Documents</h2>
-        {loadError && <p className="doclibrary-error">{loadError}</p>}
-        {!loadError && documents.length === 0 && (
-          <p className="doclibrary-empty">No documents uploaded yet.</p>
-        )}
-        {documents.length > 0 && (
-          <table className="doclibrary-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Linked Job</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc) => {
-                const linkedJob = doc.job_id
-                  ? appliedJobs.find((j) => j.job_id === doc.job_id)
-                  : null;
-                const linkedPos = linkedJob
-                  ? positionMap[linkedJob.position_id]
-                  : null;
-                const jobLabel = linkedPos
-                  ? `${linkedPos.title} @ ${linkedPos.company_name}`
-                  : null;
-                return (
-                  <tr key={doc.doc_id}>
-                    <td>
-                      {doc.document_name ||
-                        doc.document_location.split("/").pop()}
-                    </td>
-                    <td>{doc.document_type}</td>
-                    <td>
-                      {jobLabel && linkedPos ? (
-                        <button
-                          className="doclibrary-linked-job doclibrary-linked-job-btn"
-                          onClick={() =>
-                            navigate(`/?job=${linkedPos.position_id}`)
-                          }
-                          title="Open job card in Dashboard"
-                        >
-                          {jobLabel}
-                        </button>
-                      ) : (
-                        <span className="doclibrary-unlinked">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="doclibrary-actions">
-                        <button
-                          className="doclibrary-action-btn doclibrary-view-btn"
-                          onClick={() => handleView(doc)}
-                          disabled={deletingId !== null}
-                          title="View Document"
-                        >
-                          View
-                        </button>
-                        <button
-                          className="doclibrary-action-btn doclibrary-edit-btn"
-                          onClick={() => handleEdit(doc)}
-                          disabled={deletingId !== null}
-                          title="Edit Document"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="doclibrary-action-btn doclibrary-ai-btn"
-                          onClick={() => handleAiImprove(doc)}
-                          disabled={deletingId !== null}
-                          title="AI Improve"
-                        >
-                          AI Improve
-                        </button>
-                        <button
-                          className="doclibrary-action-btn doclibrary-delete-btn"
-                          onClick={() => handleDelete(doc)}
-                          disabled={deletingId === doc.doc_id}
-                          title="Delete Document"
-                        >
-                          {deletingId === doc.doc_id ? "Deleting…" : "Delete"}
-                        </button>
-                      </div>
-                    </td>
+        <div className="doclibrary-tabs">
+          <button
+            className={`doclibrary-tab${activeSection === "library" ? " doclibrary-tab--active" : ""}`}
+            onClick={() => setActiveSection("library")}
+          >
+            My Documents
+            {documents.length > 0 && (
+              <span className="doclibrary-tab-count">{documents.length}</span>
+            )}
+          </button>
+          <button
+            className={`doclibrary-tab${activeSection === "archive" ? " doclibrary-tab--active" : ""}`}
+            onClick={() => setActiveSection("archive")}
+          >
+            Archive
+            {archivedDocuments.length > 0 && (
+              <span className="doclibrary-tab-count doclibrary-tab-count--archive">
+                {archivedDocuments.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeSection === "library" && (
+          <>
+            {loadError && <p className="doclibrary-error">{loadError}</p>}
+            {!loadError && documents.length === 0 && (
+              <p className="doclibrary-empty">No documents uploaded yet.</p>
+            )}
+            {documents.length > 0 && (
+              <table className="doclibrary-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Linked Job</th>
+                    <th>Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {documents.map((doc) => {
+                    const linkedJob = doc.job_id
+                      ? appliedJobs.find((j) => j.job_id === doc.job_id)
+                      : null;
+                    const linkedPos = linkedJob
+                      ? positionMap[linkedJob.position_id]
+                      : null;
+                    const jobLabel = linkedPos
+                      ? `${linkedPos.title} @ ${linkedPos.company_name}`
+                      : null;
+                    return (
+                      <tr key={doc.doc_id}>
+                        <td>
+                          {doc.document_name || `Document #${doc.doc_id}`}
+                        </td>
+                        <td>{doc.document_type}</td>
+                        <td>
+                          {jobLabel && linkedPos ? (
+                            <button
+                              className="doclibrary-linked-job doclibrary-linked-job-btn"
+                              onClick={() =>
+                                navigate(`/?job=${linkedPos.position_id}`)
+                              }
+                              title="Open job card in Dashboard"
+                            >
+                              {jobLabel}
+                            </button>
+                          ) : (
+                            <span className="doclibrary-unlinked">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="doclibrary-actions">
+                            <button
+                              className="doclibrary-action-btn doclibrary-view-btn"
+                              onClick={() => handleView(doc)}
+                              disabled={archivingId !== null}
+                              title="View Document"
+                            >
+                              View
+                            </button>
+                            <button
+                              className="doclibrary-action-btn doclibrary-edit-btn"
+                              onClick={() => handleEdit(doc)}
+                              disabled={archivingId !== null}
+                              title="Edit Document"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="doclibrary-action-btn doclibrary-ai-btn"
+                              onClick={() => handleAiImprove(doc)}
+                              disabled={archivingId !== null}
+                              title="AI Improve"
+                            >
+                              AI Improve
+                            </button>
+                            <button
+                              className="doclibrary-action-btn doclibrary-archive-btn"
+                              onClick={() => handleArchive(doc)}
+                              disabled={archivingId === doc.doc_id}
+                              title="Archive Document"
+                            >
+                              {archivingId === doc.doc_id
+                                ? "Archiving…"
+                                : "Archive"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {activeSection === "archive" && (
+          <>
+            {archivedDocuments.length === 0 && (
+              <p className="doclibrary-empty">No archived documents.</p>
+            )}
+            {archivedDocuments.length > 0 && (
+              <table className="doclibrary-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Linked Job</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedDocuments.map((doc) => {
+                    const linkedJob = doc.job_id
+                      ? appliedJobs.find((j) => j.job_id === doc.job_id)
+                      : null;
+                    const linkedPos = linkedJob
+                      ? positionMap[linkedJob.position_id]
+                      : null;
+                    const jobLabel = linkedPos
+                      ? `${linkedPos.title} @ ${linkedPos.company_name}`
+                      : null;
+                    return (
+                      <tr key={doc.doc_id} className="doclibrary-archived-row">
+                        <td>
+                          {doc.document_name || `Document #${doc.doc_id}`}
+                        </td>
+                        <td>{doc.document_type}</td>
+                        <td>
+                          {jobLabel && linkedPos ? (
+                            <span className="doclibrary-unlinked">
+                              {jobLabel}
+                            </span>
+                          ) : (
+                            <span className="doclibrary-unlinked">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="doclibrary-actions">
+                            <button
+                              className="doclibrary-action-btn doclibrary-restore-btn"
+                              onClick={() => handleRestore(doc)}
+                              disabled={
+                                restoringId === doc.doc_id ||
+                                deletingId === doc.doc_id
+                              }
+                              title="Restore to Library"
+                            >
+                              {restoringId === doc.doc_id
+                                ? "Restoring…"
+                                : "Restore"}
+                            </button>
+                            <button
+                              className="doclibrary-action-btn doclibrary-delete-btn"
+                              onClick={() => handleDelete(doc)}
+                              disabled={
+                                deletingId === doc.doc_id ||
+                                restoringId === doc.doc_id
+                              }
+                              title="Permanently Delete"
+                            >
+                              {deletingId === doc.doc_id
+                                ? "Deleting…"
+                                : "Delete"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </section>
     </div>
