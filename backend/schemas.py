@@ -398,6 +398,7 @@ class ApplicationUpdate(BaseModel):
     deadline: date | None = None
     recruiter_notes: str | None = None
     outcome_notes: str | None = None
+    company_research_notes: str | None = None
 
 
 class ApplicationResponse(BaseModel):
@@ -413,6 +414,7 @@ class ApplicationResponse(BaseModel):
     deadline: date | None = None
     recruiter_notes: str | None = None
     outcome_notes: str | None = None
+    company_research_notes: str | None = None
 
 
 class JobActivityCreate(BaseModel):

@@ -39,6 +39,21 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Startup: Create tables if they don't exist
     # Base.metadata.create_all(bind=engine)
+
+    # Schema migrations — safe to run on every startup (IF NOT EXISTS guards)
+    from sqlalchemy import text
+
+    from database.database import engine
+
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS "
+                "company_research_notes TEXT"
+            )
+        )
+        conn.commit()
+
     yield
     # Shutdown logic goes here if needed
 

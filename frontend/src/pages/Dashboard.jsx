@@ -102,6 +102,189 @@ function DocViewerModal({ doc, onClose, token }) {
   );
 }
 
+function CompanyResearchSection({
+  job,
+  token,
+  applications,
+  onApplicationsChange,
+}) {
+  const existingApp = applications?.find(
+    (a) => a.position_id === job?.position_id
+  );
+  const existingNotes = existingApp?.company_research_notes || "";
+
+  const [prompt, setPrompt] = useState("");
+  const [notes, setNotes] = useState(existingNotes);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [savedJobId, setSavedJobId] = useState(existingApp?.job_id ?? null);
+  const [saveStatus, setSaveStatus] = useState(""); // "saved" | "error" | ""
+  const [researchError, setResearchError] = useState("");
+
+  // When the selected job changes, reset to that job's saved notes
+  useEffect(() => {
+    const app = applications?.find((a) => a.position_id === job?.position_id);
+    setNotes(app?.company_research_notes || "");
+    setSavedJobId(app?.job_id ?? null);
+    setPrompt("");
+    setResearchError("");
+    setSaveStatus("");
+  }, [job?.position_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleResearch = async () => {
+    if (researchLoading) return;
+    setResearchLoading(true);
+    setResearchError("");
+    try {
+      const res = await api.post(
+        "/documents/company-research",
+        { position_id: job.position_id, context: prompt },
+        {
+          caller: "Dashboard.CompanyResearchSection",
+          action: "company_research",
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Company research failed.");
+      }
+      const data = await res.json();
+      setNotes(data.research);
+      setSavedJobId(data.job_id);
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 3000);
+      // Sync applications state so the notes survive a job re-select
+      if (onApplicationsChange) {
+        onApplicationsChange((prev) => {
+          const exists = prev.some((a) => a.job_id === data.job_id);
+          if (exists) {
+            return prev.map((a) =>
+              a.job_id === data.job_id
+                ? { ...a, company_research_notes: data.research }
+                : a
+            );
+          }
+          return [
+            ...prev,
+            {
+              job_id: data.job_id,
+              position_id: job.position_id,
+              company_research_notes: data.research,
+              application_status: "Interested",
+            },
+          ];
+        });
+      }
+    } catch (err) {
+      setResearchError(err.message || "An error occurred.");
+    } finally {
+      setResearchLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!savedJobId || saveLoading) return;
+    setSaveLoading(true);
+    setSaveStatus("");
+    try {
+      const res = await api.put(
+        `/jobs/applications/${savedJobId}`,
+        { company_research_notes: notes },
+        {
+          caller: "Dashboard.CompanyResearchSection",
+          action: "save_research_notes",
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to save notes.");
+      }
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 3000);
+      if (onApplicationsChange) {
+        onApplicationsChange((prev) =>
+          prev.map((a) =>
+            a.job_id === savedJobId
+              ? { ...a, company_research_notes: notes }
+              : a
+          )
+        );
+      }
+    } catch (err) {
+      setSaveStatus("error");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  if (!token) return null;
+
+  return (
+    <div className="company-research-section">
+      <h3 className="company-research-title">Research {job.company_name}</h3>
+
+      {/* Prompt input */}
+      <p className="company-research-hint">
+        Add context or questions for targeted AI insights.
+      </p>
+      <textarea
+        className="company-research-textarea"
+        placeholder={`e.g. What's the culture like at ${job.company_name}? How should I prepare for an interview here?`}
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        rows={2}
+        disabled={researchLoading}
+      />
+      <button
+        className="company-research-btn"
+        onClick={handleResearch}
+        disabled={researchLoading}
+      >
+        {researchLoading ? "Researching…" : "Research Company"}
+      </button>
+      {researchError && (
+        <p className="company-research-error">{researchError}</p>
+      )}
+
+      {/* Editable notes — always shown, pre-populated with saved or generated content */}
+      {(notes || savedJobId) && (
+        <div className="company-research-notes-area">
+          <div className="company-research-notes-header">
+            <span className="company-research-notes-label">Notes</span>
+            {saveStatus === "saved" && (
+              <span className="company-research-save-status company-research-save-status--ok">
+                Saved
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="company-research-save-status company-research-save-status--err">
+                Save failed
+              </span>
+            )}
+          </div>
+          <textarea
+            className="company-research-textarea company-research-textarea--notes"
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              setSaveStatus("");
+            }}
+            rows={6}
+            disabled={saveLoading}
+          />
+          <button
+            className="company-research-save-btn"
+            onClick={handleSave}
+            disabled={saveLoading || !savedJobId}
+          >
+            {saveLoading ? "Saving…" : "Save Notes"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ApplyModal({
   job,
   documents,
@@ -1113,6 +1296,13 @@ function Dashboard() {
                   </div>
                 )}
 
+                <CompanyResearchSection
+                  job={selectedJob}
+                  token={token}
+                  applications={applications}
+                  onApplicationsChange={setApplications}
+                />
+
                 {token ? (
                   renderActionButtons(selectedJob)
                 ) : (
@@ -1189,6 +1379,13 @@ function Dashboard() {
                       <p>{selectedJob.experience_req}</p>
                     </div>
                   )}
+
+                  <CompanyResearchSection
+                    job={selectedJob}
+                    token={token}
+                    applications={applications}
+                    onApplicationsChange={setApplications}
+                  />
 
                   {token ? (
                     renderActionButtons(selectedJob)

@@ -953,3 +953,120 @@ def ai_rewrite_document(
         )
 
     return {"original": original_content, "improved": improved_content}
+
+
+@router.post("/company-research")
+def company_research(
+    body: dict,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Use OpenAI to research a company based on job listing context and user-provided notes."""
+    import openai
+
+    position_id = body.get("position_id")
+    job_id = body.get("job_id")
+    user_context = body.get("context", "").strip()
+
+    pos = None
+    if position_id:
+        from database.models.position import get_position
+
+        pos = get_position(session, position_id)
+    elif job_id:
+        from database.models.applied_jobs import get_applied_jobs
+
+        applied_job = get_applied_jobs(session, job_id)
+        if applied_job and applied_job.user_id == current_user.user_id:
+            pos = applied_job.position
+
+    if not pos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not find the job position. Please specify a valid position_id or job_id.",
+        )
+
+    company_name = pos.company.name if pos.company else "the company"
+    job_context = _build_position_context(pos)
+
+    settings = get_settings()
+    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OpenAI API key is not configured. Add OPENAI_API_KEY to your .env file.",
+        )
+
+    system_prompt = (
+        "You are a professional career advisor helping a job candidate research a company "
+        "before applying or interviewing. Based on the job listing and any context the user provides, "
+        "give a concise, useful company research summary. "
+        "Cover: what the role signals about the company's priorities, key skills and themes emphasized, "
+        "and strategic tips for tailoring an application or preparing for an interview. "
+        "If the user asks specific questions, answer those first. "
+        "Keep the response organized with clear section headers, practical, and under 500 words. "
+        "Return plain text only — no markdown code blocks."
+    )
+
+    user_message = f"I'm researching {company_name} for this job:\n{job_context}"
+    if user_context:
+        user_message += f"\n\nMy notes and questions:\n{user_context}"
+    else:
+        user_message += (
+            "\n\nPlease give me key insights about this company and role "
+            "to help me prepare my application and interview."
+        )
+
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        research_result = response.choices[0].message.content.strip()
+    except openai.AuthenticationError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid OpenAI API key. Please check your OPENAI_API_KEY configuration.",
+        )
+    except openai.RateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="OpenAI rate limit reached. Please try again in a moment.",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Company research failed: {str(e)}",
+        )
+
+    # Persist research as notes on the applied job — create an "Interested" application
+    # if the user hasn't applied yet so there's always a record to attach notes to.
+    from database.models.applied_jobs import (
+        create_applied_jobs,
+        get_applied_job_by_position,
+        update_applied_job,
+    )
+
+    resolved_position_id = pos.position_id
+    applied_job = get_applied_job_by_position(
+        session, current_user.user_id, resolved_position_id
+    )
+    if applied_job is None:
+        applied_job = create_applied_jobs(
+            session, current_user.user_id, resolved_position_id, 0
+        )
+    update_applied_job(
+        session, applied_job.job_id, company_research_notes=research_result
+    )
+
+    return {
+        "company": company_name,
+        "research": research_result,
+        "job_id": applied_job.job_id,
+    }

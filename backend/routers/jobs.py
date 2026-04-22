@@ -293,6 +293,7 @@ def update_application(
         years_of_experience=body.years_of_experience,
         deadline=body.deadline,
         recruiter_notes=body.recruiter_notes,
+        company_research_notes=body.company_research_notes,
     )
     return updated
 

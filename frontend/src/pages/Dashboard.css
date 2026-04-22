@@ -1244,3 +1244,161 @@
 .job-linked-resume-btn:hover {
   background: rgba(96, 165, 250, 0.2);
 }
+
+/* ── Company Research Section ── */
+.company-research-section {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.company-research-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-strong);
+}
+
+.company-research-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.company-research-textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.75rem;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.company-research-textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+}
+
+.company-research-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.company-research-btn {
+  margin-top: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background-color: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.company-research-btn:hover:not(:disabled) {
+  background-color: #6d28d9;
+}
+
+.company-research-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.company-research-error {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #ef4444;
+}
+
+.company-research-result {
+  margin-top: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.company-research-result pre {
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.company-research-notes-area {
+  margin-top: 1rem;
+}
+
+.company-research-notes-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.company-research-notes-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.company-research-save-status {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.company-research-save-status--ok {
+  color: #4ade80;
+}
+
+.company-research-save-status--err {
+  color: #ef4444;
+}
+
+.company-research-textarea--notes {
+  background: var(--surface-2);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.company-research-save-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  background-color: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.company-research-save-btn:hover:not(:disabled) {
+  background-color: var(--surface-2);
+  border-color: #7c3aed;
+}
+
+.company-research-save-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
