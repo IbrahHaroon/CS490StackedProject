@@ -114,9 +114,7 @@ async def validation_exception_handler(
     )
 
 
-async def http_exception_handler(
-    request: Request, exc: HTTPException
-) -> JSONResponse:
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Handle explicit HTTPException raises from route handlers."""
     request_id = _get_request_id(request)
     error_code = _STATUS_TO_CODE.get(exc.status_code, "HTTP_ERROR")
@@ -139,9 +137,7 @@ async def http_exception_handler(
     )
 
 
-async def unhandled_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     Catch-all for any exception not handled by a more specific handler.
 
