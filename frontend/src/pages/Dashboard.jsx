@@ -126,6 +126,10 @@ function Dashboard() {
   const [editingJob, setEditingJob] = useState(null);
   const [editFormValues, setEditFormValues] = useState({});
   const [isSavingJob, setIsSavingJob] = useState(false);
+  const [genDocType, setGenDocType] = useState(null);
+  const [genInstructions, setGenInstructions] = useState("");
+  const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
+  const [genJobId, setGenJobId] = useState(null);
 
   const jobBoardRef = useRef(null);
   const filterRef = useRef(null);
@@ -161,20 +165,14 @@ function Dashboard() {
     if (!editingJob) return;
     setIsSavingJob(true);
     try {
-      const res = await api.put(
-        `/jobs/${editingJob.job_id}`,
-        editFormValues,
-        {
-          caller: "Dashboard.handleSaveJobEdit",
-          action: "update_job",
-        }
-      );
+      const res = await api.put(`/jobs/${editingJob.job_id}`, editFormValues, {
+        caller: "Dashboard.handleSaveJobEdit",
+        action: "update_job",
+      });
       if (res.ok) {
         const updatedJob = await res.json();
         setJobs((prev) =>
-          prev.map((j) =>
-            j.job_id === editingJob.job_id ? updatedJob : j
-          )
+          prev.map((j) => (j.job_id === editingJob.job_id ? updatedJob : j))
         );
         setSelectedJob(updatedJob);
         setEditingJob(null);
@@ -245,41 +243,53 @@ function Dashboard() {
     }
   }, [searchParams, jobs]);
 
-  const handleGenerateAIDoc = async (docType, job_id) => {
-    if (aiGenerating) return;
-    setAiGenerating(true);
+  const handleGenerateAIDoc = (docType, job_id) => {
+    setGenDocType(docType);
+    setGenInstructions("");
+    setGenJobId(job_id);
+  };
+
+  const handleGenerateDocConfirm = async () => {
+    if (!genJobId || !genDocType || isGeneratingDoc) return;
+    setIsGeneratingDoc(true);
     try {
       const endpoint =
-        docType === "Resume"
+        genDocType === "Resume"
           ? "/documents/generate-resume"
           : "/documents/generate-cover-letter";
 
       const res = await api.post(
         endpoint,
-        { job_id },
         {
-          caller: "Dashboard.handleGenerateAIDoc",
-          action: `generate_ai_${docType.toLowerCase().replace(" ", "_")}`,
+          job_id: genJobId,
+          instructions: genInstructions || undefined,
+        },
+        {
+          caller: "Dashboard.handleGenerateDocConfirm",
+          action: `generate_ai_${genDocType.toLowerCase().replace(" ", "_")}`,
         }
       );
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Failed to generate AI ${docType}.`);
+        throw new Error(err.detail || `Failed to generate AI ${genDocType}.`);
       }
 
       const docRes = await api.get("/documents/me", {
-        caller: "Dashboard.handleGenerateAIDoc",
+        caller: "Dashboard.handleGenerateDocConfirm",
         action: "refresh_documents",
       });
       if (docRes.ok) setDocuments(await docRes.json());
 
-      setActionMessage(`AI ${docType} generated successfully!`);
+      setActionMessage(`AI ${genDocType} generated successfully!`);
       setTimeout(() => setActionMessage(""), 3000);
+      setGenDocType(null);
+      setGenInstructions("");
+      setGenJobId(null);
     } catch {
       // handled by api client
     } finally {
-      setAiGenerating(false);
+      setIsGeneratingDoc(false);
     }
   };
 
@@ -685,7 +695,8 @@ function Dashboard() {
                       location: selectedJob.location || "",
                       location_type: selectedJob.location_type || "",
                       salary: selectedJob.salary || "",
-                      years_of_experience: selectedJob.years_of_experience || "",
+                      years_of_experience:
+                        selectedJob.years_of_experience || "",
                       description: selectedJob.description || "",
                       notes: selectedJob.notes || "",
                       application_date: selectedJob.application_date || "",
@@ -833,12 +844,27 @@ function Dashboard() {
                   >
                     &times;
                   </button>
-                  <h2 className="job-detail-title" style={{ marginBottom: "1.5rem" }}>
+                  <h2
+                    className="job-detail-title"
+                    style={{ marginBottom: "1.5rem" }}
+                  >
                     Edit Job
                   </h2>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.25rem",
+                    }}
+                  >
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontWeight: 600,
+                        }}
+                      >
                         Job Title
                       </label>
                       <input
@@ -863,7 +889,13 @@ function Dashboard() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontWeight: 600,
+                        }}
+                      >
                         Company
                       </label>
                       <input
@@ -887,9 +919,21 @@ function Dashboard() {
                         }}
                       />
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "1rem",
+                      }}
+                    >
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Location
                         </label>
                         <input
@@ -915,7 +959,13 @@ function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Location Type
                         </label>
                         <select
@@ -944,9 +994,21 @@ function Dashboard() {
                         </select>
                       </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "1rem",
+                      }}
+                    >
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Salary
                         </label>
                         <input
@@ -972,7 +1034,13 @@ function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Years of Experience Required
                         </label>
                         <input
@@ -998,9 +1066,21 @@ function Dashboard() {
                         />
                       </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "1rem",
+                      }}
+                    >
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Application Date
                         </label>
                         <input
@@ -1025,7 +1105,13 @@ function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "0.5rem",
+                            fontWeight: 600,
+                          }}
+                        >
                           Application Deadline
                         </label>
                         <input
@@ -1051,7 +1137,13 @@ function Dashboard() {
                       </div>
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontWeight: 600,
+                        }}
+                      >
                         Job Description
                       </label>
                       <textarea
@@ -1078,7 +1170,13 @@ function Dashboard() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontWeight: 600,
+                        }}
+                      >
                         Notes
                       </label>
                       <textarea
@@ -1105,7 +1203,13 @@ function Dashboard() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "0.5rem",
+                          fontWeight: 600,
+                        }}
+                      >
                         Job Posting URL
                       </label>
                       <input
@@ -1130,7 +1234,14 @@ function Dashboard() {
                       />
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: "0.75rem", marginTop: "2rem", justifyContent: "flex-end" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.75rem",
+                      marginTop: "2rem",
+                      justifyContent: "flex-end",
+                    }}
+                  >
                     <button
                       onClick={() => setEditingJob(null)}
                       style={{
@@ -1165,6 +1276,147 @@ function Dashboard() {
                 </div>
               </div>
             )}
+
+            {genDocType &&
+              genJobId &&
+              (() => {
+                const genJob = jobs.find((j) => j.job_id === genJobId);
+                return (
+                  <div
+                    className="apply-overlay"
+                    onClick={() => setGenDocType(null)}
+                  >
+                    <div
+                      className="apply-modal"
+                      style={{ maxWidth: "680px" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="apply-modal-header">
+                        <div>
+                          <h3 className="apply-modal-title">
+                            Generate AI {genDocType}
+                          </h3>
+                        </div>
+                        <button
+                          className="apply-modal-x"
+                          onClick={() => setGenDocType(null)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="apply-modal-divider" />
+                      <div
+                        style={{
+                          padding: "1.5rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "1.25rem",
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "0.5rem",
+                              fontWeight: 600,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            Target Job
+                          </label>
+                          <div
+                            style={{
+                              padding: "0.75rem",
+                              borderRadius: "6px",
+                              border: "1px solid var(--border)",
+                              background: "var(--surface-2)",
+                              color: "var(--text)",
+                              fontSize: "0.95rem",
+                            }}
+                          >
+                            {genJob
+                              ? `${genJob.title} @ ${genJob.company_name} (${genJob.stage})`
+                              : "Loading..."}
+                          </div>
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "0.5rem",
+                              fontWeight: 600,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            Additional Instructions{" "}
+                            <span
+                              style={{
+                                fontWeight: 400,
+                                fontSize: "0.85rem",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              (optional)
+                            </span>
+                          </label>
+                          <textarea
+                            value={genInstructions}
+                            onChange={(e) => setGenInstructions(e.target.value)}
+                            placeholder={
+                              genDocType === "Resume"
+                                ? "e.g. Emphasize backend experience, target a senior-level role..."
+                                : "e.g. Emphasize leadership experience, formal tone..."
+                            }
+                            rows={4}
+                            style={{
+                              width: "100%",
+                              padding: "0.75rem",
+                              borderRadius: "6px",
+                              border: "1px solid var(--border)",
+                              background: "var(--surface-2)",
+                              color: "var(--text)",
+                              fontSize: "0.95rem",
+                              fontFamily: "inherit",
+                              resize: "vertical",
+                              boxSizing: "border-box",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="apply-modal-actions">
+                        <button
+                          className="apply-modal-cancel"
+                          onClick={() => setGenDocType(null)}
+                          disabled={isGeneratingDoc}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleGenerateDocConfirm}
+                          disabled={isGeneratingDoc}
+                          style={{
+                            padding: "0.6rem 1.4rem",
+                            borderRadius: "6px",
+                            border: "none",
+                            background:
+                              genDocType === "Resume" ? "#22c55e" : "#a855f7",
+                            color: "#fff",
+                            fontFamily: "inherit",
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            cursor: isGeneratingDoc ? "not-allowed" : "pointer",
+                            opacity: isGeneratingDoc ? 0.6 : 1,
+                          }}
+                        >
+                          {isGeneratingDoc
+                            ? "Generating…"
+                            : `Generate ${genDocType}`}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
           </>
         )}
       </div>
