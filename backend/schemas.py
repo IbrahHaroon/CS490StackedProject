@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 # --------------------------------------------------------------------------- #
 #  Auth                                                                         #
@@ -32,6 +34,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # --------------------------------------------------------------------------- #
 #  User                                                                         #
 # --------------------------------------------------------------------------- #
@@ -42,6 +49,26 @@ class UserResponse(BaseModel):
 
     user_id: int
     email: str
+
+
+class RecruiterRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
+
+
+class RecruiterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    recruiter_id: int
+    email: str
+    first_name: str
+    last_name: str
+    company_id: int
+    job_title: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -152,7 +179,20 @@ class DocumentCreate(BaseModel):
     document_location: str | None = None
     job_id: int | None = None
     document_name: str | None = None
+    title: str | None = None
     content: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+
+
+class DocumentUpdate(BaseModel):
+    document_name: str | None = None
+    title: str | None = None
+    document_type: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    content: str | None = None
+    is_archived: bool | None = None
 
 
 class DocumentResponse(BaseModel):
@@ -161,10 +201,97 @@ class DocumentResponse(BaseModel):
     doc_id: int
     user_id: int
     document_name: str | None = None
+    title: str | None = None
     document_type: str
     document_location: str | None = None
     content: str | None = None
     job_id: int | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    is_archived: bool = False
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _split_tags(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, list):
+            return v
+        return [t.strip() for t in v.split(",") if t.strip()]
+
+
+class DocumentVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    version_id: int
+    doc_id: int
+    version_number: int
+    content: str | None = None
+    document_location: str | None = None
+    created_at: datetime
+
+
+class DocumentJobLinkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    link_id: int
+    doc_id: int
+    job_id: int
+    linked_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+#  Job Document                                                                #
+# --------------------------------------------------------------------------- #
+
+
+class JobDocumentCreate(BaseModel):
+    job_id: int
+    title: str
+    content: str
+
+
+class JobDocumentUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+
+
+class JobDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    job_document_id: int
+    job_id: int
+    title: str
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+#  Outcome                                                                      #
+# --------------------------------------------------------------------------- #
+
+
+class OutcomeCreate(BaseModel):
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
+
+
+class OutcomeUpdate(BaseModel):
+    outcome_state: str | None = None
+    outcome_notes: str | None = None
+
+
+class OutcomeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    outcome_id: int
+    job_id: int
+    outcome_state: str
+    outcome_notes: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -189,28 +316,9 @@ class CompanyResponse(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-class RecruiterCreate(BaseModel):
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
-    job_title: str | None = None
-
-
 class RecruiterUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    job_title: str | None = None
-
-
-class RecruiterResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    recruiter_id: int
-    user_id: int
-    company_id: int
-    first_name: str
-    last_name: str
     job_title: str | None = None
 
 
@@ -239,6 +347,7 @@ class PositionCreate(BaseModel):
     education_req: str | None = None
     experience_req: str | None = None
     description: str | None = None
+    deadline: date | None = None
 
 
 class PositionUpdate(BaseModel):
@@ -251,6 +360,7 @@ class PositionUpdate(BaseModel):
     education_req: str | None = None
     experience_req: str | None = None
     description: str | None = None
+    deadline: date | None = None
 
 
 class PositionResponse(BaseModel):
@@ -266,6 +376,7 @@ class PositionResponse(BaseModel):
     education_req: str | None
     experience_req: str | None
     description: str | None
+    deadline: date | None = None
 
 
 class PositionWithCompanyResponse(BaseModel):
@@ -282,6 +393,8 @@ class PositionWithCompanyResponse(BaseModel):
     education_req: str | None
     experience_req: str | None
     description: str | None
+    is_manual: bool | None = None
+    deadline: date | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -290,9 +403,18 @@ class PositionWithCompanyResponse(BaseModel):
 
 
 class ApplicationCreate(BaseModel):
-    user_id: int
+    user_id: int | None = None  # ignored server-side; auth token determines the user
     position_id: int
     years_of_experience: int = 0
+
+
+class ManualJobCreate(BaseModel):
+    company_name: str
+    title: str
+    location: str | None = None
+    salary: Decimal | None = None
+    description: str | None = None
+    application_status: str = "Interested"
 
 
 class ApplicationUpdate(BaseModel):
@@ -370,7 +492,6 @@ class InterviewResponse(BaseModel):
 
 
 class FollowUpCreate(BaseModel):
-    job_id: int
     description: str
     due_date: date | None = None
 
@@ -458,6 +579,18 @@ class SkillResponse(BaseModel):
     category: str | None = None
     proficiency: str | None = None
     sort_order: int
+
+
+# --------------------------------------------------------------------------- #
+#  Dashboard Metrics                                                            #
+# --------------------------------------------------------------------------- #
+
+
+class DashboardMetricsResponse(BaseModel):
+    total_applications: int
+    stage_counts: dict[str, int]
+    outcome_counts: dict[str, int]
+    response_rate: float  # % of applications that have an outcome recorded
 
 
 # --------------------------------------------------------------------------- #

@@ -12,6 +12,7 @@ function JobForm() {
     company_name: "",
     title: "",
     listing_date: new Date().toISOString().split("T")[0],
+    deadline: "",
     salary: "",
     education_req: "",
     experience_req: "",
@@ -45,6 +46,7 @@ function JobForm() {
             company_name: company ? company.name : String(pos.company_id),
             title: pos.title,
             listing_date: pos.listing_date,
+            deadline: pos.deadline ?? "",
             salary: pos.salary ?? "",
             education_req: pos.education_req ?? "",
             experience_req: pos.experience_req ?? "",
@@ -188,6 +190,15 @@ function JobForm() {
           style={styles.input}
         />
         {errors.listing_date && <p style={styles.error}>{errors.listing_date}</p>}
+
+        <label style={styles.label}>Application Deadline (optional)</label>
+        <input
+          type="date"
+          name="deadline"
+          value={formData.deadline}
+          onChange={handleChange}
+          style={styles.input}
+        />
 
         <label style={styles.label}>Salary (optional)</label>
         <input
