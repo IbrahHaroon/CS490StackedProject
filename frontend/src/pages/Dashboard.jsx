@@ -567,6 +567,24 @@ function Dashboard() {
                       : ""
                   }`}
                   onClick={() => setSelectedJob(job)}
+                  style={{
+                    boxShadow: job.deadline
+                      ? (() => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const dl = new Date(job.deadline + "T00:00:00");
+                          const daysLeft = Math.ceil(
+                            (dl - today) / (1000 * 60 * 60 * 24)
+                          );
+                          return daysLeft < 7 && daysLeft >= 0
+                            ? "0 0 12px rgba(239, 68, 68, 0.6)"
+                            : daysLeft < 0
+                              ? "0 0 12px rgba(239, 68, 68, 0.8)"
+                              : undefined;
+                        })()
+                      : undefined,
+                    transition: "all 0.3s ease",
+                  }}
                 >
                   <div className="job-card-top-row">
                     <span className="job-card-company">{job.company_name}</span>
@@ -706,6 +724,13 @@ function Dashboard() {
                       <p>{selectedJob.notes}</p>
                     </div>
                   )}
+                  {selectedJob.outcome_notes && (
+                    <div className="job-detail-section">
+                      <h3>Outcome</h3>
+                      <p>{selectedJob.outcome_notes}</p>
+                    </div>
+                  )}
+
                   {renderActionButtons(selectedJob)}
                 </div>
               </div>

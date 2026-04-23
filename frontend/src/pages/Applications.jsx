@@ -434,7 +434,9 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
             ? "2px solid orange"
             : job.stage === "Offer" || job.stage === "Accepted"
               ? "2px solid green"
-              : "1px solid #333",
+              : job.stage === "Rejected" || job.stage === "Withdrawn"
+                ? "2px solid red"
+                : "1px solid #333",
         boxShadow: "none",
         transition: "0.2s ease-in-out",
       }}
