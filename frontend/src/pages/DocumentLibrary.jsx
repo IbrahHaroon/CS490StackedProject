@@ -32,12 +32,6 @@ function DocumentLibrary() {
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
 
-  // Filtering / sorting (S3-006)
-  const [filterType, setFilterType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterIncludeArchived, setFilterIncludeArchived] = useState(false);
-  const [sortBy, setSortBy] = useState("updated_desc");
-
   const [viewingDoc, setViewingDoc] = useState(null);
   const [viewContent, setViewContent] = useState("");
   const [viewFormat, setViewFormat] = useState("");
@@ -65,8 +59,27 @@ function DocumentLibrary() {
   const [genCoverDocName, setGenCoverDocName] = useState("");
   const [genCoverError, setGenCoverError] = useState("");
 
+  // Filtering / sorting (S3-006)
+  const [filterType, setFilterType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterIncludeArchived, setFilterIncludeArchived] = useState(false);
+  const [sortBy, setSortBy] = useState("updated_desc");
+
   const [jobs, setJobs] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
+  const [renameDoc, setRenameDoc] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [newTitle, setNewTitle] = useState("");
+
+  // S3-003: version history modal
+  const [historyDoc, setHistoryDoc] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [restoringVersionId, setRestoringVersionId] = useState(null);
+  const [viewingVersion, setViewingVersion] = useState(null);
+  const [versionContent, setVersionContent] = useState("");
+
   const fileInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -285,19 +298,39 @@ function DocumentLibrary() {
     }
   };
 
-  const handleRename = async (doc) => {
-    const newTitle = window.prompt("New title:", doc.title);
-    if (!newTitle || newTitle === doc.title) return;
-    const res = await api.put(
-      `/documents/${doc.document_id}`,
-      { title: newTitle },
-      { caller: "DocumentLibrary.handleRename", action: "rename_document" }
-    );
-    if (res.ok) {
-      setUploadSuccess("Renamed.");
-      setTimeout(() => setUploadSuccess(""), 3000);
-      fetchDocuments();
+  const handleRenameClick = (doc) => {
+    setRenameDoc(doc);
+    setNewTitle(doc.title);
+  };
+
+  const handleConfirmRename = async () => {
+    if (!renameDoc || !newTitle || newTitle === renameDoc.title) {
+      setRenameDoc(null);
+      setNewTitle("");
+      return;
     }
+    setRenamingId(renameDoc.document_id);
+    try {
+      const res = await api.put(
+        `/documents/${renameDoc.document_id}`,
+        { title: newTitle },
+        { caller: "DocumentLibrary.handleRename", action: "rename_document" }
+      );
+      if (res.ok) {
+        setUploadSuccess("Renamed.");
+        setTimeout(() => setUploadSuccess(""), 3000);
+        fetchDocuments();
+      }
+    } finally {
+      setRenamingId(null);
+      setRenameDoc(null);
+      setNewTitle("");
+    }
+  };
+
+  const handleCancelRename = () => {
+    setRenameDoc(null);
+    setNewTitle("");
   };
 
   const handleStatusChange = async (doc, newStatus) => {
@@ -309,20 +342,93 @@ function DocumentLibrary() {
     if (res.ok) fetchDocuments();
   };
 
-  const handleDelete = async (doc) => {
+  // S3-003: open the version-history modal for a document and load its versions.
+  const handleOpenHistory = async (doc) => {
+    setHistoryDoc(doc);
+    setVersions([]);
+    setVersionsLoading(true);
+    try {
+      const res = await api.get(`/documents/${doc.document_id}/versions`, {
+        caller: "DocumentLibrary.handleOpenHistory",
+        action: "load_document_versions",
+      });
+      if (res.ok) setVersions(await res.json());
+    } catch {
+      // leave versions empty; modal will show "No versions yet."
+    }
+    setVersionsLoading(false);
+  };
+
+  // S3-003: fetch the content of a specific (non-current) version and open
+  // the nested viewer modal.
+  const handleViewVersion = async (version) => {
+    if (!historyDoc) return;
+    try {
+      const res = await api.get(
+        `/documents/${historyDoc.document_id}/versions/${version.version_id}/content`,
+        {
+          caller: "DocumentLibrary.handleViewVersion",
+          action: "view_document_version",
+        }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setVersionContent(data.content || "");
+      setViewingVersion(version);
+    } catch {
+      // silently ignore — user can retry
+    }
+  };
+
+  // S3-003: restore an older version as the current one. Confirms first,
+  // then refreshes both the modal's history doc and the underlying list.
+  const handleRestoreVersion = async (version) => {
+    if (!historyDoc) return;
     if (
       !window.confirm(
-        `Permanently delete "${doc.title}"? This cannot be undone. Use Archive to soft-delete instead.`
+        `Restore v${version.version_number} as the current version?`
       )
     )
       return;
-    if (!token) return;
-    setDeletingId(doc.document_id);
+    setRestoringVersionId(version.version_id);
     try {
-      const res = await api.delete(`/documents/${doc.document_id}`, {
-        caller: "DocumentLibrary.handleDelete",
-        action: "delete_document",
-      });
+      const res = await api.post(
+        `/documents/${historyDoc.document_id}/versions/${version.version_id}/restore`,
+        {},
+        {
+          caller: "DocumentLibrary.handleRestoreVersion",
+          action: "restore_document_version",
+        }
+      );
+      if (res.ok) {
+        const updated = await res.json();
+        setHistoryDoc(updated);
+        fetchDocuments();
+      }
+    } catch {
+      // silently ignore — user can retry
+    }
+    setRestoringVersionId(null);
+  };
+
+  const handleDeleteClick = (doc) => {
+    setDeleteConfirmDoc(doc);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmDoc || !token) {
+      setDeleteConfirmDoc(null);
+      return;
+    }
+    setDeletingId(deleteConfirmDoc.document_id);
+    try {
+      const res = await api.delete(
+        `/documents/${deleteConfirmDoc.document_id}`,
+        {
+          caller: "DocumentLibrary.handleDelete",
+          action: "delete_document",
+        }
+      );
       if (!res.ok) {
         let errorMsg = "Failed to delete document.";
         try {
@@ -337,6 +443,7 @@ function DocumentLibrary() {
         setUploadError(errorMsg);
         setTimeout(() => setUploadError(""), 4000);
         setDeletingId(null);
+        setDeleteConfirmDoc(null);
         return;
       }
       setUploadSuccess("Document deleted successfully!");
@@ -350,7 +457,12 @@ function DocumentLibrary() {
       setDeletingId(null);
     } finally {
       setDeletingId(null);
+      setDeleteConfirmDoc(null);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmDoc(null);
   };
 
   const onPdfLoadSuccess = ({ numPages }) => setPdfNumPages(numPages);
@@ -773,6 +885,256 @@ function DocumentLibrary() {
         </div>
       )}
 
+      {renameDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal" style={{ maxWidth: "400px" }}>
+            <div className="doclibrary-modal-header">
+              <h2 style={{ margin: 0 }}>Rename Document</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={handleCancelRename}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: "1.5rem", borderTop: "1px solid #e5e7eb" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  fontSize: "0.9rem",
+                  fontWeight: "500",
+                }}
+              >
+                New title:
+              </label>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmRename();
+                  if (e.key === "Escape") handleCancelRename();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginBottom: "1rem",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.95rem",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={handleCancelRename}
+              >
+                Cancel
+              </button>
+              <button
+                className="doclibrary-save-btn"
+                onClick={handleConfirmRename}
+                disabled={
+                  renamingId === renameDoc.document_id ||
+                  !newTitle ||
+                  newTitle === renameDoc.title
+                }
+              >
+                {renamingId === renameDoc.document_id ? "Renaming…" : "Rename"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal" style={{ maxWidth: "400px" }}>
+            <div className="doclibrary-modal-header">
+              <h2 style={{ margin: 0, color: "#ef4444" }}>Delete Document</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={handleCancelDelete}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: "1.5rem", borderTop: "1px solid #e5e7eb" }}>
+              <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.95rem" }}>
+                Are you sure you want to permanently delete:
+              </p>
+              <p
+                style={{
+                  margin: "0 0 1.5rem 0",
+                  padding: "0.75rem",
+                  background: "#fef2f2",
+                  borderRadius: "0.375rem",
+                  fontSize: "0.9rem",
+                  fontWeight: "500",
+                  color: "#7f1d1d",
+                  wordBreak: "break-word",
+                }}
+              >
+                {deleteConfirmDoc.title}
+              </p>
+              <p style={{ margin: "0", fontSize: "0.85rem", color: "#6b7280" }}>
+                This action cannot be undone. Consider using Archive instead to
+                soft-delete.
+              </p>
+            </div>
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={handleCancelDelete}
+              >
+                Cancel
+              </button>
+              <button
+                className="doclibrary-delete-btn"
+                onClick={handleConfirmDelete}
+                disabled={deletingId === deleteConfirmDoc.document_id}
+                style={{
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.375rem",
+                  cursor: "pointer",
+                  fontWeight: "500",
+                }}
+              >
+                {deletingId === deleteConfirmDoc.document_id
+                  ? "Deleting…"
+                  : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* S3-003: Version history modal */}
+      {historyDoc && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal" style={{ maxWidth: "640px" }}>
+            <div className="doclibrary-modal-header">
+              <h2>Version history — {historyDoc.title}</h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => setHistoryDoc(null)}
+              >
+                ✕
+              </button>
+            </div>
+            {versionsLoading ? (
+              <p style={{ padding: "1rem" }}>Loading…</p>
+            ) : versions.length === 0 ? (
+              <p style={{ padding: "1rem" }}>No versions yet.</p>
+            ) : (
+              <table className="doclibrary-table" style={{ marginTop: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Version</th>
+                    <th>Source</th>
+                    <th>Saved</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.map((v) => {
+                    const isCurrent =
+                      v.version_id === historyDoc.current_version_id;
+                    return (
+                      <tr key={v.version_id}>
+                        <td>
+                          v{v.version_number}
+                          {isCurrent && (
+                            <span style={{ marginLeft: 6, color: "#22c55e" }}>
+                              · current
+                            </span>
+                          )}
+                        </td>
+                        <td>{v.source || "—"}</td>
+                        <td>{new Date(v.created_at).toLocaleString()}</td>
+                        <td>
+                          <div className="doclibrary-actions">
+                            <button
+                              className="doclibrary-action-btn doclibrary-view-btn"
+                              onClick={() => handleViewVersion(v)}
+                            >
+                              View
+                            </button>
+                            {!isCurrent && (
+                              <button
+                                className="doclibrary-action-btn"
+                                onClick={() => handleRestoreVersion(v)}
+                                disabled={restoringVersionId === v.version_id}
+                              >
+                                {restoringVersionId === v.version_id
+                                  ? "Restoring…"
+                                  : "Restore"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-cancel-btn"
+                onClick={() => setHistoryDoc(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* S3-003: nested viewer for a specific version's content */}
+      {viewingVersion && (
+        <div className="doclibrary-modal-overlay">
+          <div className="doclibrary-modal">
+            <div className="doclibrary-modal-header">
+              <h2>
+                v{viewingVersion.version_number} —{" "}
+                {historyDoc ? historyDoc.title : ""}
+              </h2>
+              <button
+                className="doclibrary-modal-close"
+                onClick={() => {
+                  setViewingVersion(null);
+                  setVersionContent("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="doclibrary-viewer">
+              <pre>{versionContent}</pre>
+            </div>
+            <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-close-btn"
+                onClick={() => {
+                  setViewingVersion(null);
+                  setVersionContent("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="doclibrary-upload">
         <h2>Upload Document</h2>
         <form onSubmit={handleUpload} className="doclibrary-upload-form">
@@ -947,7 +1309,7 @@ function DocumentLibrary() {
                       </button>
                       <button
                         className="doclibrary-action-btn"
-                        onClick={() => handleRename(doc)}
+                        onClick={() => handleRenameClick(doc)}
                         disabled={deletingId !== null}
                         title="Rename"
                       >
@@ -970,8 +1332,16 @@ function DocumentLibrary() {
                         {doc.is_deleted ? "Restore" : "Archive"}
                       </button>
                       <button
+                        className="doclibrary-action-btn"
+                        onClick={() => handleOpenHistory(doc)}
+                        disabled={deletingId !== null}
+                        title="View version history"
+                      >
+                        History
+                      </button>
+                      <button
                         className="doclibrary-action-btn doclibrary-delete-btn"
-                        onClick={() => handleDelete(doc)}
+                        onClick={() => handleDeleteClick(doc)}
                         disabled={deletingId === doc.document_id}
                         title="Permanently delete"
                       >

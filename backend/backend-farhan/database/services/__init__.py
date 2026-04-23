@@ -1,1 +1,0 @@
-# backend-farhan database services

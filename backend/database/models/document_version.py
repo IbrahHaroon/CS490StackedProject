@@ -105,3 +105,19 @@ def get_versions_for_document(
         .all()
     )
     return list(rows)
+
+
+def restore_version(session: Session, document_id: int, version_id: int):
+    """Set document.current_version_id to an existing version of THIS document.
+
+    Returns the updated Document, or None if `version_id` does not belong to
+    `document_id` (or the version doesn't exist). Caller is expected to have
+    already checked that the document is owned by the current user.
+    """
+    version = session.get(DocumentVersion, version_id)
+    if version is None or version.document_id != document_id:
+        return None
+    # Local import to avoid the circular Document <-> DocumentVersion dependency.
+    from database.models.document import update_document
+
+    return update_document(session, document_id, current_version_id=version_id)

@@ -70,8 +70,11 @@ def get_current_user(
     if jti and db.query(TokenBlacklist).filter(TokenBlacklist.jti == jti).first():
         raise credentials_exception
 
-    user = db.query(User).filter(User.email == email).first()
-    if user is None:
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            raise credentials_exception
+    except Exception:
         raise credentials_exception
 
     return user
