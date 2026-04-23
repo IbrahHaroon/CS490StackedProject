@@ -1202,7 +1202,9 @@ function AddJobModal({ onClose, onAdded }) {
         application_date: form.application_date || null,
         deadline: form.deadline || null,
         source_url: form.source_url.trim() || null,
-        years_of_experience: form.years_of_experience ? parseFloat(form.years_of_experience) : null,
+        years_of_experience: form.years_of_experience
+          ? parseFloat(form.years_of_experience)
+          : null,
         notes: form.notes.trim() || null,
       };
       const res = await api.post("/jobs", body, {
@@ -1306,7 +1308,9 @@ function AddJobModal({ onClose, onAdded }) {
             />
           </div>
           <div>
-            <label className="details-label">Years of Experience Required</label>
+            <label className="details-label">
+              Years of Experience Required
+            </label>
             <input
               type="number"
               className="details-input"
@@ -1320,7 +1324,9 @@ function AddJobModal({ onClose, onAdded }) {
             />
           </div>
           <div>
-            <label className="details-label">Job Description / Requirements</label>
+            <label className="details-label">
+              Job Description / Requirements
+            </label>
             <textarea
               className="details-textarea"
               style={{ width: "100%", boxSizing: "border-box" }}

@@ -103,7 +103,6 @@ function DocViewerModal({ doc, onClose }) {
   );
 }
 
-
 function Dashboard() {
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -194,7 +193,6 @@ function Dashboard() {
       );
     }
   }, [searchParams, jobs]);
-
 
   const handleGenerateAIDoc = async (docType, job_id) => {
     if (aiGenerating) return;
