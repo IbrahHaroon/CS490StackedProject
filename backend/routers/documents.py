@@ -1,5 +1,20 @@
+"""Document Library router (PRD §6 / Sprint 3 stories S3-001 → S3-010).
+
+Architecture:
+  Document        — parent record (title, type, status, ownership, timestamps)
+  DocumentVersion — immutable content snapshots; current_version_id on Document
+                    points at the latest
+  DocumentTag     — many tags per document (S3-006 filter)
+  JobDocumentLink — N:N between a Job and a specific DocumentVersion (S3-009)
+
+File-storage helpers (PDF/DOCX/text extraction + write-back) live in this module
+so the upload + edit workflow keeps its existing semantics.
+"""
+from __future__ import annotations
+
 import base64
 import os
+from datetime import date as date_class
 
 from docx import Document as DocxDocument
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -9,111 +24,108 @@ from sqlalchemy.orm import Session
 from database import get_db
 from database.auth import get_current_user
 from database.database import get_settings
-from database.models.documents import create_document, get_all_documents, get_document
+from database.models.document import (
+    create_document,
+    get_document,
+    get_documents_for_user,
+    hard_delete_document,
+    update_document,
+)
+from database.models.document_tag import (
+    add_tag,
+    get_tags_for_document,
+    remove_tag,
+)
+from database.models.document_version import (
+    create_document_version,
+    get_document_version,
+    get_versions_for_document,
+)
+from database.models.education import get_educations_by_user
+from database.models.experience import get_experiences_by_user
+from database.models.job import get_job
+from database.models.job_document_link import (
+    get_links_for_job,
+    link_version_to_job,
+    unlink,
+)
 from database.models.profile import get_profile_by_user_id
+from database.models.skill import get_skills_for_user
 from database.models.user import User
-from schemas import DocumentCreate, DocumentResponse
+from schemas import (
+    DocumentCreate,
+    DocumentResponse,
+    DocumentTagCreate,
+    DocumentTagResponse,
+    DocumentUpdate,
+    DocumentVersionCreate,
+    DocumentVersionResponse,
+    JobDocumentLinkCreate,
+    JobDocumentLinkResponse,
+)
 
 router = APIRouter()
 
-# Base directory where uploaded files are stored (sibling of backend/ directory)
 _ROUTERS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_ROUTERS_DIR)
 UPLOAD_BASE = os.path.join(_BACKEND_DIR, "uploads")
 
 
+# --------------------------------------------------------------------------- #
+#  File-storage helpers                                                         #
+# --------------------------------------------------------------------------- #
+
+
 def _extract_pdf_content(file_path: str) -> str:
-    """Extract text content from a PDF file."""
-    try:
-        with open(file_path, "rb") as f:
-            pdf_reader = PdfReader(f)
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-            return text.strip()
-    except Exception as e:
-        raise ValueError(f"Failed to extract PDF content: {str(e)}")
+    with open(file_path, "rb") as f:
+        pdf_reader = PdfReader(f)
+        return "\n".join(p.extract_text() or "" for p in pdf_reader.pages).strip()
 
 
 def _extract_docx_content(file_path: str) -> str:
-    """Extract text content from a DOCX file."""
-    try:
-        doc = DocxDocument(file_path)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        return text.strip()
-    except Exception as e:
-        raise ValueError(f"Failed to extract DOCX content: {str(e)}")
+    doc = DocxDocument(file_path)
+    return "\n".join(p.text for p in doc.paragraphs).strip()
 
 
 def _write_docx_content(file_path: str, content: str) -> None:
-    """Write text content to a DOCX file."""
-    try:
-        doc = DocxDocument()
-        # Split content by newlines and add as paragraphs
-        for line in content.split("\n"):
-            doc.add_paragraph(line)
-        doc.save(file_path)
-    except Exception as e:
-        raise ValueError(f"Failed to write DOCX content: {str(e)}")
+    doc = DocxDocument()
+    for line in content.split("\n"):
+        doc.add_paragraph(line)
+    doc.save(file_path)
 
 
 def _write_pdf_content(file_path: str, content: str) -> None:
-    """
-    Write text content to a PDF file.
-    Creates a new PDF with the edited text content as plain text pages.
-    """
-    try:
-        from io import BytesIO
+    from io import BytesIO
 
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.lib.units import inch
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-        # Create document in memory
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=72,
-            leftMargin=72,
-            topMargin=72,
-            bottomMargin=72,
-        )
-
-        # Build content
-        story = []
-        styles = getSampleStyleSheet()
-
-        # Add the edited text as paragraphs
-        for line in content.split("\n"):
-            if line.strip():
-                p = Paragraph(line, styles["Normal"])
-                story.append(p)
-                story.append(Spacer(1, 0.12 * inch))
-
-        # Build PDF
-        doc.build(story)
-
-        # Write to file
-        buffer.seek(0)
-        with open(file_path, "wb") as f:
-            f.write(buffer.read())
-    except ImportError:
-        raise ValueError(
-            "reportlab library not available. PDF editing requires reportlab package."
-        )
-    except Exception as e:
-        raise ValueError(f"Failed to write PDF content: {str(e)}")
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=72,
+    )
+    story = []
+    styles = getSampleStyleSheet()
+    for line in content.split("\n"):
+        if line.strip():
+            story.append(Paragraph(line, styles["Normal"]))
+            story.append(Spacer(1, 0.12 * inch))
+    doc.build(story)
+    buffer.seek(0)
+    with open(file_path, "wb") as f:
+        f.write(buffer.read())
 
 
 def _update_file_content(file_path: str, filename: str, content: str) -> None:
-    """Update file content based on file extension."""
     ext = os.path.splitext(filename)[1].lower()
-
-    if ext == ".txt" or ext == ".md":
+    if ext in (".txt", ".md"):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
     elif ext == ".docx":
@@ -124,74 +136,340 @@ def _update_file_content(file_path: str, filename: str, content: str) -> None:
         raise ValueError(f"Unsupported file type for editing: {ext}")
 
 
-def _get_file_content_and_format(file_path: str, filename: str) -> dict:
-    """
-    Get file content and return it with format info.
-    For text files, returns the text. For binary files, returns base64-encoded data.
-    """
-    ext = os.path.splitext(filename)[1].lower()
-
+def _read_file(file_path: str, filename: str) -> dict:
+    ext = os.path.splitext(filename or "")[1].lower()
     if ext == ".pdf":
-        text_content = _extract_pdf_content(file_path)
-        # Also return base64-encoded PDF for display
+        text = _extract_pdf_content(file_path)
         with open(file_path, "rb") as f:
-            pdf_base64 = base64.b64encode(f.read()).decode("utf-8")
-        return {
-            "content": text_content,
-            "format": "pdf",
-            "binary_data": pdf_base64,
-            "editable": True,
-        }
-    elif ext == ".docx":
-        text_content = _extract_docx_content(file_path)
-        return {
-            "content": text_content,
-            "format": "docx",
-            "editable": True,
-        }
-    elif ext in (".txt", ".md"):
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        return {"content": text, "format": "pdf", "binary_data": b64, "editable": True}
+    if ext == ".docx":
+        return {"content": _extract_docx_content(file_path), "format": "docx", "editable": True}
+    if ext in (".txt", ".md"):
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return {
-            "content": content,
-            "format": ext[1:],  # "txt" or "md"
-            "editable": True,
-        }
-    else:
-        return {
-            "content": f"[Unsupported file type: {ext}]",
-            "format": "unknown",
-            "editable": False,
-        }
+            return {"content": f.read(), "format": ext[1:], "editable": True}
+    return {"content": f"[Unsupported file type: {ext}]", "format": "unknown", "editable": False}
 
 
 def _build_upload_path(
     base: str, first_name: str, last_name: str, user_id: int, filename: str
 ) -> str:
-    """Return the full filesystem path for an uploaded file."""
-    last_initial = last_name[0].upper()
-    first_initial = first_name[0].upper()
-    full_name = f"{first_name} {last_name}"
+    last_initial = (last_name or "X")[0].upper()
+    first_initial = (first_name or "X")[0].upper()
+    full_name = f"{first_name or ''} {last_name or ''}".strip() or f"user_{user_id}"
     return os.path.join(
         base, last_initial, first_initial, full_name, str(user_id), filename
     )
 
 
-def _build_position_context(pos) -> str:
-    """Build a job context string from a Position ORM object."""
-    company_name = pos.company.name if pos.company else "Unknown"
-    ctx = ["\nTARGET JOB:", f"Title: {pos.title}", f"Company: {company_name}"]
-    if pos.location_type:
-        ctx.append(f"Location Type: {pos.location_type}")
-    if pos.location:
-        ctx.append(f"Location: {pos.location}")
-    if pos.description:
-        ctx.append(f"Job Description:\n{pos.description}")
-    if pos.experience_req:
-        ctx.append(f"Experience Required: {pos.experience_req}")
-    if pos.education_req:
-        ctx.append(f"Education Required: {pos.education_req}")
-    return "\n".join(ctx)
+def _ensure_owns(document, current_user: User) -> None:
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this document",
+        )
+
+
+def _build_job_context(job) -> str:
+    parts = [
+        "\nTARGET JOB:",
+        f"Title: {job.title}",
+        f"Company: {job.company_name}",
+    ]
+    if job.location:
+        parts.append(f"Location: {job.location}")
+    if job.salary:
+        parts.append(f"Salary: {job.salary}")
+    if job.description:
+        parts.append(f"Job Description:\n{job.description}")
+    if job.years_of_experience is not None:
+        parts.append(f"Years of Experience Expected: {job.years_of_experience}")
+    if job.company_research_notes:
+        parts.append(f"Company Research:\n{job.company_research_notes}")
+    return "\n".join(parts)
+
+
+# --------------------------------------------------------------------------- #
+#  Document CRUD (list, read, create, update, archive/restore, hard delete)     #
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/me", response_model=list[DocumentResponse])
+def list_my_documents(
+    include_archived: bool = False,
+    document_type: str | None = None,
+    status_filter: str | None = None,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the user's documents. Supports S3-006 filtering by type and status."""
+    docs = get_documents_for_user(
+        session, current_user.user_id, include_deleted=include_archived
+    )
+    if document_type:
+        docs = [d for d in docs if d.document_type == document_type]
+    if status_filter:
+        docs = [d for d in docs if d.status == status_filter]
+    return docs
+
+
+@router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+def create_document_endpoint(
+    body: DocumentCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a Document plus an initial v1 DocumentVersion in one shot."""
+    doc = create_document(
+        session,
+        current_user.user_id,
+        body.title,
+        body.document_type,
+        status=body.status or "Draft",
+    )
+    if body.content or body.storage_location:
+        version = create_document_version(
+            session,
+            doc.document_id,
+            storage_location=body.storage_location,
+            content=body.content,
+            source=body.source or "manual",
+        )
+        update_document(session, doc.document_id, current_version_id=version.version_id)
+    if body.tags:
+        for label in body.tags:
+            add_tag(session, doc.document_id, label)
+    if body.job_id is not None:
+        job = get_job(session, body.job_id)
+        if job and job.user_id == current_user.user_id:
+            current_version_id = doc.current_version_id or (
+                create_document_version(
+                    session, doc.document_id, source=body.source or "manual"
+                ).version_id
+            )
+            link_version_to_job(
+                session,
+                job_id=body.job_id,
+                version_id=current_version_id,
+                role=body.role or doc.document_type,
+            )
+    return get_document(session, doc.document_id)
+
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+def read_document(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    return doc
+
+
+@router.put("/{document_id}", response_model=DocumentResponse)
+def update_document_endpoint(
+    document_id: int,
+    body: DocumentUpdate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update document metadata only (S3-002, S3-006, S3-008).
+
+    Use POST /{document_id}/versions to write new content.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    return update_document(
+        session,
+        document_id,
+        title=body.title,
+        document_type=body.document_type,
+        status=body.status,
+        is_deleted=body.is_deleted,
+    )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def hard_delete_document_endpoint(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Hard delete (cascades to versions/tags/links). Prefer PUT with is_deleted=True for archive."""
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    # Best-effort: remove uploaded file if any version stored a file location
+    for version in get_versions_for_document(session, document_id):
+        if version.storage_location and os.path.exists(version.storage_location):
+            try:
+                os.remove(version.storage_location)
+            except Exception:
+                pass
+    hard_delete_document(session, document_id)
+
+
+@router.post("/{document_id}/duplicate", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+def duplicate_document(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """S3-007: duplicate an existing document (copies the current version content)."""
+    src = get_document(session, document_id)
+    _ensure_owns(src, current_user)
+    new_doc = create_document(
+        session,
+        current_user.user_id,
+        f"{src.title} (copy)",
+        src.document_type,
+        status=src.status,
+    )
+    # Copy the current version's content forward as v1 of the new document.
+    if src.current_version_id:
+        cv = get_document_version(session, src.current_version_id)
+        if cv:
+            new_version = create_document_version(
+                session,
+                new_doc.document_id,
+                storage_location=None,  # new doc gets its own file lifecycle
+                content=cv.content,
+                source="duplicate",
+            )
+            update_document(
+                session, new_doc.document_id, current_version_id=new_version.version_id
+            )
+    return get_document(session, new_doc.document_id)
+
+
+# --------------------------------------------------------------------------- #
+#  Versions                                                                     #
+# --------------------------------------------------------------------------- #
+
+
+@router.get(
+    "/{document_id}/versions", response_model=list[DocumentVersionResponse]
+)
+def list_versions(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    return get_versions_for_document(session, document_id)
+
+
+@router.post(
+    "/{document_id}/versions",
+    response_model=DocumentVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_new_version(
+    document_id: int,
+    body: DocumentVersionCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Append a new version. Sets it as the document's current_version."""
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    version = create_document_version(
+        session,
+        document_id,
+        storage_location=body.storage_location,
+        content=body.content,
+        source=body.source or "manual",
+    )
+    update_document(session, document_id, current_version_id=version.version_id)
+    return version
+
+
+# --------------------------------------------------------------------------- #
+#  Content read / edit (operates on the current version)                        #
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/{document_id}/content")
+def read_current_content(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    if doc.current_version_id is None:
+        raise HTTPException(status_code=404, detail="Document has no version yet")
+    version = get_document_version(session, doc.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Current version missing")
+    if version.content:
+        return {"content": version.content, "format": "text"}
+    if version.storage_location and os.path.exists(version.storage_location):
+        try:
+            return _read_file(version.storage_location, doc.title)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {e}",
+            )
+    raise HTTPException(status_code=404, detail="No content available")
+
+
+@router.put("/{document_id}/content", response_model=DocumentVersionResponse)
+def edit_current_content(
+    document_id: int,
+    body: dict,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Edit current version content. If the version is file-backed, the file is
+    rewritten on disk; otherwise a new version row is appended carrying the
+    text content.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    content = body.get("content")
+    if content is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Content field is required",
+        )
+    current = (
+        get_document_version(session, doc.current_version_id)
+        if doc.current_version_id
+        else None
+    )
+    if current and current.storage_location and os.path.exists(current.storage_location):
+        try:
+            _update_file_content(
+                current.storage_location, os.path.basename(current.storage_location), content
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+            )
+        # Append a new version row with the in-memory text snapshot for history.
+        new_version = create_document_version(
+            session,
+            document_id,
+            storage_location=current.storage_location,
+            content=content,
+            source="edit",
+        )
+    else:
+        new_version = create_document_version(
+            session, document_id, content=content, source="edit"
+        )
+    update_document(session, document_id, current_version_id=new_version.version_id)
+    return new_version
+
+
+# --------------------------------------------------------------------------- #
+#  Upload (S3-004)                                                              #
+# --------------------------------------------------------------------------- #
 
 
 @router.post(
@@ -200,6 +478,8 @@ def _build_position_context(pos) -> str:
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
+    title: str | None = Form(None),
+    status_value: str = Form("Draft"),
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -209,7 +489,6 @@ async def upload_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User profile not found — create a profile before uploading documents",
         )
-
     dest_path = _build_upload_path(
         UPLOAD_BASE,
         profile.first_name,
@@ -218,213 +497,159 @@ async def upload_document(
         file.filename,
     )
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-
     contents = await file.read()
     with open(dest_path, "wb") as f:
         f.write(contents)
 
-    return create_document(
+    doc = create_document(
         session,
         current_user.user_id,
+        title or file.filename,
         document_type,
-        document_location=dest_path,
-        document_name=file.filename,
+        status=status_value,
     )
-
-
-@router.get("/me", response_model=list[DocumentResponse])
-def read_my_documents(
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    return list(get_all_documents(session, current_user.user_id))
-
-
-@router.post("/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-def create_document_endpoint(body: DocumentCreate, session: Session = Depends(get_db)):
-    return create_document(
+    version = create_document_version(
         session,
-        body.user_id,
-        body.document_type,
-        document_location=body.document_location,
-        job_id=body.job_id,
-        document_name=body.document_name,
-        content=body.content,
+        doc.document_id,
+        storage_location=dest_path,
+        source="upload",
+    )
+    update_document(session, doc.document_id, current_version_id=version.version_id)
+    return get_document(session, doc.document_id)
+
+
+# --------------------------------------------------------------------------- #
+#  Tags (S3-006)                                                                #
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/{document_id}/tags", response_model=list[DocumentTagResponse])
+def list_tags(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    return get_tags_for_document(session, document_id)
+
+
+@router.post(
+    "/{document_id}/tags",
+    response_model=DocumentTagResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_tag(
+    document_id: int,
+    body: DocumentTagCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    tag = add_tag(session, document_id, body.label)
+    if tag is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Empty tag label"
+        )
+    return tag
+
+
+@router.delete("/{document_id}/tags/{label}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_tag(
+    document_id: int,
+    label: str,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    if not remove_tag(session, document_id, label):
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+
+# --------------------------------------------------------------------------- #
+#  Job ↔ Document linking (S3-009 / S3-010)                                     #
+# --------------------------------------------------------------------------- #
+
+
+@router.post(
+    "/links",
+    response_model=JobDocumentLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_link(
+    body: JobDocumentLinkCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = get_job(session, body.job_id)
+    if not job or job.user_id != current_user.user_id:
+        raise HTTPException(status_code=404, detail="Job not found")
+    version = get_document_version(session, body.version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    parent_doc = get_document(session, version.document_id)
+    _ensure_owns(parent_doc, current_user)
+    return link_version_to_job(
+        session, job_id=body.job_id, version_id=body.version_id, role=body.role
     )
 
 
-@router.get("/user/{user_id}", response_model=list[DocumentResponse])
-def read_all_documents(user_id: int, session: Session = Depends(get_db)):
-    return list(get_all_documents(session, user_id))
-
-
-@router.get("/{doc_id}", response_model=DocumentResponse)
-def read_document(doc_id: int, session: Session = Depends(get_db)):
-    document = get_document(session, doc_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
-
-@router.get("/{doc_id}/content")
-def read_document_content(
-    doc_id: int,
+@router.delete("/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_link(
+    link_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Read document content (for viewing/editing resumes and documents)."""
-    document = get_document(session, doc_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if document.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to view this document",
-        )
+    # Ownership inferred via the underlying job.
+    from database.models.job_document_link import JobDocumentLink
 
-    # If document has stored content (text-based)
-    if document.content:
-        return {"content": document.content, "format": "text"}
-
-    # If document is a file, try to read it
-    if document.document_location and os.path.exists(document.document_location):
-        try:
-            file_info = _get_file_content_and_format(
-                document.document_location, document.document_name
-            )
-            return file_info
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to read file: {str(e)}",
-            )
-
-    raise HTTPException(
-        status_code=404, detail="Document content not found or not accessible"
-    )
+    link = session.get(JobDocumentLink, link_id)
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    job = get_job(session, link.job_id)
+    if not job or job.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    unlink(session, link_id)
 
 
-@router.put("/{doc_id}", response_model=DocumentResponse)
-def update_document_content(
-    doc_id: int,
-    body: dict,
+@router.get(
+    "/links/by-job/{job_id}",
+    response_model=list[JobDocumentLinkResponse],
+)
+def list_links_for_job(
+    job_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update document content (for editing resumes and documents)."""
-    from database.models.documents import update_document
-
-    document = get_document(session, doc_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if document.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to edit this document",
-        )
-
-    content = body.get("content")
-    if content is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Content field is required",
-        )
-
-    # If document is stored in database, update directly
-    if document.content is not None:
-        updated_doc = update_document(session, doc_id, content=content)
-        return updated_doc
-
-    # If document is a file, update the file and also store in DB
-    if document.document_location and os.path.exists(document.document_location):
-        try:
-            _update_file_content(
-                document.document_location, document.document_name, content
-            )
-            # Also store in DB for quick access
-            updated_doc = update_document(session, doc_id, content=content)
-            return updated_doc
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e),
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to update document: {str(e)}",
-            )
-
-    raise HTTPException(status_code=404, detail="Document not found or not accessible")
+    job = get_job(session, job_id)
+    if not job or job.user_id != current_user.user_id:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return get_links_for_job(session, job_id)
 
 
-@router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document_endpoint(
-    doc_id: int,
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a document."""
-    from database.models.documents import delete_document
-
-    document = get_document(session, doc_id)
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if document.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete this document",
-        )
-
-    # Delete file from disk if it exists
-    if document.document_location and os.path.exists(document.document_location):
-        try:
-            os.remove(document.document_location)
-        except Exception:
-            pass  # File cleanup is best-effort; DB record is authoritative
-
-    result = delete_document(session, doc_id)
-    if not result:
-        raise HTTPException(
-            status_code=500, detail="Failed to delete document from database"
-        )
+# --------------------------------------------------------------------------- #
+#  AI generation (creates a Document + version + optional job link)             #
+# --------------------------------------------------------------------------- #
 
 
-@router.post("/generate-resume")
-def generate_resume_from_profile(
-    body: dict,
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Generate a tailored resume draft using OpenAI from the user's profile and optional job context."""
-    from datetime import date as date_class
-
-    import openai
-
-    from database.models.education import get_educations_by_user
-    from database.models.experience import get_experiences_by_user
-    from database.models.skills import get_skills_by_user
-
-    profile = get_profile_by_user_id(session, current_user.user_id)
+def _build_profile_text(session: Session, user_id: int) -> str:
+    profile = get_profile_by_user_id(session, user_id)
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User profile not found — create a profile before generating a resume",
+            detail="User profile not found — create a profile first",
         )
+    experiences = get_experiences_by_user(session, user_id)
+    educations = get_educations_by_user(session, user_id)
+    skills = get_skills_for_user(session, user_id)
 
-    experiences = get_experiences_by_user(session, current_user.user_id)
-    educations = get_educations_by_user(session, current_user.user_id)
-    skills = get_skills_by_user(session, current_user.user_id)
-
-    # Build profile context string
     lines = [f"Name: {profile.first_name} {profile.last_name}"]
     if profile.phone_number:
         lines.append(f"Phone: {profile.phone_number}")
     if profile.summary:
         lines.append(f"Summary: {profile.summary}")
-
     if experiences:
         lines.append("\nWORK EXPERIENCE:")
         for exp in experiences:
@@ -432,100 +657,35 @@ def generate_resume_from_profile(
             lines.append(
                 f"  {exp.title} at {exp.company} ({exp.start_date.strftime('%b %Y')} - {end})"
             )
+            if exp.location:
+                lines.append(f"  Location: {exp.location}")
             if exp.description:
                 lines.append(f"  {exp.description}")
-
     if educations:
         lines.append("\nEDUCATION:")
         for edu in educations:
             field = f" in {edu.field_of_study}" if edu.field_of_study else ""
-            lines.append(f"  {edu.degree}{field} — {edu.school_or_college}")
+            lines.append(f"  {edu.degree}{field} — {edu.school}")
             if edu.gpa:
                 lines.append(f"  GPA: {edu.gpa}")
             if edu.start_date and edu.end_date:
                 lines.append(f"  {edu.start_date.year} - {edu.end_date.year}")
-
     if skills:
         lines.append("\nSKILLS:")
         lines.append("  " + ", ".join(s.name for s in skills))
+    return "\n".join(lines)
 
-    profile_text = "\n".join(lines)
 
-    # Fetch job context — accept either job_id (applied application) or position_id (listing)
-    job_context = ""
-    job_id = body.get("job_id")
-    position_id = body.get("position_id")
-    resolved_job_id = None  # for linking the saved document
-    job_label = ""  # used in the document name
-
-    if job_id:
-        from database.models.applied_jobs import get_applied_jobs
-
-        applied_job = get_applied_jobs(session, job_id)
-        if applied_job and applied_job.user_id == current_user.user_id:
-            job_context = _build_position_context(applied_job.position)
-            resolved_job_id = job_id
-            company_name = (
-                applied_job.position.company.name
-                if applied_job.position.company
-                else ""
-            )
-            job_label = (
-                f" - {applied_job.position.title} @ {company_name}"
-                if company_name
-                else f" - {applied_job.position.title}"
-            )
-    elif position_id:
-        from database.models.applied_jobs import get_applied_job_by_position
-        from database.models.position import get_position
-
-        pos = get_position(session, position_id)
-        if pos:
-            job_context = _build_position_context(pos)
-            company_name = pos.company.name if pos.company else ""
-            job_label = (
-                f" - {pos.title} @ {company_name}"
-                if company_name
-                else f" - {pos.title}"
-            )
-            # Link to an existing application for this position if one exists
-            existing_app = get_applied_job_by_position(
-                session, current_user.user_id, position_id
-            )
-            if existing_app:
-                resolved_job_id = existing_app.job_id
+def _call_openai(system_prompt: str, user_message: str) -> str:
+    import openai
 
     settings = get_settings()
     api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OpenAI API key is not configured. Add OPENAI_API_KEY to your .env file.",
+            detail="OpenAI API key is not configured.",
         )
-
-    instructions = body.get("instructions", "").strip()
-
-    system_prompt = (
-        "You are an expert resume writer and career coach. "
-        "Create a professional, ATS-friendly resume draft from the provided profile data. "
-        "Rules:\n"
-        "- Use clear, professional plain-text formatting with standard resume sections\n"
-        "- Use strong action verbs and quantify achievements where possible\n"
-        "- Tailor content to highlight relevant skills for the target job if one is provided\n"
-        "- Keep the resume concise and impactful (1-2 pages of content)\n"
-        "- Return ONLY the resume content — no explanations, preamble, or markdown code blocks\n"
-        "- Format with clear section headers (CONTACT INFORMATION, PROFESSIONAL SUMMARY, WORK EXPERIENCE, EDUCATION, SKILLS)\n"
-        "- Use plain text suitable for saving as a .txt file"
-    )
-
-    user_message = (
-        f"Generate a professional resume from this profile:\n\n{profile_text}"
-    )
-    if job_context:
-        user_message += f"\n\n{job_context}"
-    if instructions:
-        user_message += f"\n\nAdditional instructions: {instructions}"
-
     try:
         client = openai.OpenAI(api_key=api_key)
         response = client.chat.completions.create(
@@ -537,38 +697,94 @@ def generate_resume_from_profile(
             max_tokens=4096,
             temperature=0.7,
         )
-        generated_content = response.choices[0].message.content.strip()
+        return response.choices[0].message.content.strip()
     except openai.AuthenticationError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid OpenAI API key. Please check your OPENAI_API_KEY configuration.",
+            detail="Invalid OpenAI API key.",
         )
     except openai.RateLimitError:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="OpenAI rate limit reached. Please try again in a moment.",
+            detail="OpenAI rate limit reached. Try again shortly.",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Resume generation failed: {str(e)}",
+            detail=f"AI generation failed: {e}",
         )
 
-    doc_name = f"AI Resume{job_label} - {date_class.today().strftime('%Y-%m-%d')}.txt"
-    new_doc = create_document(
-        session,
-        current_user.user_id,
-        "Resume",
-        document_name=doc_name,
-        content=generated_content,
-        job_id=resolved_job_id,
-    )
 
+def _generate_doc(
+    session: Session,
+    *,
+    user: User,
+    document_type: str,
+    role: str,
+    title_prefix: str,
+    system_prompt: str,
+    body: dict,
+) -> dict:
+    profile_text = _build_profile_text(session, user.user_id)
+    job_id = body.get("job_id")
+    job_context = ""
+    job_label = ""
+    job = None
+    if job_id:
+        job = get_job(session, job_id)
+        if not job or job.user_id != user.user_id:
+            raise HTTPException(status_code=404, detail="Job not found")
+        job_context = _build_job_context(job)
+        job_label = f" - {job.title} @ {job.company_name}"
+
+    instructions = (body.get("instructions") or "").strip()
+    user_message = f"Generate from this profile:\n\n{profile_text}"
+    if job_context:
+        user_message += f"\n\n{job_context}"
+    if instructions:
+        user_message += f"\n\nAdditional instructions: {instructions}"
+
+    content = _call_openai(system_prompt, user_message)
+
+    doc_title = f"{title_prefix}{job_label} - {date_class.today().isoformat()}"
+    doc = create_document(
+        session, user.user_id, doc_title, document_type, status="Draft"
+    )
+    version = create_document_version(
+        session, doc.document_id, content=content, source="ai"
+    )
+    update_document(session, doc.document_id, current_version_id=version.version_id)
+    if job is not None:
+        link_version_to_job(
+            session, job_id=job.job_id, version_id=version.version_id, role=role
+        )
     return {
-        "doc_id": new_doc.doc_id,
-        "content": generated_content,
-        "document_name": doc_name,
+        "document_id": doc.document_id,
+        "version_id": version.version_id,
+        "content": content,
+        "title": doc_title,
     }
+
+
+@router.post("/generate-resume")
+def generate_resume(
+    body: dict,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _generate_doc(
+        session,
+        user=current_user,
+        document_type="Resume",
+        role="resume",
+        title_prefix="AI Resume",
+        system_prompt=(
+            "You are an expert resume writer. Produce a clean ATS-friendly resume from the "
+            "candidate profile and (when given) the target job. Plain text. Standard sections "
+            "(CONTACT, SUMMARY, EXPERIENCE, EDUCATION, SKILLS). No code fences or preamble."
+        ),
+        body=body,
+    )
 
 
 @router.post("/generate-cover-letter")
@@ -577,285 +793,34 @@ def generate_cover_letter(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Generate a tailored cover letter using OpenAI from the user's profile and job context."""
-    from datetime import date as date_class
-
-    import openai
-
-    from database.models.experience import get_experiences_by_user
-    from database.models.skills import get_skills_by_user
-
-    profile = get_profile_by_user_id(session, current_user.user_id)
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User profile not found — create a profile before generating a cover letter",
-        )
-
-    experiences = get_experiences_by_user(session, current_user.user_id)
-    skills = get_skills_by_user(session, current_user.user_id)
-
-    lines = [f"Name: {profile.first_name} {profile.last_name}"]
-    if profile.phone_number:
-        lines.append(f"Phone: {profile.phone_number}")
-    if profile.summary:
-        lines.append(f"Professional Summary: {profile.summary}")
-
-    if experiences:
-        lines.append("\nWORK EXPERIENCE:")
-        for exp in experiences:
-            end = exp.end_date.strftime("%b %Y") if exp.end_date else "Present"
-            lines.append(
-                f"  {exp.title} at {exp.company} ({exp.start_date.strftime('%b %Y')} - {end})"
-            )
-            if exp.description:
-                lines.append(f"  {exp.description}")
-
-    if skills:
-        lines.append("\nSKILLS:")
-        lines.append("  " + ", ".join(s.name for s in skills))
-
-    profile_text = "\n".join(lines)
-
-    # Resolve job context
-    job_context = ""
-    job_id = body.get("job_id")
-    position_id = body.get("position_id")
-    resolved_job_id = None
-    job_label = ""  # used in the document name
-
-    if job_id:
-        from database.models.applied_jobs import get_applied_jobs
-
-        applied_job = get_applied_jobs(session, job_id)
-        if applied_job and applied_job.user_id == current_user.user_id:
-            job_context = _build_position_context(applied_job.position)
-            resolved_job_id = job_id
-            company_name = (
-                applied_job.position.company.name
-                if applied_job.position.company
-                else ""
-            )
-            job_label = (
-                f" - {applied_job.position.title} @ {company_name}"
-                if company_name
-                else f" - {applied_job.position.title}"
-            )
-    elif position_id:
-        from database.models.applied_jobs import get_applied_job_by_position
-        from database.models.position import get_position
-
-        pos = get_position(session, position_id)
-        if pos:
-            job_context = _build_position_context(pos)
-            company_name = pos.company.name if pos.company else ""
-            job_label = (
-                f" - {pos.title} @ {company_name}"
-                if company_name
-                else f" - {pos.title}"
-            )
-            # Link to an existing application for this position if one exists
-            existing_app = get_applied_job_by_position(
-                session, current_user.user_id, position_id
-            )
-            if existing_app:
-                resolved_job_id = existing_app.job_id
-
-    settings = get_settings()
-    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OpenAI API key is not configured. Add OPENAI_API_KEY to your .env file.",
-        )
-
-    instructions = body.get("instructions", "").strip()
-
-    system_prompt = (
-        "You are an expert career coach and professional writer specializing in cover letters. "
-        "Write a compelling, personalized cover letter based on the provided profile and job details. "
-        "Rules:\n"
-        "- Address the letter to the hiring team at the specific company if known\n"
-        "- Open with a strong hook that connects the candidate's background to the role\n"
-        "- Highlight 2-3 most relevant experiences or skills from the profile that match the job\n"
-        "- Keep it to 3-4 paragraphs — concise and impactful\n"
-        "- Close with a clear call to action (requesting an interview)\n"
-        "- Return ONLY the cover letter content — no explanations or preamble\n"
-        "- Use plain text suitable for saving as a .txt file\n"
-        "- Sign off with the candidate's name"
-    )
-
-    user_message = f"Write a cover letter for this candidate:\n\n{profile_text}"
-    if job_context:
-        user_message += f"\n\n{job_context}"
-    else:
-        user_message += (
-            "\n\nNote: No specific job was provided — write a general cover letter."
-        )
-    if instructions:
-        user_message += f"\n\nAdditional instructions: {instructions}"
-
-    try:
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            max_tokens=2048,
-            temperature=0.7,
-        )
-        generated_content = response.choices[0].message.content.strip()
-    except openai.AuthenticationError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid OpenAI API key. Please check your OPENAI_API_KEY configuration.",
-        )
-    except openai.RateLimitError:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="OpenAI rate limit reached. Please try again in a moment.",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Cover letter generation failed: {str(e)}",
-        )
-
-    doc_name = (
-        f"AI Cover Letter{job_label} - {date_class.today().strftime('%Y-%m-%d')}.txt"
-    )
-    new_doc = create_document(
+    return _generate_doc(
         session,
-        current_user.user_id,
-        "Cover Letter",
-        document_name=doc_name,
-        content=generated_content,
-        job_id=resolved_job_id,
+        user=current_user,
+        document_type="Cover Letter",
+        role="cover_letter",
+        title_prefix="AI Cover Letter",
+        system_prompt=(
+            "You are an expert cover-letter writer. Produce a personalized 3-4 paragraph "
+            "cover letter for the target job using the candidate profile. Address it to the "
+            "hiring team at the company. End with a clear call to action and the candidate's "
+            "name. Plain text only — no preamble or markdown."
+        ),
+        body=body,
     )
 
-    return {
-        "doc_id": new_doc.doc_id,
-        "content": generated_content,
-        "document_name": doc_name,
-    }
+
+# --------------------------------------------------------------------------- #
+#  Backwards-compatible aliases (DocumentCreate shape used by older callers)    #
+# --------------------------------------------------------------------------- #
 
 
-@router.post("/{doc_id}/ai-rewrite")
-def ai_rewrite_document(
-    doc_id: int,
-    body: dict,
+@router.post(
+    "/", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED
+)
+def create_document_legacy_path(
+    body: DocumentCreate,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Use OpenAI to suggest improvements to a document's content."""
-    import openai
-
-    document = get_document(session, doc_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if document.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this document",
-        )
-
-    # Extract text content from the document
-    original_content = None
-    if document.content:
-        original_content = document.content
-    elif document.document_location:
-        if not os.path.exists(document.document_location):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Document file not found on server. Please re-upload the file.",
-            )
-        # Derive extension from name, fall back to location path
-        ext = os.path.splitext(document.document_name or "")[1].lower()
-        if not ext:
-            ext = os.path.splitext(document.document_location)[1].lower()
-        try:
-            if ext == ".pdf":
-                original_content = _extract_pdf_content(document.document_location)
-            elif ext == ".docx":
-                original_content = _extract_docx_content(document.document_location)
-            elif ext in (".txt", ".md"):
-                with open(document.document_location, "r", encoding="utf-8") as f:
-                    original_content = f.read()
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Unsupported file type '{ext}'. Only PDF, DOCX, TXT, and MD files are supported.",
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Could not read document content: {str(e)}",
-            )
-
-    if not original_content or not original_content.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Document appears to be empty or contains no extractable text. If this is a scanned PDF, please use a text-based PDF or paste the content manually.",
-        )
-
-    settings = get_settings()
-    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OpenAI API key is not configured. Add OPENAI_API_KEY to your .env file.",
-        )
-
-    doc_type = document.document_type or "document"
-    instructions = body.get("instructions", "").strip()
-
-    system_prompt = (
-        f"You are an expert career coach and professional writer specializing in {doc_type.lower()} writing. "
-        "Your task is to improve the provided content to make it more professional, impactful, and compelling. "
-        "Rules:\n"
-        "- Preserve ALL factual information (names, dates, companies, roles, technologies, metrics)\n"
-        "- Improve action verbs and make language more dynamic\n"
-        "- Enhance clarity and conciseness\n"
-        "- Ensure consistent formatting and parallel structure\n"
-        "- Make it ATS-friendly by using strong keywords\n"
-        "- Return ONLY the improved content — no explanations, no preamble, no markdown code blocks\n"
-        "- Match the original document's structure and section ordering"
-    )
-
-    user_message = f"Please improve the following {doc_type.lower()} content:\n\n{original_content}"
-    if instructions:
-        user_message += f"\n\nAdditional instructions: {instructions}"
-
-    try:
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-            max_tokens=4096,
-            temperature=0.7,
-        )
-        improved_content = response.choices[0].message.content.strip()
-    except openai.AuthenticationError:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid OpenAI API key. Please check your OPENAI_API_KEY configuration.",
-        )
-    except openai.RateLimitError:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="OpenAI rate limit reached. Please try again in a moment.",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI rewrite failed: {str(e)}",
-        )
-
-    return {"original": original_content, "improved": improved_content}
+    """Trailing-slash alias of POST /. Retained for the existing frontend client."""
+    return create_document_endpoint(body, session, current_user)

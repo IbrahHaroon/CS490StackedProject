@@ -8,14 +8,14 @@ from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from database.base import Base
 
 if TYPE_CHECKING:
-    from database.models.applied_jobs import AppliedJobs
     from database.models.career_preferences import CareerPreferences
     from database.models.credentials import Credentials
-    from database.models.documents import Documents
+    from database.models.document import Document
     from database.models.education import Education
     from database.models.experience import Experience
+    from database.models.job import Job
     from database.models.profile import Profile
-    from database.models.skills import Skills
+    from database.models.skill import Skill
 
 
 class User(Base):
@@ -30,10 +30,10 @@ class User(Base):
     )
     profile: Mapped["Profile"] = relationship(back_populates="user", uselist=False)
     educations: Mapped[list["Education"]] = relationship(back_populates="user")
-    documents: Mapped[list["Documents"]] = relationship(back_populates="user")
-    applied_jobs: Mapped[list["AppliedJobs"]] = relationship(back_populates="user")
+    documents: Mapped[list["Document"]] = relationship(back_populates="user")
+    jobs: Mapped[list["Job"]] = relationship(back_populates="user")
     experiences: Mapped[list["Experience"]] = relationship(back_populates="user")
-    skills: Mapped[list["Skills"]] = relationship(back_populates="user")
+    skills: Mapped[list["Skill"]] = relationship(back_populates="user")
     career_preferences: Mapped["Optional[CareerPreferences]"] = relationship(
         back_populates="user", uselist=False
     )

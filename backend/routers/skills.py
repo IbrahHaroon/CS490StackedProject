@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from database.models.skills import (
+from database.models.skill import (
     create_skill,
     delete_skill,
     get_skill,
-    get_skills_by_user,
+    get_skills_for_user,
 )
 from schemas import SkillCreate, SkillResponse, SkillUpdate
 
@@ -27,7 +27,7 @@ def create_skill_endpoint(body: SkillCreate, session: Session = Depends(get_db))
 
 @router.get("/user/{user_id}", response_model=list[SkillResponse])
 def read_skills_by_user(user_id: int, session: Session = Depends(get_db)):
-    return get_skills_by_user(session, user_id)
+    return get_skills_for_user(session, user_id)
 
 
 @router.get("/{skill_id}", response_model=SkillResponse)

@@ -21,7 +21,6 @@ function ProtectedRoute({ children }) {
           setValid(true);
         } else {
           localStorage.removeItem("token");
-          localStorage.removeItem("isRecruiter");
           setValid(false);
         }
       })

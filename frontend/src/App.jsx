@@ -7,8 +7,6 @@ import Profile from "./pages/Profile.jsx";
 import DocumentLibrary from "./pages/DocumentLibrary.jsx";
 import Settings from "./pages/Settings.jsx";
 import Applications from "./pages/Applications.jsx";
-import Postings from "./pages/Postings.jsx";
-import JobForm from "./pages/JobForm";
 import SignIn from "./pages/SignIn";
 import DevLogViewer from "./components/DevLogViewer.jsx";
 import { api } from "./lib/apiClient";
@@ -45,7 +43,6 @@ function App() {
       .then((res) => {
         if (res.status === 401 || res.status === 403) {
           localStorage.removeItem("token");
-          localStorage.removeItem("isRecruiter");
           window.location.reload();
         }
       })
@@ -61,22 +58,6 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/signin" element={<SignIn />} />
-          <Route
-            path="/jobs/new"
-            element={
-              <ProtectedRoute>
-                <JobForm />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/jobs/edit/:id"
-            element={
-              <ProtectedRoute>
-                <JobForm />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/profile"
             element={
@@ -109,7 +90,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/postings" element={<Postings />} />
         </Routes>
       </main>
       {import.meta.env.VITE_SHOW_CONSOLE === "true" && <DevLogViewer />}

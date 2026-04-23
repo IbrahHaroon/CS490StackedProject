@@ -3,12 +3,10 @@ import "./Navbar.css";
 
 export function MyAppNav() {
   const token = localStorage.getItem("token");
-  const isRecruiter = localStorage.getItem("isRecruiter") === "true";
   const navigate = useNavigate();
 
   const handleSignOut = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("isRecruiter");
     navigate("/");
   };
 
@@ -24,10 +22,6 @@ export function MyAppNav() {
             Applications
           </NavLink>
 
-          <NavLink to="/postings" end>
-            Postings
-          </NavLink>
-
           <NavLink to="/documents" end>
             Document Library
           </NavLink>
@@ -39,12 +33,6 @@ export function MyAppNav() {
           <NavLink to="/settings" end>
             Settings
           </NavLink>
-
-          {isRecruiter && (
-            <NavLink to="/jobs/new" end>
-              Add Posting
-            </NavLink>
-          )}
         </>
       )}
 

@@ -29,6 +29,7 @@ def create_experience_endpoint(
         end_date=body.end_date,
         description=body.description,
         sort_order=body.sort_order,
+        location=body.location,
     )
 
 
@@ -61,6 +62,7 @@ def update_experience_endpoint(
         clear_end_date=body.clear_end_date,
         description=body.description,
         sort_order=body.sort_order,
+        location=body.location,
     )
     if not experience:
         raise HTTPException(status_code=404, detail="Experience not found")

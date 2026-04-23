@@ -17,7 +17,6 @@ function SignIn() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isRecruiter, setIsRecruiter] = useState(false);
   const [signup, setSignup] = useState(EMPTY_SIGNUP);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -62,7 +61,7 @@ function SignIn() {
       const loginData = await loginRes.json();
       const token = loginData.access_token;
 
-      // 3. Create profile
+      // 3. Create profile (v2 shape — address fields inlined)
       localStorage.setItem("token", token);
       const profileRes = await api.post(
         "/profile/",
@@ -71,11 +70,9 @@ function SignIn() {
           first_name: signup.firstName,
           last_name: signup.lastName,
           dob: signup.dob,
-          address: {
-            address: signup.address,
-            state: signup.state,
-            zip_code: parseInt(signup.zipCode, 10),
-          },
+          address_line: signup.address,
+          state: signup.state,
+          zip_code: signup.zipCode,
         },
         { caller: "SignIn.createProfile", action: "create_profile" }
       );
@@ -96,11 +93,9 @@ function SignIn() {
     form.append("username", email);
     form.append("password", password);
 
-    const endpoint = isRecruiter ? "/auth/recruiter/login" : "/auth/login";
-
-    const res = await api.post(endpoint, form, {
+    const res = await api.post("/auth/login", form, {
       caller: "SignIn.login",
-      action: isRecruiter ? "recruiter_login" : "user_login",
+      action: "user_login",
     });
 
     if (!res.ok) {
@@ -110,13 +105,11 @@ function SignIn() {
 
     const data = await res.json();
     localStorage.setItem("token", data.access_token);
-    localStorage.setItem("isRecruiter", isRecruiter ? "true" : "false");
     navigate("/");
   };
 
   const switchMode = () => {
     setMode(mode === "signin" ? "signup" : "signin");
-    setIsRecruiter(false);
     setError("");
     setSuccess("");
   };
@@ -177,7 +170,7 @@ function SignIn() {
               />
               <label>Zip Code</label>
               <input
-                type="number"
+                type="text"
                 name="zipCode"
                 value={signup.zipCode}
                 onChange={handleSignupField}
@@ -203,24 +196,6 @@ function SignIn() {
             placeholder="••••••••"
             required
           />
-          {mode === "signin" && (
-            <label
-              style={{
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                fontSize: "14px",
-                fontWeight: "normal",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={isRecruiter}
-                onChange={(e) => setIsRecruiter(e.target.checked)}
-              />
-              I am a recruiter
-            </label>
-          )}
           <button type="submit" className="signin-btn">
             {mode === "signin" ? "Sign In" : "Sign Up"}
           </button>

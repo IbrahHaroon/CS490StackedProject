@@ -8,8 +8,6 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from database.models.applied_jobs import create_applied_jobs
-from database.models.company import create_company
 from database.models.follow_up import (
     create_follow_up,
     delete_follow_up,
@@ -17,30 +15,16 @@ from database.models.follow_up import (
     get_follow_ups_by_job,
     update_follow_up,
 )
-from database.models.position import create_position
+from database.models.job import create_job
 from database.models.user import create_user
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _create_job(session, user_id: int) -> int:
-    company = create_company(session, "Acme", "1 Main St", "NY", 10001)
-    position = create_position(
-        session,
-        company.company_id,
-        "Engineer",
-        None,
-        None,
-        None,
-        None,
-        date.today(),
-    )
-    job = create_applied_jobs(
+    job = create_job(
         session,
         user_id=user_id,
-        position_id=position.position_id,
+        title="Engineer",
+        company_name="Acme",
         years_of_experience=2,
     )
     return job.job_id

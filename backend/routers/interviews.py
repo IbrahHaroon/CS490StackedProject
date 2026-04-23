@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
-from database.models.applied_jobs import get_applied_jobs
 from database.models.interview import (
     create_interview,
     delete_interview,
@@ -11,11 +10,25 @@ from database.models.interview import (
     get_interviews_by_job,
     update_interview,
 )
+from database.models.job import get_job
 from database.models.job_activity import create_job_activity
 from database.models.user import User
 from schemas import InterviewCreate, InterviewResponse, InterviewUpdate
 
 router = APIRouter()
+
+
+def _ensure_owns_job(session, job_id: int, current_user: User):
+    job = get_job(session, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
+    if job.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+    return job
 
 
 @router.post(
@@ -29,33 +42,23 @@ def create_interview_endpoint(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new interview for a job."""
-    job = get_applied_jobs(session, job_id)
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Job application not found"
-        )
-    if job.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
-
+    _ensure_owns_job(session, job_id, current_user)
     interview = create_interview(
         session,
         job_id=job_id,
         round_type=body.round_type,
         scheduled_at=body.scheduled_at,
+        interviewer=body.interviewer,
+        mode=body.mode,
+        prep_notes=body.prep_notes,
         notes=body.notes,
     )
-    dt_str = (
-        body.scheduled_at.strftime("%b %d, %Y %I:%M %p") if body.scheduled_at else ""
-    )
+    dt_str = body.scheduled_at.strftime("%b %d, %Y %I:%M %p")
     create_job_activity(
         session,
-        job_id=job_id,
-        stage="Interview Scheduled",
+        job_id,
         event_type="interview",
-        notes=f"{body.round_type} — {dt_str}",
+        notes=f"Interview scheduled: {body.round_type} — {dt_str}",
     )
     return interview
 
@@ -66,17 +69,7 @@ def get_job_interviews(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Retrieve all interviews for a job."""
-    job = get_applied_jobs(session, job_id)
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Job application not found"
-        )
-    if job.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
-
+    _ensure_owns_job(session, job_id, current_user)
     return get_interviews_by_job(session, job_id)
 
 
@@ -87,27 +80,22 @@ def update_interview_endpoint(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update an existing interview."""
     interview = get_interview(session, interview_id)
     if not interview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Interview not found"
         )
-
-    job = get_applied_jobs(session, interview.job_id)
-    if job.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
-
-    updated = update_interview(
+    _ensure_owns_job(session, interview.job_id, current_user)
+    return update_interview(
         session,
         interview_id,
         round_type=body.round_type,
         scheduled_at=body.scheduled_at,
+        interviewer=body.interviewer,
+        mode=body.mode,
+        prep_notes=body.prep_notes,
         notes=body.notes,
     )
-    return updated
 
 
 @router.delete("/interviews/{interview_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,17 +104,10 @@ def delete_interview_endpoint(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete an interview."""
     interview = get_interview(session, interview_id)
     if not interview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Interview not found"
         )
-
-    job = get_applied_jobs(session, interview.job_id)
-    if job.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
-
+    _ensure_owns_job(session, interview.job_id, current_user)
     delete_interview(session, interview_id)

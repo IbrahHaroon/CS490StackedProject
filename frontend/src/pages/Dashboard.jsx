@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../lib/apiClient";
-import { logAction } from "../lib/actionLogger";
 import "./Dashboard.css";
 
-// Extract city portion from a location string so variants like
-// "New York, NY" and "New York" resolve to the same filter bucket.
-const normalizeLocation = (loc) => {
-  if (!loc) return "";
-  return loc.split(",")[0].trim();
-};
+const PIPELINE_STAGES = [
+  "Interested",
+  "Applied",
+  "Interview",
+  "Offer",
+  "Rejected",
+  "Withdrawn",
+  "Accepted",
+  "Archived",
+];
 
 function DeadlineBadge({ deadline, className = "job-card-meta" }) {
   if (!deadline) return null;
@@ -36,15 +39,15 @@ function DeadlineBadge({ deadline, className = "job-card-meta" }) {
   );
 }
 
-function DocViewerModal({ doc, onClose, token }) {
+function DocViewerModal({ doc, onClose }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!doc || !token) return;
+    if (!doc) return;
     setLoading(true);
     api
-      .get(`/documents/${doc.doc_id}/content`, {
+      .get(`/documents/${doc.document_id}/content`, {
         caller: "Dashboard.DocViewerModal",
         action: "fetch_document_content",
       })
@@ -52,7 +55,7 @@ function DocViewerModal({ doc, onClose, token }) {
       .then((data) => setContent(data.content || ""))
       .catch(() => setContent(""))
       .finally(() => setLoading(false));
-  }, [doc, token]);
+  }, [doc]);
 
   if (!doc) return null;
 
@@ -65,9 +68,7 @@ function DocViewerModal({ doc, onClose, token }) {
       >
         <div className="apply-modal-header">
           <div>
-            <h3 className="apply-modal-title">
-              {doc.document_name || "Resume"}
-            </h3>
+            <h3 className="apply-modal-title">{doc.title}</h3>
             <p className="apply-modal-company">{doc.document_type}</p>
           </div>
           <button className="apply-modal-x" onClick={onClose}>
@@ -102,35 +103,38 @@ function DocViewerModal({ doc, onClose, token }) {
   );
 }
 
-function ApplyModal({
-  job,
-  documents,
-  onClose,
-  onConfirm,
-  onGenerateAIDoc,
-  aiGenerating,
-}) {
+function AddJobModal({ onClose, onCreate }) {
+  const [form, setForm] = useState({
+    title: "",
+    company_name: "",
+    location: "",
+    source_url: "",
+    description: "",
+    stage: "Interested",
+    application_date: "",
+    deadline: "",
+    salary: "",
+  });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [selectedResume, setSelectedResume] = useState("");
-  const [selectedCoverLetter, setSelectedCoverLetter] = useState("");
-  const [selectedOther, setSelectedOther] = useState("");
 
-  const resumes = documents.filter((d) => d.document_type === "Resume");
-  const coverLetters = documents.filter(
-    (d) => d.document_type === "Cover Letter"
-  );
-  const others = documents.filter(
-    (d) => d.document_type !== "Resume" && d.document_type !== "Cover Letter"
-  );
+  const handleField = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-  const docLabel = (d) => d.document_name || `Document #${d.doc_id}`;
-
-  const handleConfirm = async () => {
+  const handleSubmit = async () => {
     if (submitting) return;
     setError("");
     setSubmitting(true);
-    const err = await onConfirm(job.position_id);
+    const body = { ...form };
+    if (!body.application_date) delete body.application_date;
+    if (!body.deadline) delete body.deadline;
+    if (!body.salary) delete body.salary;
+    if (!body.location) delete body.location;
+    if (!body.source_url) delete body.source_url;
+    if (!body.description) delete body.description;
+    const err = await onCreate(body);
     setSubmitting(false);
     if (err) setError(err);
   };
@@ -139,100 +143,114 @@ function ApplyModal({
     <div className="apply-overlay" onClick={onClose}>
       <div className="apply-modal" onClick={(e) => e.stopPropagation()}>
         <div className="apply-modal-header">
-          <div>
-            <h3 className="apply-modal-title">{job.title}</h3>
-            <p className="apply-modal-company">{job.company_name}</p>
-          </div>
+          <h3 className="apply-modal-title">Add Job</h3>
           <button className="apply-modal-x" onClick={onClose}>
             ✕
           </button>
         </div>
-
         <div className="apply-modal-divider" />
-
         <div className="apply-modal-fields">
           <div className="apply-modal-field">
-            <label className="apply-modal-field-label">
-              Choose your resume
-              <button
-                type="button"
-                className="generate-ai-doc-btn"
-                onClick={() =>
-                  onGenerateAIDoc("Resume", job.position_id, setSelectedResume)
-                }
-                disabled={submitting || aiGenerating}
-              >
-                Generate AI Resume
-              </button>
-            </label>
+            <label className="apply-modal-field-label">Job Title *</label>
+            <input
+              className="filter-panel-input"
+              name="title"
+              value={form.title}
+              onChange={handleField}
+              placeholder="Software Engineer"
+              required
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Company *</label>
+            <input
+              className="filter-panel-input"
+              name="company_name"
+              value={form.company_name}
+              onChange={handleField}
+              placeholder="Acme Corp"
+              required
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Location</label>
+            <input
+              className="filter-panel-input"
+              name="location"
+              value={form.location}
+              onChange={handleField}
+              placeholder="Remote · NYC"
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Source URL</label>
+            <input
+              className="filter-panel-input"
+              name="source_url"
+              value={form.source_url}
+              onChange={handleField}
+              placeholder="https://..."
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Stage</label>
             <select
               className="apply-modal-select"
-              value={selectedResume}
-              onChange={(e) => setSelectedResume(e.target.value)}
-              disabled={submitting || aiGenerating}
+              name="stage"
+              value={form.stage}
+              onChange={handleField}
             >
-              <option value="">— None —</option>
-              {resumes.map((d) => (
-                <option key={d.doc_id} value={d.doc_id}>
-                  {docLabel(d)}
+              {PIPELINE_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
               ))}
             </select>
           </div>
-
           <div className="apply-modal-field">
-            <label className="apply-modal-field-label">
-              Choose your cover letter
-              <button
-                type="button"
-                className="generate-ai-doc-btn"
-                onClick={() =>
-                  onGenerateAIDoc(
-                    "Cover Letter",
-                    job.position_id,
-                    setSelectedCoverLetter
-                  )
-                }
-                disabled={submitting || aiGenerating}
-              >
-                Generate AI Cover Letter
-              </button>
-            </label>
-            <select
-              className="apply-modal-select"
-              value={selectedCoverLetter}
-              onChange={(e) => setSelectedCoverLetter(e.target.value)}
-              disabled={submitting || aiGenerating}
-            >
-              <option value="">— None —</option>
-              {coverLetters.map((d) => (
-                <option key={d.doc_id} value={d.doc_id}>
-                  {docLabel(d)}
-                </option>
-              ))}
-            </select>
+            <label className="apply-modal-field-label">Application Date</label>
+            <input
+              className="filter-panel-input"
+              type="date"
+              name="application_date"
+              value={form.application_date}
+              onChange={handleField}
+            />
           </div>
-
           <div className="apply-modal-field">
-            <label className="apply-modal-field-label">Other documents</label>
-            <select
-              className="apply-modal-select"
-              value={selectedOther}
-              onChange={(e) => setSelectedOther(e.target.value)}
-              disabled={submitting}
-            >
-              <option value="">— None —</option>
-              {others.map((d) => (
-                <option key={d.doc_id} value={d.doc_id}>
-                  {docLabel(d)}
-                </option>
-              ))}
-            </select>
+            <label className="apply-modal-field-label">Deadline</label>
+            <input
+              className="filter-panel-input"
+              type="date"
+              name="deadline"
+              value={form.deadline}
+              onChange={handleField}
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Salary</label>
+            <input
+              className="filter-panel-input"
+              type="number"
+              name="salary"
+              value={form.salary}
+              onChange={handleField}
+              placeholder="120000"
+            />
+          </div>
+          <div className="apply-modal-field">
+            <label className="apply-modal-field-label">Description</label>
+            <textarea
+              className="filter-panel-input"
+              name="description"
+              value={form.description}
+              onChange={handleField}
+              placeholder="Job description (paste from posting)…"
+              rows={4}
+            />
           </div>
         </div>
-
         {error && <p className="apply-modal-error">{error}</p>}
-
         <div className="apply-modal-actions">
           <button
             className="apply-modal-cancel"
@@ -243,10 +261,10 @@ function ApplyModal({
           </button>
           <button
             className="apply-modal-confirm"
-            onClick={handleConfirm}
-            disabled={submitting}
+            onClick={handleSubmit}
+            disabled={submitting || !form.title || !form.company_name}
           >
-            {submitting ? "Applying…" : "Confirm Apply"}
+            {submitting ? "Saving…" : "Add Job"}
           </button>
         </div>
       </div>
@@ -255,23 +273,20 @@ function ApplyModal({
 }
 
 function Dashboard() {
-  const [jobs, setJobs] = useState([]); // recruiter-posted only (job board)
-  const [positionMap, setPositionMap] = useState({}); // all positions keyed by id (for lookup)
+  const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [applications, setApplications] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [applyTarget, setApplyTarget] = useState(null);
+  const [showAddJob, setShowAddJob] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [applySuccess, setApplySuccess] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [firstName, setFirstName] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filterLocationType, setFilterLocationType] = useState("");
-  const [filterLocation, setFilterLocation] = useState("");
+  const [filterStage, setFilterStage] = useState("");
   const [filterCompany, setFilterCompany] = useState("");
   const [filterTitle, setFilterTitle] = useState("");
   const [filterMinSalary, setFilterMinSalary] = useState("");
@@ -285,70 +300,47 @@ function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const token = localStorage.getItem("token");
 
-  const fetchJobsOnly = async () => {
-    try {
-      const posRes = await api.get("/jobs/positions/?include_manual=true", {
-        caller: "Dashboard.fetchJobsOnly",
-        action: "refresh_positions",
-      });
-      if (posRes.ok) {
-        const data = await posRes.json();
-        const boardJobs = data.filter((p) => !p.is_manual);
-        setJobs(boardJobs);
-        const map = {};
-        for (const p of data) map[p.position_id] = p;
-        setPositionMap(map);
-      }
-    } catch (err) {
-      // handled by api client
-    }
+  const refreshJobs = async () => {
+    const res = await api.get("/jobs/dashboard", {
+      caller: "Dashboard.refreshJobs",
+      action: "load_jobs",
+    });
+    if (res.ok) setJobs(await res.json());
   };
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const posRes = await api.get("/jobs/positions/?include_manual=true", {
-          caller: "Dashboard.fetchAll",
-          action: "load_positions",
-        });
-        if (posRes.ok) {
-          const data = await posRes.json();
-          const boardJobs = data.filter((p) => !p.is_manual);
-          setJobs(boardJobs);
-          const map = {};
-          for (const p of data) map[p.position_id] = p;
-          setPositionMap(map);
+        if (!token) {
+          setLoading(false);
+          return;
         }
-
-        // Applications, documents, and metrics require auth
-        if (token) {
-          const [appRes, docRes, metricsRes, meRes] = await Promise.all([
-            api.get("/jobs/dashboard", {
-              caller: "Dashboard.fetchAll",
-              action: "load_applications",
-            }),
-            api.get("/documents/me", {
-              caller: "Dashboard.fetchAll",
-              action: "load_documents",
-            }),
-            api.get("/dashboard/metrics", {
-              caller: "Dashboard.fetchAll",
-              action: "load_metrics",
-            }),
-            api.get("/profile/me", {
-              caller: "Dashboard.fetchAll",
-              action: "load_profile",
-            }),
-          ]);
-          if (appRes.ok) setApplications(await appRes.json());
-          if (docRes.ok) setDocuments(await docRes.json());
-          if (metricsRes.ok) setMetrics(await metricsRes.json());
-          if (meRes.ok) {
-            const profile = await meRes.json();
-            setFirstName(profile.first_name || "");
-          }
+        const [jobsRes, docRes, metricsRes, meRes] = await Promise.all([
+          api.get("/jobs/dashboard", {
+            caller: "Dashboard.fetchAll",
+            action: "load_jobs",
+          }),
+          api.get("/documents/me", {
+            caller: "Dashboard.fetchAll",
+            action: "load_documents",
+          }),
+          api.get("/dashboard/metrics", {
+            caller: "Dashboard.fetchAll",
+            action: "load_metrics",
+          }),
+          api.get("/profile/me", {
+            caller: "Dashboard.fetchAll",
+            action: "load_profile",
+          }),
+        ]);
+        if (jobsRes.ok) setJobs(await jobsRes.json());
+        if (docRes.ok) setDocuments(await docRes.json());
+        if (metricsRes.ok) setMetrics(await metricsRes.json());
+        if (meRes.ok) {
+          const profile = await meRes.json();
+          setFirstName(profile.first_name || "");
         }
-      } catch (err) {
+      } catch {
         // handled by api client
       } finally {
         setLoading(false);
@@ -357,23 +349,11 @@ function Dashboard() {
     fetchAll();
   }, [location.pathname, token]);
 
-  // Re-fetch jobs when a new posting is added from the Postings page
+  // Open a specific job card when navigated here from another page (?job=<job_id>)
   useEffect(() => {
-    const handlePositionsUpdated = () => fetchJobsOnly();
-    const handleFocus = () => fetchJobsOnly();
-    window.addEventListener("positionsUpdated", handlePositionsUpdated);
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      window.removeEventListener("positionsUpdated", handlePositionsUpdated);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, []);
-
-  // Open a specific job card when navigated here from Documents page (?job=<position_id>)
-  useEffect(() => {
-    const pid = searchParams.get("job");
-    if (!pid || jobs.length === 0) return;
-    const target = jobs.find((j) => String(j.position_id) === pid);
+    const jid = searchParams.get("job");
+    if (!jid || jobs.length === 0) return;
+    const target = jobs.find((j) => String(j.job_id) === jid);
     if (target) {
       setSelectedJob(target);
       setSearchParams({}, { replace: true });
@@ -384,41 +364,23 @@ function Dashboard() {
     }
   }, [searchParams, jobs]);
 
-  const handleApply = async (position_id) => {
-    const meRes = await api.get("/auth/me", {
-      caller: "Dashboard.handleApply",
-      action: "verify_auth",
+  const handleCreateJob = async (body) => {
+    const res = await api.post("/jobs", body, {
+      caller: "Dashboard.handleCreateJob",
+      action: "create_job",
     });
-    if (!meRes.ok) return "You must be signed in to apply.";
-    const me = await meRes.json();
-
-    const res = await api.post(
-      "/jobs/applications/",
-      {
-        user_id: me.user_id,
-        position_id,
-        years_of_experience: 0,
-      },
-      { caller: "Dashboard.handleApply", action: "submit_application" }
-    );
-
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return err.detail || "Application failed.";
+      return err.detail || "Failed to create job.";
     }
-
-    setApplyTarget(null);
-    setApplySuccess(`Applied to ${applyTarget?.title}!`);
-    setTimeout(() => setApplySuccess(""), 3000);
-    const appRes = await api.get("/jobs/dashboard", {
-      caller: "Dashboard.handleApply",
-      action: "refresh_applications",
-    });
-    if (appRes.ok) setApplications(await appRes.json());
+    setShowAddJob(false);
+    setActionMessage(`Added ${body.title} @ ${body.company_name}`);
+    setTimeout(() => setActionMessage(""), 3000);
+    await refreshJobs();
     return null;
   };
 
-  const handleGenerateAIDoc = async (docType, position_id, setSelectedDoc) => {
+  const handleGenerateAIDoc = async (docType, job_id) => {
     if (aiGenerating) return;
     setAiGenerating(true);
     try {
@@ -429,7 +391,7 @@ function Dashboard() {
 
       const res = await api.post(
         endpoint,
-        { position_id },
+        { job_id },
         {
           caller: "Dashboard.handleGenerateAIDoc",
           action: `generate_ai_${docType.toLowerCase().replace(" ", "_")}`,
@@ -441,72 +403,39 @@ function Dashboard() {
         throw new Error(err.detail || `Failed to generate AI ${docType}.`);
       }
 
-      const newDoc = await res.json();
-      // Refetch documents so job-resume links are current
       const docRes = await api.get("/documents/me", {
         caller: "Dashboard.handleGenerateAIDoc",
         action: "refresh_documents",
       });
       if (docRes.ok) setDocuments(await docRes.json());
-      else
-        setDocuments((prev) => [
-          ...prev,
-          {
-            doc_id: newDoc.doc_id,
-            document_type: docType,
-            document_name: newDoc.document_name,
-            job_id: newDoc.job_id ?? null,
-          },
-        ]);
 
-      setSelectedDoc(newDoc.doc_id);
-      setApplySuccess(`AI ${docType} generated successfully!`);
-      setTimeout(() => setApplySuccess(""), 3000);
-    } catch (err) {
+      setActionMessage(`AI ${docType} generated successfully!`);
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch {
       // handled by api client
     } finally {
       setAiGenerating(false);
     }
   };
 
-  // Build position_id → resume docs map so job cards can show linked resumes.
-  // Path: doc.job_id → applied_job.job_id → applied_job.position_id
-  const positionResumeMap = {};
-  for (const doc of documents) {
-    if (doc.document_type === "Resume" && doc.job_id) {
-      const app = applications.find((a) => a.job_id === doc.job_id);
-      if (app) {
-        if (!positionResumeMap[app.position_id])
-          positionResumeMap[app.position_id] = [];
-        positionResumeMap[app.position_id].push(doc);
-      }
-    }
-  }
+  // Map job_id → resume/cover-letter docs linked to that job (via JobDocumentLink, but
+  // we don't fetch links inline. Best-effort: filter docs by ai_draft + match via title.)
+  // Documents now don't have job_id — links live separately. Until we add a links call
+  // here, this is empty; the document itself is shown on the Documents page.
+  const jobResumeMap = {};
 
-  const uniqueLocations = [
-    ...new Map(
-      jobs
-        .filter((j) => j.location)
-        .map((j) => [
-          normalizeLocation(j.location).toLowerCase(),
-          normalizeLocation(j.location),
-        ])
-    ).values(),
-  ].sort();
   const uniqueCompanies = [
     ...new Set(jobs.map((j) => j.company_name).filter(Boolean)),
   ].sort();
   const hasActiveFilters =
-    filterLocationType ||
-    filterLocation ||
+    filterStage ||
     filterCompany ||
     filterTitle ||
     filterMinSalary ||
     filterMaxSalary;
 
   const clearFilters = () => {
-    setFilterLocationType("");
-    setFilterLocation("");
+    setFilterStage("");
     setFilterCompany("");
     setFilterTitle("");
     setFilterMinSalary("");
@@ -520,22 +449,13 @@ function Dashboard() {
           job.title?.toLowerCase().includes(q) ||
           job.company_name?.toLowerCase().includes(q) ||
           job.location?.toLowerCase().includes(q) ||
-          job.location_type?.toLowerCase().includes(q)
+          job.stage?.toLowerCase().includes(q)
         );
       })
     : jobs;
 
-  if (filterLocationType) {
-    filteredJobs = filteredJobs.filter(
-      (j) => j.location_type?.toLowerCase() === filterLocationType.toLowerCase()
-    );
-  }
-  if (filterLocation) {
-    filteredJobs = filteredJobs.filter(
-      (j) =>
-        normalizeLocation(j.location).toLowerCase() ===
-        filterLocation.toLowerCase()
-    );
+  if (filterStage) {
+    filteredJobs = filteredJobs.filter((j) => j.stage === filterStage);
   }
   if (filterCompany) {
     filteredJobs = filteredJobs.filter((j) => j.company_name === filterCompany);
@@ -559,11 +479,11 @@ function Dashboard() {
 
   if (sortOrder === "date-asc") {
     filteredJobs = [...filteredJobs].sort(
-      (a, b) => new Date(a.listing_date) - new Date(b.listing_date)
+      (a, b) => new Date(a.created_at) - new Date(b.created_at)
     );
   } else if (sortOrder === "date-desc") {
     filteredJobs = [...filteredJobs].sort(
-      (a, b) => new Date(b.listing_date) - new Date(a.listing_date)
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
     );
   } else if (sortOrder === "salary-asc") {
     filteredJobs = [...filteredJobs].sort(
@@ -589,83 +509,59 @@ function Dashboard() {
     jobBoardRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Renders linked resumes for a job inside the detail panel / expanded modal
-  const renderLinkedResumes = (job) => {
-    const resumes = positionResumeMap[job.position_id];
-    if (!resumes || resumes.length === 0) return null;
-    return (
-      <div className="job-detail-section">
-        <h3>Generated Resume{resumes.length > 1 ? "s" : ""}</h3>
-        {resumes.map((doc) => (
-          <button
-            key={doc.doc_id}
-            className="job-linked-resume-btn"
-            onClick={() => setViewingDoc(doc)}
-          >
-            {doc.document_name || `Resume #${doc.doc_id}`}
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  // ── Action buttons row (shared between inline detail and expanded overlay) ──
-
-  const renderActionButtons = (job) => {
-    const isApplied = applications.some(
-      (a) =>
-        a.position_id === job.position_id &&
-        a.application_status !== "Withdrawn"
-    );
-    return (
-      <div className="job-actions-section">
-        <div className="job-action-row">
-          <button
-            className="job-ai-btn job-ai-btn--resume"
-            onClick={() => setApplyTarget(job)}
-            title="Generate AI-powered resume tailored to this job"
-          >
-            Generate Resume
-          </button>
-          <button
-            className="job-ai-btn job-ai-btn--cover"
-            onClick={() => setApplyTarget(job)}
-            title="Generate AI-powered cover letter tailored to this job"
-          >
-            Generate Cover Letter
-          </button>
-          <button
-            className="job-ai-btn job-ai-btn--improve"
-            onClick={() => navigate("/documents")}
-            title="Improve existing resume or cover letter"
-          >
-            Improve Resume
-          </button>
-          {isApplied ? (
-            <button
-              className="apply-btn apply-btn-applied apply-btn--row"
-              disabled
-            >
-              Already Applied
-            </button>
-          ) : (
-            <button
-              className="apply-btn apply-btn--row"
-              onClick={() => setApplyTarget(job)}
-            >
-              Apply Now
-            </button>
-          )}
-        </div>
+  const renderActionButtons = (job) => (
+    <div className="job-actions-section">
+      <div className="job-action-row">
         <button
-          className="apply-btn apply-btn--edit"
-          onClick={() => navigate(`/jobs/edit/${job.position_id}`)}
+          className="job-ai-btn job-ai-btn--resume"
+          onClick={() => handleGenerateAIDoc("Resume", job.job_id)}
+          disabled={aiGenerating}
+          title="Generate AI-powered resume tailored to this job"
         >
-          Edit Posting
+          {aiGenerating ? "Generating…" : "Generate Resume"}
+        </button>
+        <button
+          className="job-ai-btn job-ai-btn--cover"
+          onClick={() => handleGenerateAIDoc("Cover Letter", job.job_id)}
+          disabled={aiGenerating}
+          title="Generate AI-powered cover letter tailored to this job"
+        >
+          {aiGenerating ? "Generating…" : "Generate Cover Letter"}
+        </button>
+        <button
+          className="job-ai-btn job-ai-btn--improve"
+          onClick={() => navigate("/documents")}
+          title="Browse and improve existing documents"
+        >
+          Document Library
+        </button>
+      </div>
+      <button
+        className="apply-btn apply-btn--edit"
+        onClick={() => navigate(`/applications?job=${job.job_id}`)}
+      >
+        Open Job Detail
+      </button>
+    </div>
+  );
+
+  if (!token) {
+    return (
+      <div className="dashboard">
+        <h1 className="dashboard-welcome">Welcome to your Job Tracker</h1>
+        <p style={{ color: "#888", padding: "2rem" }}>
+          Sign in to track jobs, generate resumes, and manage your pipeline.
+        </p>
+        <button
+          className="apply-btn"
+          onClick={() => navigate("/signin")}
+          style={{ marginLeft: "2rem" }}
+        >
+          Sign In
         </button>
       </div>
     );
-  };
+  }
 
   if (loading)
     return (
@@ -676,36 +572,28 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
-      {applyTarget && (
-        <ApplyModal
-          job={applyTarget}
-          documents={documents}
-          onClose={() => setApplyTarget(null)}
-          onConfirm={handleApply}
-          onGenerateAIDoc={handleGenerateAIDoc}
-          aiGenerating={aiGenerating}
+      {showAddJob && (
+        <AddJobModal
+          onClose={() => setShowAddJob(false)}
+          onCreate={handleCreateJob}
         />
       )}
       {viewingDoc && (
-        <DocViewerModal
-          doc={viewingDoc}
-          token={token}
-          onClose={() => setViewingDoc(null)}
-        />
+        <DocViewerModal doc={viewingDoc} onClose={() => setViewingDoc(null)} />
       )}
       <h1 className="dashboard-welcome">
         Welcome{firstName ? `, ${firstName}` : ""}
       </h1>
-      {applySuccess && <p className="apply-success-msg">{applySuccess}</p>}
+      {actionMessage && <p className="apply-success-msg">{actionMessage}</p>}
 
-      {token && metrics && (
+      {metrics && (
         <div className="metrics-section">
           <div className="metrics-summary">
             <div className="metrics-stat">
               <span className="metrics-stat-value">
                 {metrics.total_applications}
               </span>
-              <span className="metrics-stat-label">Total Applications</span>
+              <span className="metrics-stat-label">Total Jobs</span>
             </div>
             <div className="metrics-stat">
               <span className="metrics-stat-value">
@@ -746,55 +634,46 @@ function Dashboard() {
               </div>
             </div>
           )}
-
-          {Object.values(metrics.outcome_counts).some((v) => v > 0) && (
-            <div className="metrics-outcomes">
-              <h3 className="metrics-heading">Outcomes</h3>
-              <div className="metrics-stage-grid">
-                {Object.entries(metrics.outcome_counts)
-                  .filter(([, count]) => count > 0)
-                  .map(([state, count]) => (
-                    <div
-                      key={state}
-                      className={`metrics-stage-badge metrics-outcome-${state.toLowerCase()}`}
-                    >
-                      <span className="metrics-stage-count">{count}</span>
-                      <span className="metrics-stage-name">{state}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       <div className="dashboard-preview-grid">
         <div className="preview-card preview-card-jobs">
           <div className="preview-card-header">
-            <h2>Jobs for You</h2>
+            <h2>Recent Jobs</h2>
             <button className="view-more-btn" onClick={scrollToJobBoard}>
               View More →
             </button>
           </div>
           <div className="preview-card-body">
             {jobs.length === 0 ? (
-              <p className="preview-placeholder">No job listings yet.</p>
+              <p className="preview-placeholder">No jobs yet — add one!</p>
             ) : (
-              jobs.slice(0, 2).map((job) => (
-                <div key={job.position_id} className="preview-job-item">
-                  <span className="preview-job-company">
-                    {job.company_name}
-                  </span>
-                  <span className="preview-job-title">{job.title}</span>
-                </div>
-              ))
+              [...jobs]
+                .sort((a, b) => b.job_id - a.job_id)
+                .slice(0, 3)
+                .map((job) => (
+                  <div key={job.job_id} className="preview-job-item">
+                    <div className="preview-job-item-top">
+                      <span className="preview-job-company">
+                        {job.company_name}
+                      </span>
+                      <span
+                        className={`preview-status-badge preview-status-${job.stage?.toLowerCase()}`}
+                      >
+                        {job.stage}
+                      </span>
+                    </div>
+                    <span className="preview-job-title">{job.title}</span>
+                  </div>
+                ))
             )}
           </div>
         </div>
 
         <div className="preview-card preview-card-apps">
           <div className="preview-card-header">
-            <h2>Current Apps</h2>
+            <h2>Applications</h2>
             <button
               className="view-more-btn"
               onClick={() => navigate("/applications")}
@@ -803,32 +682,28 @@ function Dashboard() {
             </button>
           </div>
           <div className="preview-card-body">
-            {applications.length === 0 ? (
-              <p className="preview-placeholder">No applications yet.</p>
+            {jobs.filter((j) => j.stage !== "Interested").length === 0 ? (
+              <p className="preview-placeholder">No active applications.</p>
             ) : (
-              [...applications]
+              [...jobs]
+                .filter((j) => j.stage !== "Interested")
                 .sort((a, b) => b.job_id - a.job_id)
                 .slice(0, 3)
-                .map((app) => {
-                  const pos = positionMap[app.position_id];
-                  return (
-                    <div key={app.job_id} className="preview-job-item">
-                      <div className="preview-job-item-top">
-                        <span className="preview-job-company">
-                          {pos?.company_name || "—"}
-                        </span>
-                        <span
-                          className={`preview-status-badge preview-status-${app.application_status?.toLowerCase()}`}
-                        >
-                          {app.application_status}
-                        </span>
-                      </div>
-                      <span className="preview-job-title">
-                        {pos?.title || `Application #${app.job_id}`}
+                .map((job) => (
+                  <div key={job.job_id} className="preview-job-item">
+                    <div className="preview-job-item-top">
+                      <span className="preview-job-company">
+                        {job.company_name}
+                      </span>
+                      <span
+                        className={`preview-status-badge preview-status-${job.stage?.toLowerCase()}`}
+                      >
+                        {job.stage}
                       </span>
                     </div>
-                  );
-                })
+                    <span className="preview-job-title">{job.title}</span>
+                  </div>
+                ))
             )}
           </div>
         </div>
@@ -848,15 +723,11 @@ function Dashboard() {
               <p className="preview-placeholder">No documents yet.</p>
             ) : (
               documents.slice(0, 2).map((doc) => (
-                <div key={doc.doc_id} className="preview-job-item">
+                <div key={doc.document_id} className="preview-job-item">
                   <span className="preview-job-company">
                     {doc.document_type}
                   </span>
-                  <span className="preview-job-title">
-                    {doc.document_location
-                      ? doc.document_location.split("/").pop()
-                      : doc.document_name || "Unnamed document"}
-                  </span>
+                  <span className="preview-job-title">{doc.title}</span>
                 </div>
               ))
             )}
@@ -864,16 +735,21 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Full job board */}
       <div className="job-board-search-row">
         <input
           className="job-board-search"
           type="text"
-          placeholder="Search by title, company, or location…"
+          placeholder="Search by title, company, location, or stage…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         <div className="job-board-controls">
+          <button
+            className="apply-btn apply-btn--row"
+            onClick={() => setShowAddJob(true)}
+          >
+            + Add Job
+          </button>
           <div className="job-board-filter-wrap" ref={filterRef}>
             <button
               className={`job-board-control-btn${hasActiveFilters ? " job-board-control-btn--active" : ""}`}
@@ -884,29 +760,16 @@ function Dashboard() {
             {filterOpen && (
               <div className="job-board-filter-panel">
                 <div className="filter-panel-row">
-                  <label className="filter-panel-label">Work Type</label>
+                  <label className="filter-panel-label">Stage</label>
                   <select
                     className="filter-panel-select"
-                    value={filterLocationType}
-                    onChange={(e) => setFilterLocationType(e.target.value)}
+                    value={filterStage}
+                    onChange={(e) => setFilterStage(e.target.value)}
                   >
                     <option value="">All</option>
-                    <option value="Remote">Remote</option>
-                    <option value="Hybrid">Hybrid</option>
-                    <option value="Onsite">In-Person</option>
-                  </select>
-                </div>
-                <div className="filter-panel-row">
-                  <label className="filter-panel-label">Location</label>
-                  <select
-                    className="filter-panel-select"
-                    value={filterLocation}
-                    onChange={(e) => setFilterLocation(e.target.value)}
-                  >
-                    <option value="">All</option>
-                    {uniqueLocations.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
+                    {PIPELINE_STAGES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
                       </option>
                     ))}
                   </select>
@@ -980,82 +843,50 @@ function Dashboard() {
           </div>
         </div>
       </div>
+
       <div className="job-board" ref={jobBoardRef}>
         {filteredJobs.length === 0 ? (
           <p style={{ color: "#888", padding: "1rem" }}>
             {jobs.length === 0
-              ? "No job listings available."
+              ? "No jobs yet. Click + Add Job to start tracking."
               : "No jobs match your search."}
           </p>
         ) : (
           <>
             <div className="job-board-list">
-              {filteredJobs.map((job) => {
-                const cardResumes = positionResumeMap[job.position_id];
-                return (
-                  <div
-                    key={job.position_id}
-                    className={`job-card ${
-                      selectedJob?.position_id === job.position_id
-                        ? "job-card-selected"
-                        : ""
-                    }`}
-                    onClick={() => setSelectedJob(job)}
-                  >
-                    <div className="job-card-top-row">
-                      <span className="job-card-company">
-                        {job.company_name}
-                      </span>
-                      {(() => {
-                        const app = applications.find(
-                          (a) =>
-                            a.position_id === job.position_id &&
-                            a.application_status !== "Withdrawn"
-                        );
-                        return app ? (
-                          <span
-                            className={`preview-status-badge preview-status-${app.application_status?.toLowerCase()}`}
-                          >
-                            {app.application_status}
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-                    <h3 className="job-card-title">{job.title}</h3>
-                    {(job.location || job.location_type) && (
-                      <span className="job-card-meta">
-                        📍{" "}
-                        {[job.location_type, job.location]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    )}
-                    <span className="job-card-meta">
-                      {job.salary
-                        ? `$${Number(job.salary).toLocaleString()}`
-                        : "Salary not listed"}
+              {filteredJobs.map((job) => (
+                <div
+                  key={job.job_id}
+                  className={`job-card ${
+                    selectedJob?.job_id === job.job_id ? "job-card-selected" : ""
+                  }`}
+                  onClick={() => setSelectedJob(job)}
+                >
+                  <div className="job-card-top-row">
+                    <span className="job-card-company">{job.company_name}</span>
+                    <span
+                      className={`preview-status-badge preview-status-${job.stage?.toLowerCase()}`}
+                    >
+                      {job.stage}
                     </span>
-                    <span className="job-card-meta">{job.listing_date}</span>
-                    <DeadlineBadge deadline={job.deadline} />
-                    {cardResumes?.length > 0 && (
-                      <div className="job-card-resume-row">
-                        {cardResumes.slice(-1).map((doc) => (
-                          <button
-                            key={doc.doc_id}
-                            className="job-card-resume-link"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingDoc(doc);
-                            }}
-                          >
-                            📄 {doc.document_name || "View Resume"}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                  <h3 className="job-card-title">{job.title}</h3>
+                  {job.location && (
+                    <span className="job-card-meta">📍 {job.location}</span>
+                  )}
+                  <span className="job-card-meta">
+                    {job.salary
+                      ? `$${Number(job.salary).toLocaleString()}`
+                      : "Salary not listed"}
+                  </span>
+                  {job.application_date && (
+                    <span className="job-card-meta">
+                      Applied: {job.application_date}
+                    </span>
+                  )}
+                  <DeadlineBadge deadline={job.deadline} />
+                </div>
+              ))}
             </div>
 
             {selectedJob && (
@@ -1069,30 +900,37 @@ function Dashboard() {
                 <h2 className="job-detail-title">
                   {selectedJob.title} @ {selectedJob.company_name}
                 </h2>
-                {(selectedJob.location || selectedJob.location_type) && (
-                  <p className="job-detail-meta">
-                    📍{" "}
-                    {[selectedJob.location_type, selectedJob.location]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                {selectedJob.location && (
+                  <p className="job-detail-meta">📍 {selectedJob.location}</p>
                 )}
                 <p className="job-detail-meta">
                   {selectedJob.salary
                     ? `$${Number(selectedJob.salary).toLocaleString()}`
                     : "Salary not listed"}
                 </p>
-                <p className="job-detail-meta">
-                  Listed: {selectedJob.listing_date}
-                </p>
+                {selectedJob.application_date && (
+                  <p className="job-detail-meta">
+                    Applied: {selectedJob.application_date}
+                  </p>
+                )}
                 {selectedJob.deadline && (
                   <DeadlineBadge
                     deadline={selectedJob.deadline}
                     className="job-detail-meta"
                   />
                 )}
-
-                {renderLinkedResumes(selectedJob)}
+                <p className="job-detail-meta">Stage: {selectedJob.stage}</p>
+                {selectedJob.source_url && (
+                  <p className="job-detail-meta">
+                    <a
+                      href={selectedJob.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Original posting ↗
+                    </a>
+                  </p>
+                )}
 
                 {selectedJob.description && (
                   <div className="job-detail-section">
@@ -1100,33 +938,23 @@ function Dashboard() {
                     <p>{selectedJob.description}</p>
                   </div>
                 )}
-                {selectedJob.education_req && (
+                {selectedJob.notes && (
                   <div className="job-detail-section">
-                    <h3>Education</h3>
-                    <p>{selectedJob.education_req}</p>
+                    <h3>Notes</h3>
+                    <p>{selectedJob.notes}</p>
                   </div>
                 )}
-                {selectedJob.experience_req && (
+                {selectedJob.outcome_notes && (
                   <div className="job-detail-section">
-                    <h3>Experience</h3>
-                    <p>{selectedJob.experience_req}</p>
+                    <h3>Outcome</h3>
+                    <p>{selectedJob.outcome_notes}</p>
                   </div>
                 )}
 
-                {token ? (
-                  renderActionButtons(selectedJob)
-                ) : (
-                  <button
-                    className="apply-btn"
-                    onClick={() => navigate("/signin")}
-                  >
-                    Sign In to Apply
-                  </button>
-                )}
+                {renderActionButtons(selectedJob)}
               </div>
             )}
 
-            {/* Expanded job overlay */}
             {expandedJob && selectedJob && (
               <div
                 className="expand-overlay"
@@ -1146,21 +974,13 @@ function Dashboard() {
                   <h2 className="job-detail-title">
                     {selectedJob.title} @ {selectedJob.company_name}
                   </h2>
-                  {(selectedJob.location || selectedJob.location_type) && (
-                    <p className="job-detail-meta">
-                      📍{" "}
-                      {[selectedJob.location_type, selectedJob.location]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
+                  {selectedJob.location && (
+                    <p className="job-detail-meta">📍 {selectedJob.location}</p>
                   )}
                   <p className="job-detail-meta">
                     {selectedJob.salary
                       ? `$${Number(selectedJob.salary).toLocaleString()}`
                       : "Salary not listed"}
-                  </p>
-                  <p className="job-detail-meta">
-                    Listed: {selectedJob.listing_date}
                   </p>
                   {selectedJob.deadline && (
                     <DeadlineBadge
@@ -1168,38 +988,19 @@ function Dashboard() {
                       className="job-detail-meta"
                     />
                   )}
-
-                  {renderLinkedResumes(selectedJob)}
-
                   {selectedJob.description && (
                     <div className="job-detail-section">
                       <h3>Job Description</h3>
                       <p>{selectedJob.description}</p>
                     </div>
                   )}
-                  {selectedJob.education_req && (
+                  {selectedJob.notes && (
                     <div className="job-detail-section">
-                      <h3>Education</h3>
-                      <p>{selectedJob.education_req}</p>
+                      <h3>Notes</h3>
+                      <p>{selectedJob.notes}</p>
                     </div>
                   )}
-                  {selectedJob.experience_req && (
-                    <div className="job-detail-section">
-                      <h3>Experience</h3>
-                      <p>{selectedJob.experience_req}</p>
-                    </div>
-                  )}
-
-                  {token ? (
-                    renderActionButtons(selectedJob)
-                  ) : (
-                    <button
-                      className="apply-btn"
-                      onClick={() => navigate("/signin")}
-                    >
-                      Sign In to Apply
-                    </button>
-                  )}
+                  {renderActionButtons(selectedJob)}
                 </div>
               </div>
             )}

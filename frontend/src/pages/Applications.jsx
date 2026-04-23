@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import "./Applications.css";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { api } from "../lib/apiClient";
-import { logAction } from "../lib/actionLogger";
 
 const STAGES = [
   "Interested",
   "Applied",
   "Interview",
   "Offer",
+  "Accepted",
   "Rejected",
   "Archived",
   "Withdrawn",
@@ -19,6 +19,7 @@ const STATUS_COLOR = {
   Applied: "#a78bfa",
   Interview: "#f59e0b",
   Offer: "#22c55e",
+  Accepted: "#22c55e",
   Rejected: "#ef4444",
   Archived: "#6b7280",
   Withdrawn: "#374151",
@@ -32,7 +33,7 @@ const EVENT_TYPE_META = {
 };
 
 function Pipeline({ current }) {
-  const isTerminal = current === "Rejected" || current === "Archived";
+  const isTerminal = ["Rejected", "Archived", "Withdrawn"].includes(current);
   const active = isTerminal ? STAGES.slice(0, 4) : STAGES.slice(0, 5);
   const currentIdx = active.indexOf(current);
 
@@ -73,13 +74,7 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({
-  app,
-  position,
-  onRemove,
-  onStageChange,
-  linkedDocs,
-}) {
+function ApplicationCard({ job, onRemove, onStageChange }) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
@@ -90,19 +85,17 @@ function ApplicationCard({
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [genError, setGenError] = useState("");
-  const token = localStorage.getItem("token");
 
-  // S2-007 — Deadline & Recruiter Notes
+  // Deadline + notes (v2: column is `notes`, not `recruiter_notes`)
   const [showDetails, setShowDetails] = useState(false);
   const [editingDetails, setEditingDetails] = useState(false);
   const [detailValues, setDetailValues] = useState({
-    deadline: app.deadline || "",
-    recruiter_notes: app.recruiter_notes || "",
+    deadline: job.deadline || "",
+    notes: job.notes || "",
   });
   const [detailSaving, setDetailSaving] = useState(false);
   const [detailError, setDetailError] = useState("");
 
-  // S2-012 — Follow-Ups
   const [showFollowUps, setShowFollowUps] = useState(false);
   const [followUps, setFollowUps] = useState([]);
   const [followUpsLoaded, setFollowUpsLoaded] = useState(false);
@@ -113,7 +106,6 @@ function ApplicationCard({
   const [addingFollowUp, setAddingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
 
-  // Interviews
   const [showInterviews, setShowInterviews] = useState(false);
   const [interviews, setInterviews] = useState([]);
   const [interviewsLoaded, setInterviewsLoaded] = useState(false);
@@ -124,29 +116,29 @@ function ApplicationCard({
   });
   const [interviewError, setInterviewError] = useState("");
 
-  // Documents
   const [showDocs, setShowDocs] = useState(false);
+  const [docLinks, setDocLinks] = useState([]);
+  const [docLinksLoaded, setDocLinksLoaded] = useState(false);
 
-  // Notes
   const [showNotes, setShowNotes] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
-  const [notesValue, setNotesValue] = useState(app.outcome_notes || "");
+  const [notesValue, setNotesValue] = useState(job.outcome_notes || "");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState("");
 
   const handleStageChange = async (newStage) => {
-    if (newStage === app.application_status || updatingStage) return;
-    const previousStage = app.application_status;
+    if (newStage === job.stage || updatingStage) return;
+    const previousStage = job.stage;
     setUpdatingStage(true);
     setStageError("");
-    onStageChange(app.job_id, newStage);
+    onStageChange(job.job_id, newStage);
     try {
       const res = await api.put(
-        `/jobs/applications/${app.job_id}`,
-        { application_status: newStage },
+        `/jobs/${job.job_id}`,
+        { stage: newStage },
         {
           caller: "Applications.handleStageChange",
-          action: "update_application_stage",
+          action: "update_job_stage",
         }
       );
       if (!res.ok) {
@@ -154,14 +146,14 @@ function ApplicationCard({
         setStageError(
           errBody.detail || `Failed to update stage (${res.status}).`
         );
-        onStageChange(app.job_id, previousStage);
+        onStageChange(job.job_id, previousStage);
       } else {
         setActivity(null);
         setActivityLoaded(false);
       }
     } catch {
       setStageError("Could not reach server. Stage change reverted.");
-      onStageChange(app.job_id, previousStage);
+      onStageChange(job.job_id, previousStage);
     } finally {
       setUpdatingStage(false);
     }
@@ -172,20 +164,15 @@ function ApplicationCard({
       setExpanded((v) => !v);
       return;
     }
-
     try {
-      const res = await api.get(`/jobs/applications/${app.job_id}/activity`, {
+      const res = await api.get(`/jobs/${job.job_id}/activity`, {
         caller: "Applications.loadActivity",
-        action: "fetch_application_activity",
+        action: "fetch_job_activity",
       });
-
-      if (res.ok) {
-        setActivity(await res.json());
-      }
+      if (res.ok) setActivity(await res.json());
     } catch {
       // handled by api client logging
     }
-
     setActivityLoaded(true);
     setExpanded(true);
   };
@@ -196,7 +183,7 @@ function ApplicationCard({
     try {
       const res = await api.post(
         "/documents/generate-cover-letter",
-        { job_id: app.job_id },
+        { job_id: job.job_id },
         {
           caller: "Applications.generateCoverLetter",
           action: "generate_cover_letter",
@@ -225,17 +212,15 @@ function ApplicationCard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // S2-007 — save deadline + recruiter notes
   const saveDetails = async () => {
     setDetailSaving(true);
     setDetailError("");
     try {
       const res = await api.put(
-        `/jobs/applications/${app.job_id}`,
+        `/jobs/${job.job_id}`,
         {
-          ...detailValues,
           deadline: detailValues.deadline || null,
-          recruiter_notes: detailValues.recruiter_notes || null,
+          notes: detailValues.notes || null,
         },
         {
           caller: "Applications.saveDetails",
@@ -255,11 +240,10 @@ function ApplicationCard({
     }
   };
 
-  // S2-012 — lazy-load follow-ups (mirrors loadActivity pattern)
   const loadFollowUps = async () => {
     if (!showFollowUps && !followUpsLoaded) {
       try {
-        const res = await api.get(`/jobs/${app.job_id}/followups`, {
+        const res = await api.get(`/jobs/${job.job_id}/followups`, {
           caller: "Applications.loadFollowUps",
           action: "fetch_follow_ups",
         });
@@ -279,9 +263,8 @@ function ApplicationCard({
     }
     try {
       const res = await api.post(
-        `/jobs/${app.job_id}/followups`,
+        `/jobs/${job.job_id}/followups`,
         {
-          job_id: app.job_id,
           description: newFollowUp.description,
           due_date: newFollowUp.due_date || null,
         },
@@ -316,7 +299,7 @@ function ApplicationCard({
         );
       }
     } catch {
-      // silently fail — checkbox will snap back on next load
+      // silently fail
     }
   };
 
@@ -339,7 +322,7 @@ function ApplicationCard({
   const loadInterviews = async () => {
     if (!showInterviews && !interviewsLoaded) {
       try {
-        const res = await api.get(`/jobs/${app.job_id}/interviews`, {
+        const res = await api.get(`/jobs/${job.job_id}/interviews`, {
           caller: "Applications.loadInterviews",
           action: "fetch_interviews",
         });
@@ -363,9 +346,8 @@ function ApplicationCard({
     }
     try {
       const res = await api.post(
-        `/jobs/${app.job_id}/interviews`,
+        `/jobs/${job.job_id}/interviews`,
         {
-          job_id: app.job_id,
           round_type: newInterview.round_type,
           scheduled_at: newInterview.scheduled_at,
         },
@@ -377,7 +359,6 @@ function ApplicationCard({
         setNewInterview({ round_type: "", scheduled_at: "" });
         setInterviewError("");
         setAddingInterview(false);
-        // Reset timeline so new event appears on next load
         setActivity(null);
         setActivityLoaded(false);
       } else {
@@ -405,12 +386,28 @@ function ApplicationCard({
     }
   };
 
+  const loadDocLinks = async () => {
+    if (!showDocs && !docLinksLoaded) {
+      try {
+        const res = await api.get(`/documents/links/by-job/${job.job_id}`, {
+          caller: "Applications.loadDocLinks",
+          action: "fetch_doc_links",
+        });
+        if (res.ok) setDocLinks(await res.json());
+      } catch {
+        // leave empty
+      }
+      setDocLinksLoaded(true);
+    }
+    setShowDocs((v) => !v);
+  };
+
   const saveNotes = async () => {
     setNotesSaving(true);
     setNotesError("");
     try {
       const res = await api.put(
-        `/jobs/applications/${app.job_id}`,
+        `/jobs/${job.job_id}`,
         { outcome_notes: notesValue },
         { caller: "Applications.saveNotes", action: "save_outcome_notes" }
       );
@@ -428,17 +425,14 @@ function ApplicationCard({
     setNotesSaving(false);
   };
 
-  const title = position?.title || `Position #${app.position_id}`;
-  const company = position?.company_name;
-
   return (
     <div
       className="app-card"
       style={{
         border:
-          app.application_status === "Interview"
+          job.stage === "Interview"
             ? "2px solid orange"
-            : app.application_status === "Offer"
+            : job.stage === "Offer" || job.stage === "Accepted"
               ? "2px solid green"
               : "1px solid #333",
         boxShadow: "none",
@@ -447,24 +441,31 @@ function ApplicationCard({
     >
       <div className="app-card-header">
         <div className="app-card-info">
-          <h3 className="app-card-title">{title}</h3>
-          {company && <span className="app-card-company">{company}</span>}
-          <span className="app-card-meta">Applied {app.application_date}</span>
-          <span className="app-card-meta">
-            {app.years_of_experience} yr
-            {app.years_of_experience !== 1 ? "s" : ""} experience
-          </span>
+          <h3 className="app-card-title">{job.title}</h3>
+          {job.company_name && (
+            <span className="app-card-company">{job.company_name}</span>
+          )}
+          {job.application_date && (
+            <span className="app-card-meta">Applied {job.application_date}</span>
+          )}
+          {job.years_of_experience !== null &&
+            job.years_of_experience !== undefined && (
+              <span className="app-card-meta">
+                {job.years_of_experience} yr
+                {job.years_of_experience !== 1 ? "s" : ""} experience
+              </span>
+            )}
         </div>
 
         <div className="app-card-right">
           <select
             className="app-stage-select"
-            value={app.application_status}
+            value={job.stage}
             disabled={updatingStage}
             onChange={(e) => handleStageChange(e.target.value)}
             style={{
-              borderColor: STATUS_COLOR[app.application_status],
-              color: STATUS_COLOR[app.application_status],
+              borderColor: STATUS_COLOR[job.stage],
+              color: STATUS_COLOR[job.stage],
             }}
           >
             {STAGES.map((s) => (
@@ -497,9 +498,9 @@ function ApplicationCard({
         </div>
       </div>
 
-      <Pipeline current={app.application_status} />
+      <Pipeline current={job.stage} />
 
-      {/* S2-007 — Deadline & Recruiter Notes */}
+      {/* Deadline & Notes */}
       <div className="details-section">
         <button
           className="app-history-btn details-toggle"
@@ -522,9 +523,9 @@ function ApplicationCard({
                   </span>
                 </div>
                 <div className="details-row">
-                  <span className="details-label">Recruiter Notes</span>
+                  <span className="details-label">Notes</span>
                   <span className="details-value">
-                    {detailValues.recruiter_notes || (
+                    {detailValues.notes || (
                       <em style={{ color: "#6b7280" }}>No notes yet</em>
                     )}
                   </span>
@@ -551,16 +552,14 @@ function ApplicationCard({
                     }))
                   }
                 />
-                <label className="details-label">
-                  Recruiter / Contact Notes
-                </label>
+                <label className="details-label">Contact / Recruiter Notes</label>
                 <textarea
                   className="details-textarea"
-                  value={detailValues.recruiter_notes}
+                  value={detailValues.notes}
                   onChange={(e) =>
                     setDetailValues((prev) => ({
                       ...prev,
-                      recruiter_notes: e.target.value,
+                      notes: e.target.value,
                     }))
                   }
                   rows={3}
@@ -600,7 +599,7 @@ function ApplicationCard({
         )}
       </div>
 
-      {/* S2-012 — Follow-Up & Reminder Tracking */}
+      {/* Follow-ups */}
       <div className="followup-section">
         <button
           className="app-history-btn followup-toggle"
@@ -816,29 +815,26 @@ function ApplicationCard({
       <div className="followup-section">
         <button
           className="app-history-btn followup-toggle"
-          onClick={() => setShowDocs((v) => !v)}
+          onClick={loadDocLinks}
         >
-          Documents
-          {linkedDocs && linkedDocs.length > 0
-            ? ` (${linkedDocs.length})`
-            : ""}{" "}
+          Documents{docLinks.length > 0 ? ` (${docLinks.length})` : ""}{" "}
           {showDocs ? "▾" : "▸"}
         </button>
         {showDocs && (
           <div className="followup-body">
-            {!linkedDocs || linkedDocs.length === 0 ? (
+            {docLinks.length === 0 ? (
               <p className="followup-empty">
-                No documents linked to this application yet. Generate a resume
-                or cover letter from the Dashboard or Document Library.
+                No documents linked to this job yet. Generate a resume or cover
+                letter from the Dashboard or Document Library.
               </p>
             ) : (
               <ul className="followup-list">
-                {linkedDocs.map((doc) => (
-                  <li key={doc.doc_id} className="followup-item">
+                {docLinks.map((link) => (
+                  <li key={link.link_id} className="followup-item">
                     <span className="followup-desc">
-                      {doc.document_name || `Document #${doc.doc_id}`}
+                      Version #{link.version_id}
                     </span>
-                    <span className="followup-date">{doc.document_type}</span>
+                    <span className="followup-date">{link.role || "—"}</span>
                   </li>
                 ))}
               </ul>
@@ -847,13 +843,13 @@ function ApplicationCard({
         )}
       </div>
 
-      {/* Notes */}
+      {/* Outcome Notes */}
       <div className="followup-section">
         <button
           className="app-history-btn followup-toggle"
           onClick={() => setShowNotes((v) => !v)}
         >
-          Notes {showNotes ? "▾" : "▸"}
+          Outcome Notes {showNotes ? "▾" : "▸"}
         </button>
         {showNotes && (
           <div className="followup-body">
@@ -862,7 +858,7 @@ function ApplicationCard({
                 <textarea
                   className="followup-input"
                   rows={4}
-                  placeholder="Add your notes here…"
+                  placeholder="Add your outcome notes here…"
                   value={notesValue}
                   onChange={(e) => setNotesValue(e.target.value)}
                   style={{ resize: "vertical" }}
@@ -890,7 +886,7 @@ function ApplicationCard({
                     className="app-history-btn"
                     onClick={() => {
                       setEditingNotes(false);
-                      setNotesValue(app.outcome_notes || "");
+                      setNotesValue(job.outcome_notes || "");
                       setNotesError("");
                     }}
                   >
@@ -908,7 +904,7 @@ function ApplicationCard({
                     {notesValue}
                   </p>
                 ) : (
-                  <p className="followup-empty">No notes yet.</p>
+                  <p className="followup-empty">No outcome notes yet.</p>
                 )}
                 <button
                   className="app-history-btn"
@@ -981,25 +977,31 @@ function ApplicationCard({
               {activity.map((a) => {
                 const meta =
                   EVENT_TYPE_META[a.event_type] || EVENT_TYPE_META.stage_change;
-                const dotColor = meta.color || STATUS_COLOR[a.stage] || "#888";
+                const stageLabel = a.to_stage || a.from_stage || "—";
+                const dotColor =
+                  meta.color || STATUS_COLOR[stageLabel] || "#888";
                 return (
                   <li key={a.activity_id} className="app-activity-item">
                     <span
                       className="app-activity-dot"
                       style={{ backgroundColor: dotColor }}
-                      title={meta.label || a.stage}
+                      title={meta.label || stageLabel}
                     >
                       {meta.icon !== "●" ? meta.icon : ""}
                     </span>
                     <span className="app-activity-stage">
-                      {meta.label ? `${meta.label}: ` : ""}
-                      {a.stage}
+                      {meta.label
+                        ? `${meta.label}: `
+                        : a.from_stage
+                          ? `${a.from_stage} → `
+                          : ""}
+                      {stageLabel}
                     </span>
                     {a.notes && (
                       <span className="app-activity-notes">{a.notes}</span>
                     )}
                     <span className="app-activity-date">
-                      {new Date(a.changed_at).toLocaleString()}
+                      {new Date(a.occurred_at).toLocaleString()}
                     </span>
                   </li>
                 );
@@ -1022,34 +1024,29 @@ function ApplicationCard({
   );
 }
 
-function HistoryOverlay({ applications, positions, onClose, onRestore }) {
+function HistoryOverlay({ jobs, onClose, onRestore }) {
   const [allActivity, setAllActivity] = useState([]);
   const [activityByJob, setActivityByJob] = useState({});
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [restoringJobId, setRestoringJobId] = useState(null);
-  const token = localStorage.getItem("token");
 
   useEffect(() => {
     const loadAll = async () => {
       const results = [];
       const byJob = {};
       await Promise.all(
-        applications.map(async (app) => {
+        jobs.map(async (job) => {
           try {
-            const res = await api.get(
-              `/jobs/applications/${app.job_id}/activity`,
-              {
-                caller: "Applications.HistoryOverlay",
-                action: "fetch_all_activity",
-              }
-            );
+            const res = await api.get(`/jobs/${job.job_id}/activity`, {
+              caller: "Applications.HistoryOverlay",
+              action: "fetch_all_activity",
+            });
             if (res.ok) {
               const activities = await res.json();
-              const pos = positions[app.position_id];
-              const title = pos?.title || `Position #${app.position_id}`;
-              byJob[app.job_id] = activities;
+              const title = `${job.title} @ ${job.company_name}`;
+              byJob[job.job_id] = activities;
               activities.forEach((a) =>
-                results.push({ ...a, jobTitle: title, job_id: app.job_id })
+                results.push({ ...a, jobTitle: title, job_id: job.job_id })
               );
             }
           } catch {
@@ -1057,41 +1054,37 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
           }
         })
       );
-      results.sort((a, b) => new Date(b.changed_at) - new Date(a.changed_at));
+      results.sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at));
       setAllActivity(results);
       setActivityByJob(byJob);
       setLoadingHistory(false);
     };
     loadAll();
-  }, [applications, positions, token]);
+  }, [jobs]);
 
-  // A job is "restorable" from history if it's currently Archived. The current
-  // state is looked up by job_id so the button appears next to the Archived
-  // timeline entry regardless of which stage-change row the user is looking at.
-  const currentStatusById = Object.fromEntries(
-    applications.map((a) => [a.job_id, a.application_status])
+  const currentStageById = Object.fromEntries(
+    jobs.map((j) => [j.job_id, j.stage])
   );
 
   const handleRestore = async (jobId) => {
     setRestoringJobId(jobId);
     const history = activityByJob[jobId] || [];
     const sorted = [...history].sort(
-      (a, b) => new Date(b.changed_at) - new Date(a.changed_at)
+      (a, b) => new Date(b.occurred_at) - new Date(a.occurred_at)
     );
-    const previous = sorted.find(
-      (h) => h.stage && h.stage !== "Archived" && h.stage !== "Withdrawn"
-    );
-    const targetStage = previous?.stage || "Applied";
+    const previous = sorted.find((h) => {
+      const stage = h.to_stage;
+      return stage && stage !== "Archived" && stage !== "Withdrawn";
+    });
+    const targetStage = previous?.to_stage || "Applied";
 
     try {
       const res = await api.put(
-        `/jobs/applications/${jobId}`,
-        { application_status: targetStage },
-        { caller: "Applications.handleRestore", action: "restore_application" }
+        `/jobs/${jobId}`,
+        { stage: targetStage },
+        { caller: "Applications.handleRestore", action: "restore_job" }
       );
-      if (!res.ok) {
-        return;
-      }
+      if (!res.ok) return;
       onRestore(jobId, targetStage);
     } catch {
       // handled by api client logging
@@ -1106,7 +1099,7 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
         <button className="history-close-btn" onClick={onClose}>
           &times;
         </button>
-        <h2 className="history-modal-title">Application History</h2>
+        <h2 className="history-modal-title">Job History</h2>
 
         <h3 className="history-section-title">Activity Timeline</h3>
         {loadingHistory ? (
@@ -1116,37 +1109,39 @@ function HistoryOverlay({ applications, positions, onClose, onRestore }) {
         ) : (
           <ul className="app-activity-list">
             {allActivity.map((a, i) => {
-              const isArchivedEntry = a.stage === "Archived";
-              const isWithdrawnEntry = a.stage === "Withdrawn";
+              const stageLabel = a.to_stage || a.from_stage || "—";
+              const isArchivedEntry = stageLabel === "Archived";
+              const isWithdrawnEntry = stageLabel === "Withdrawn";
               const isCurrentlyArchived =
-                currentStatusById[a.job_id] === "Archived";
+                currentStageById[a.job_id] === "Archived";
               const isCurrentlyWithdrawn =
-                currentStatusById[a.job_id] === "Withdrawn";
+                currentStageById[a.job_id] === "Withdrawn";
               const showRestore =
                 (isArchivedEntry && isCurrentlyArchived) ||
                 (isWithdrawnEntry && isCurrentlyWithdrawn);
               const meta =
                 EVENT_TYPE_META[a.event_type] || EVENT_TYPE_META.stage_change;
-              const dotColor = meta.color || STATUS_COLOR[a.stage] || "#888";
+              const dotColor =
+                meta.color || STATUS_COLOR[stageLabel] || "#888";
               return (
                 <li key={`${a.activity_id}-${i}`} className="history-item">
                   <span
                     className="app-activity-dot"
                     style={{ backgroundColor: dotColor }}
-                    title={meta.label || a.stage}
+                    title={meta.label || stageLabel}
                   >
                     {meta.icon !== "●" ? meta.icon : ""}
                   </span>
                   <span className="history-job-title">{a.jobTitle}</span>
                   <span className="app-activity-stage">
                     {meta.label ? `${meta.label}: ` : ""}
-                    {a.stage}
+                    {stageLabel}
                   </span>
                   {a.notes && (
                     <span className="app-activity-notes">{a.notes}</span>
                   )}
                   <span className="app-activity-date">
-                    {new Date(a.changed_at).toLocaleString()}
+                    {new Date(a.occurred_at).toLocaleString()}
                   </span>
                   {showRestore && (
                     <button
@@ -1174,11 +1169,10 @@ function AddJobModal({ onClose, onAdded }) {
     location: "",
     salary: "",
     description: "",
-    application_status: "Interested",
+    stage: "Interested",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const token = localStorage.getItem("token");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1195,19 +1189,19 @@ function AddJobModal({ onClose, onAdded }) {
         location: form.location.trim() || null,
         salary: form.salary ? parseFloat(form.salary) : null,
         description: form.description.trim() || null,
-        application_status: form.application_status,
+        stage: form.stage,
       };
-      const res = await api.post("/jobs/manual", body, {
+      const res = await api.post("/jobs", body, {
         caller: "Applications.AddJobModal",
-        action: "create_manual_job",
+        action: "create_job",
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => ({}));
         setError(detail.detail || "Failed to save job.");
         return;
       }
-      const newApp = await res.json();
-      onAdded(newApp);
+      const newJob = await res.json();
+      onAdded(newJob);
       onClose();
     } catch {
       setError("Could not reach the server.");
@@ -1295,14 +1289,12 @@ function AddJobModal({ onClose, onAdded }) {
             />
           </div>
           <div>
-            <label className="details-label">Initial Status</label>
+            <label className="details-label">Initial Stage</label>
             <select
               className="app-stage-select"
               style={{ width: "100%", boxSizing: "border-box" }}
-              value={form.application_status}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, application_status: e.target.value }))
-              }
+              value={form.stage}
+              onChange={(e) => setForm((p) => ({ ...p, stage: e.target.value }))}
             >
               {STAGES.map((s) => (
                 <option key={s} value={s}>
@@ -1336,9 +1328,7 @@ function AddJobModal({ onClose, onAdded }) {
 }
 
 function Applications() {
-  const [applications, setApplications] = useState([]);
-  const [positions, setPositions] = useState({});
-  const [documents, setDocuments] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
@@ -1358,48 +1348,17 @@ function Applications() {
         });
 
         if (!res.ok) {
-          setApplications([]);
-          setPositions({});
-          setError("Could not load applications. Please sign in again.");
+          setJobs([]);
+          setError("Could not load jobs. Please sign in again.");
           setLoading(false);
           return;
         }
 
-        const apps = await res.json();
-        const safeApps = apps || [];
-        setApplications(safeApps);
-
-        // Fetch all positions in one request to avoid exhausting the DB connection pool
-        const posMap = {};
-        if (safeApps.length > 0) {
-          const pr = await api.get("/jobs/positions/?include_manual=true", {
-            caller: "Applications.load",
-            action: "fetch_positions",
-          });
-          if (pr.ok) {
-            const allPositions = await pr.json();
-            const neededIds = new Set(safeApps.map((a) => a.position_id));
-            for (const p of allPositions) {
-              if (neededIds.has(p.position_id)) posMap[p.position_id] = p;
-            }
-          }
-        }
-
-        setPositions(posMap);
-
-        if (token) {
-          const docRes = await api.get("/documents/me", {
-            caller: "Applications.load",
-            action: "fetch_user_documents",
-          });
-          if (docRes.ok) setDocuments(await docRes.json());
-        }
-
+        setJobs(await res.json());
         setError("");
         setLoading(false);
       } catch {
-        setApplications([]);
-        setPositions({});
+        setJobs([]);
         setError("Could not reach the server.");
         setLoading(false);
       }
@@ -1408,22 +1367,18 @@ function Applications() {
     load();
   }, [token]);
 
-  const filtered = applications
-    .filter((a) => {
+  const filtered = jobs
+    .filter((j) => {
       const matchesStage =
         filter === "All"
-          ? a.application_status !== "Withdrawn" &&
-            a.application_status !== "Archived"
-          : a.application_status === filter;
+          ? j.stage !== "Withdrawn" && j.stage !== "Archived"
+          : j.stage === filter;
 
-      const positionTitle = positions[a.position_id]?.title || "";
-      const companyName = positions[a.position_id]?.company_name || "";
       const query = search.toLowerCase().trim();
-
       const matchesSearch =
         query === "" ||
-        positionTitle.toLowerCase().includes(query) ||
-        companyName.toLowerCase().includes(query);
+        (j.title || "").toLowerCase().includes(query) ||
+        (j.company_name || "").toLowerCase().includes(query);
 
       return matchesStage && matchesSearch;
     })
@@ -1431,23 +1386,20 @@ function Applications() {
 
   const handleDeleteApplication = async () => {
     if (!deleteTarget) return;
-
     try {
       setIsDeleting(true);
       const res = await api.put(
-        `/jobs/applications/${deleteTarget.job_id}`,
-        { application_status: "Withdrawn" },
+        `/jobs/${deleteTarget.job_id}`,
+        { stage: "Withdrawn" },
         {
           caller: "Applications.handleDeleteApplication",
-          action: "withdraw_application",
+          action: "withdraw_job",
         }
       );
       if (res.ok) {
-        setApplications((prev) =>
-          prev.map((a) =>
-            a.job_id === deleteTarget.job_id
-              ? { ...a, application_status: "Withdrawn" }
-              : a
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.job_id === deleteTarget.job_id ? { ...j, stage: "Withdrawn" } : j
           )
         );
       }
@@ -1459,17 +1411,8 @@ function Applications() {
     }
   };
 
-  const handleJobAdded = async (newApp) => {
-    // Fetch the position info for the new app so the card renders correctly
-    const r = await api.get(`/jobs/positions/${newApp.position_id}`, {
-      caller: "Applications.handleJobAdded",
-      action: "fetch_new_position",
-    });
-    if (r.ok) {
-      const pos = await r.json();
-      setPositions((prev) => ({ ...prev, [newApp.position_id]: pos }));
-    }
-    setApplications((prev) => [newApp, ...prev]);
+  const handleJobAdded = (newJob) => {
+    setJobs((prev) => [newJob, ...prev]);
   };
 
   return (
@@ -1483,12 +1426,10 @@ function Applications() {
 
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
-        title="Delete this application?"
+        title="Withdraw this job?"
         message={
           deleteTarget
-            ? `Are you sure you want to remove the ${
-                positions[deleteTarget.position_id]?.title || "selected"
-              } application? This action cannot be undone.`
+            ? `Mark "${deleteTarget.title} @ ${deleteTarget.company_name}" as Withdrawn? You can restore it later from History.`
             : ""
         }
         onCancel={() => setDeleteTarget(null)}
@@ -1498,14 +1439,11 @@ function Applications() {
 
       {showHistory && (
         <HistoryOverlay
-          applications={applications}
-          positions={positions}
+          jobs={jobs}
           onClose={() => setShowHistory(false)}
           onRestore={(id, newStage) =>
-            setApplications((prev) =>
-              prev.map((a) =>
-                a.job_id === id ? { ...a, application_status: newStage } : a
-              )
+            setJobs((prev) =>
+              prev.map((j) => (j.job_id === id ? { ...j, stage: newStage } : j))
             )
           }
         />
@@ -1552,12 +1490,7 @@ function Applications() {
                 <option value="All">Filter: All</option>
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
-                    {s} (
-                    {
-                      applications.filter((a) => a.application_status === s)
-                        .length
-                    }
-                    )
+                    {s} ({jobs.filter((j) => j.stage === s).length})
                   </option>
                 ))}
               </select>
@@ -1579,24 +1512,20 @@ function Applications() {
           {filtered.length === 0 ? (
             <p className="applications-placeholder">
               {filter === "All"
-                ? "No applications yet."
-                : `No applications with status "${filter}".`}
+                ? "No jobs yet."
+                : `No jobs with status "${filter}".`}
             </p>
           ) : (
             <div className="app-list">
-              {filtered.map((app) => (
+              {filtered.map((job) => (
                 <ApplicationCard
-                  key={app.job_id}
-                  app={app}
-                  position={positions[app.position_id]}
-                  linkedDocs={documents.filter((d) => d.job_id === app.job_id)}
-                  onRemove={() => setDeleteTarget(app)}
+                  key={job.job_id}
+                  job={job}
+                  onRemove={() => setDeleteTarget(job)}
                   onStageChange={(id, newStage) =>
-                    setApplications((prev) =>
-                      prev.map((a) =>
-                        a.job_id === id
-                          ? { ...a, application_status: newStage }
-                          : a
+                    setJobs((prev) =>
+                      prev.map((j) =>
+                        j.job_id === id ? { ...j, stage: newStage } : j
                       )
                     )
                   }

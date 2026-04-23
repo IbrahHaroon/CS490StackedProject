@@ -110,7 +110,6 @@ function Profile() {
           first_name: values.first_name || "",
           last_name: values.last_name || "",
           dob: values.dob || "2000-01-01",
-          address: { address: "", state: "", zip_code: 0 },
           phone_number: values.phone_number || null,
           summary: values.summary || null,
         },
@@ -250,12 +249,17 @@ function Profile() {
 
   const saveEducation = async (values) => {
     const missing = [];
-    if (!values.highest_education?.trim()) missing.push("Highest Education");
     if (!values.degree?.trim()) missing.push("Degree");
-    if (!values.school_or_college?.trim()) missing.push("School");
+    if (!values.school?.trim()) missing.push("School");
     if (!values.field_of_study?.trim()) missing.push("Field of Study");
     if (!values.start_date) missing.push("Start Date");
     if (missing.length > 0) return `Required: ${missing.join(", ")}`;
+
+    const schoolLocation =
+      [values.address_street, values.address_state, values.address_zip]
+        .map((v) => (v || "").trim())
+        .filter(Boolean)
+        .join(", ") || null;
 
     let res;
     if (!activeRecord) {
@@ -263,18 +267,13 @@ function Profile() {
         "/education/",
         {
           user_id: userId,
-          highest_education: values.highest_education,
+          school: values.school,
           degree: values.degree,
-          school_or_college: values.school_or_college,
-          address: {
-            address: values.address_street || "",
-            state: values.address_state || "",
-            zip_code: parseInt(values.address_zip) || 0,
-          },
           field_of_study: values.field_of_study,
           start_date: values.start_date,
           end_date: values.end_date || null,
           gpa: values.gpa || null,
+          school_location: schoolLocation,
         },
         { caller: "Profile.saveEducation", action: "create_education" }
       );
@@ -282,13 +281,13 @@ function Profile() {
       res = await api.put(
         `/education/${activeRecord.education_id}`,
         {
-          highest_education: values.highest_education,
+          school: values.school,
           degree: values.degree,
-          school_or_college: values.school_or_college,
           field_of_study: values.field_of_study,
           start_date: values.start_date,
           end_date: values.end_date || null,
           gpa: values.gpa || null,
+          school_location: schoolLocation,
         },
         { caller: "Profile.saveEducation", action: "update_education" }
       );
@@ -494,21 +493,15 @@ function Profile() {
     const rec = activeRecord || {};
     const fields = [
       {
-        name: "highest_education",
-        label: "Highest Education",
-        value: rec.highest_education || "",
-        placeholder: "e.g. Bachelor's",
-      },
-      {
         name: "degree",
         label: "Degree",
         value: rec.degree || "",
         placeholder: "e.g. Bachelor of Science",
       },
       {
-        name: "school_or_college",
+        name: "school",
         label: "School / College",
-        value: rec.school_or_college || "",
+        value: rec.school || "",
         placeholder: "e.g. Rutgers University",
       },
       {
@@ -754,7 +747,7 @@ function Profile() {
                   {edu.degree} in {edu.field_of_study}
                 </p>
                 <p style={styles.itemSecondary}>
-                  {edu.school_or_college} · {edu.start_date}–
+                  {edu.school} · {edu.start_date}–
                   {edu.end_date || "Present"}
                   {edu.gpa ? ` · GPA: ${edu.gpa}` : ""}
                 </p>

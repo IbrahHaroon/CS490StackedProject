@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from database.models.user import User
 
 
-class Skills(Base):
-    __tablename__ = "skills"
+class Skill(Base):
+    __tablename__ = "skill"
 
     skill_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
@@ -21,25 +21,19 @@ class Skills(Base):
     proficiency: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    # Relationships
     user: Mapped["User"] = relationship(back_populates="skills")
-
-
-# --------------------------------------------------------------------------- #
-#  Functions                                                                    #
-# --------------------------------------------------------------------------- #
 
 
 def create_skill(
     session: Session,
     user_id: int,
     name: str,
+    *,
     category: str | None = None,
     proficiency: str | None = None,
     sort_order: int = 0,
-) -> "Skills":
-    """Create a new Skills row and return the persisted object."""
-    skill = Skills(
+) -> "Skill":
+    skill = Skill(
         user_id=user_id,
         name=name,
         category=category,
@@ -49,19 +43,17 @@ def create_skill(
     session.add(skill)
     session.commit()
     session.refresh(skill)
-    return get_skill(session, skill.skill_id)
+    return skill
 
 
-def get_skill(session: Session, skill_id: int) -> "Skills | None":
-    """Return Skills object by primary key, or None if not found."""
-    return session.get(Skills, skill_id)
+def get_skill(session: Session, skill_id: int) -> "Skill | None":
+    return session.get(Skill, skill_id)
 
 
-def get_skills_by_user(session: Session, user_id: int) -> list["Skills"]:
-    """Return all skills for a user ordered by sort_order."""
+def get_skills_for_user(session: Session, user_id: int) -> list["Skill"]:
     rows = (
         session.execute(
-            select(Skills).where(Skills.user_id == user_id).order_by(Skills.sort_order)
+            select(Skill).where(Skill.user_id == user_id).order_by(Skill.sort_order)
         )
         .scalars()
         .all()
@@ -72,12 +64,12 @@ def get_skills_by_user(session: Session, user_id: int) -> list["Skills"]:
 def update_skill(
     session: Session,
     skill_id: int,
+    *,
     name: str | None = None,
     category: str | None = None,
     proficiency: str | None = None,
     sort_order: int | None = None,
-) -> "Skills | None":
-    """Update mutable fields on an existing skill. Returns None if not found."""
+) -> "Skill | None":
     skill = get_skill(session, skill_id)
     if skill is None:
         return None
@@ -95,7 +87,6 @@ def update_skill(
 
 
 def delete_skill(session: Session, skill_id: int) -> bool:
-    """Delete a skill by primary key. Returns True if deleted."""
     skill = get_skill(session, skill_id)
     if skill is None:
         return False

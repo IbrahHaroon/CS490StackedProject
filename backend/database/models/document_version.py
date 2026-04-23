@@ -3,29 +3,51 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, select
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
 
 if TYPE_CHECKING:
-    from database.models.documents import Documents
+    from database.models.document import Document
+    from database.models.job_document_link import JobDocumentLink
 
 
 class DocumentVersion(Base):
+    """An immutable content snapshot for a Document."""
+
     __tablename__ = "document_version"
 
-    version_id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
+    version_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("document.document_id", ondelete="CASCADE"), nullable=False
     )
-    doc_id: Mapped[int] = mapped_column(ForeignKey("documents.doc_id"), nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    document_location: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
 
     # Relationships
-    document: Mapped["Documents"] = relationship(back_populates="versions")
+    document: Mapped["Document"] = relationship(
+        back_populates="versions", foreign_keys=[document_id]
+    )
+    job_links: Mapped[list["JobDocumentLink"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (UniqueConstraint("document_id", "version_number"),)
 
 
 # --------------------------------------------------------------------------- #
@@ -33,29 +55,28 @@ class DocumentVersion(Base):
 # --------------------------------------------------------------------------- #
 
 
-def create_version(
+def create_document_version(
     session: Session,
-    doc_id: int,
+    document_id: int,
+    *,
+    storage_location: str | None = None,
     content: str | None = None,
-    document_location: str | None = None,
+    source: str | None = None,
 ) -> "DocumentVersion":
-    """Snapshot the current state of a document as a new version.
-
-    The version_number is auto-calculated as max(existing) + 1 for the document.
-    """
-    max_version = (
+    """Create the next version for a document (auto-increments version_number)."""
+    next_num = (
         session.execute(
-            select(func.max(DocumentVersion.version_number)).where(
-                DocumentVersion.doc_id == doc_id
-            )
+            select(func.coalesce(func.max(DocumentVersion.version_number), 0))
+            .where(DocumentVersion.document_id == document_id)
         ).scalar()
         or 0
-    )
+    ) + 1
     version = DocumentVersion(
-        doc_id=doc_id,
-        version_number=max_version + 1,
+        document_id=document_id,
+        version_number=next_num,
+        storage_location=storage_location,
         content=content,
-        document_location=document_location,
+        source=source,
         created_at=datetime.utcnow(),
     )
     session.add(version)
@@ -64,34 +85,22 @@ def create_version(
     return version
 
 
-def get_versions(session: Session, doc_id: int) -> list["DocumentVersion"]:
-    """Return all versions for a document ordered by version_number ascending."""
+def get_document_version(
+    session: Session, version_id: int
+) -> "DocumentVersion | None":
+    return session.get(DocumentVersion, version_id)
+
+
+def get_versions_for_document(
+    session: Session, document_id: int
+) -> list["DocumentVersion"]:
     rows = (
         session.execute(
             select(DocumentVersion)
-            .where(DocumentVersion.doc_id == doc_id)
-            .order_by(DocumentVersion.version_number)
+            .where(DocumentVersion.document_id == document_id)
+            .order_by(DocumentVersion.version_number.desc())
         )
         .scalars()
         .all()
     )
     return list(rows)
-
-
-def get_version(session: Session, version_id: int) -> "DocumentVersion | None":
-    """Return a single version by primary key, or None if not found."""
-    return session.get(DocumentVersion, version_id)
-
-
-def get_latest_version(session: Session, doc_id: int) -> "DocumentVersion | None":
-    """Return the highest version_number entry for a document, or None."""
-    return (
-        session.execute(
-            select(DocumentVersion)
-            .where(DocumentVersion.doc_id == doc_id)
-            .order_by(DocumentVersion.version_number.desc())
-            .limit(1)
-        )
-        .scalars()
-        .first()
-    )

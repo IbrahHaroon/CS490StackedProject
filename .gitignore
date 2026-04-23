@@ -44,6 +44,7 @@ build/
 # Temp repo for manual code sharing
 temprepo/
 backend/uploads/
+backend/backups/
 .claude/
 
 # Local-only notes
