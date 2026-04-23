@@ -1170,9 +1170,15 @@ function AddJobModal({ onClose, onAdded }) {
     company_name: "",
     title: "",
     location: "",
+    location_type: "",
     salary: "",
     description: "",
     stage: "Interested",
+    application_date: "",
+    deadline: "",
+    source_url: "",
+    years_of_experience: "",
+    notes: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1193,6 +1199,11 @@ function AddJobModal({ onClose, onAdded }) {
         salary: form.salary ? parseFloat(form.salary) : null,
         description: form.description.trim() || null,
         stage: form.stage,
+        application_date: form.application_date || null,
+        deadline: form.deadline || null,
+        source_url: form.source_url.trim() || null,
+        years_of_experience: form.years_of_experience ? parseFloat(form.years_of_experience) : null,
+        notes: form.notes.trim() || null,
       };
       const res = await api.post("/jobs", body, {
         caller: "Applications.AddJobModal",
@@ -1217,7 +1228,7 @@ function AddJobModal({ onClose, onAdded }) {
     <div className="history-overlay" onClick={onClose}>
       <div
         className="history-modal"
-        style={{ maxWidth: "480px" }}
+        style={{ maxWidth: "520px", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button className="history-close-btn" onClick={onClose}>
@@ -1253,6 +1264,22 @@ function AddJobModal({ onClose, onAdded }) {
             />
           </div>
           <div>
+            <label className="details-label">Location Type</label>
+            <select
+              className="app-stage-select"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.location_type}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, location_type: e.target.value }))
+              }
+            >
+              <option value="">Select…</option>
+              <option value="Remote">Remote</option>
+              <option value="Onsite">Onsite</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+          <div>
             <label className="details-label">Location</label>
             <input
               className="details-input"
@@ -1279,7 +1306,21 @@ function AddJobModal({ onClose, onAdded }) {
             />
           </div>
           <div>
-            <label className="details-label">Notes / Description</label>
+            <label className="details-label">Years of Experience Required</label>
+            <input
+              type="number"
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.years_of_experience}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, years_of_experience: e.target.value }))
+              }
+              placeholder="e.g. 3"
+              min="0"
+            />
+          </div>
+          <div>
+            <label className="details-label">Job Description / Requirements</label>
             <textarea
               className="details-textarea"
               style={{ width: "100%", boxSizing: "border-box" }}
@@ -1288,7 +1329,56 @@ function AddJobModal({ onClose, onAdded }) {
                 setForm((p) => ({ ...p, description: e.target.value }))
               }
               rows={3}
-              placeholder="Any notes about the job..."
+              placeholder="Paste job description from posting…"
+            />
+          </div>
+          <div>
+            <label className="details-label">Job Posting URL</label>
+            <input
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.source_url}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, source_url: e.target.value }))
+              }
+              placeholder="https://..."
+            />
+          </div>
+          <div>
+            <label className="details-label">Application Date</label>
+            <input
+              type="date"
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.application_date}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, application_date: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="details-label">Application Deadline</label>
+            <input
+              type="date"
+              className="details-input"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.deadline}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, deadline: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className="details-label">Notes</label>
+            <textarea
+              className="details-textarea"
+              style={{ width: "100%", boxSizing: "border-box" }}
+              value={form.notes}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, notes: e.target.value }))
+              }
+              rows={2}
+              placeholder="Any additional notes about this job…"
             />
           </div>
           <div>
