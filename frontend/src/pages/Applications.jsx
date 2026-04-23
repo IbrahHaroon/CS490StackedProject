@@ -1491,17 +1491,12 @@ function Applications() {
     if (!deleteTarget) return;
     try {
       setIsDeleting(true);
-      const res = await api.delete(
-        `/jobs/${deleteTarget.job_id}`,
-        {
-          caller: "Applications.handleDeleteApplication",
-          action: "delete_job",
-        }
-      );
+      const res = await api.delete(`/jobs/${deleteTarget.job_id}`, {
+        caller: "Applications.handleDeleteApplication",
+        action: "delete_job",
+      });
       if (res.ok) {
-        setJobs((prev) =>
-          prev.filter((j) => j.job_id !== deleteTarget.job_id)
-        );
+        setJobs((prev) => prev.filter((j) => j.job_id !== deleteTarget.job_id));
       }
       setDeleteTarget(null);
     } catch {
