@@ -240,7 +240,6 @@ class JobActivityResponse(BaseModel):
 
 
 class InterviewCreate(BaseModel):
-    job_id: int
     round_type: str
     scheduled_at: datetime
     interviewer: str | None = None
