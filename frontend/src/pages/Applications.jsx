@@ -134,9 +134,13 @@ function ApplicationCard({
   const [notesError, setNotesError] = useState("");
 
   const [showResearch, setShowResearch] = useState(false);
-  const [researchNotes, setResearchNotes] = useState(job.company_research_notes || "");
+  const [researchNotes, setResearchNotes] = useState(
+    job.company_research_notes || ""
+  );
   const [editingResearch, setEditingResearch] = useState(false);
-  const [researchValue, setResearchValue] = useState(job.company_research_notes || "");
+  const [researchValue, setResearchValue] = useState(
+    job.company_research_notes || ""
+  );
   const [showAiPrompt, setShowAiPrompt] = useState(false);
   const [aiContext, setAiContext] = useState("");
   const [isResearching, setIsResearching] = useState(false);
@@ -473,7 +477,10 @@ function ApplicationCard({
       const res = await api.post(
         `/jobs/${job.job_id}/research`,
         { context: aiContext },
-        { caller: "Applications.generateResearch", action: "generate_company_research" }
+        {
+          caller: "Applications.generateResearch",
+          action: "generate_company_research",
+        }
       );
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -945,7 +952,13 @@ function ApplicationCard({
                   style={{ resize: "vertical" }}
                 />
                 {researchError && (
-                  <p style={{ color: "#ef4444", fontSize: "13px", margin: "4px 0" }}>
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
                     {researchError}
                   </p>
                 )}
@@ -972,7 +985,10 @@ function ApplicationCard({
             ) : (
               <>
                 {researchNotes ? (
-                  <p className="followup-desc" style={{ whiteSpace: "pre-wrap" }}>
+                  <p
+                    className="followup-desc"
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
                     {researchNotes}
                   </p>
                 ) : (
@@ -1001,7 +1017,10 @@ function ApplicationCard({
                   </button>
                 </div>
                 {showAiPrompt && (
-                  <div className="followup-add-form" style={{ marginTop: "8px" }}>
+                  <div
+                    className="followup-add-form"
+                    style={{ marginTop: "8px" }}
+                  >
                     <label className="details-label">
                       Context for AI (optional)
                     </label>
@@ -1015,7 +1034,13 @@ function ApplicationCard({
                       disabled={isResearching}
                     />
                     {researchError && (
-                      <p style={{ color: "#ef4444", fontSize: "13px", margin: "4px 0" }}>
+                      <p
+                        style={{
+                          color: "#ef4444",
+                          fontSize: "13px",
+                          margin: "4px 0",
+                        }}
+                      >
                         {researchError}
                       </p>
                     )}
