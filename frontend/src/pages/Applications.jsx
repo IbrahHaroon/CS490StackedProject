@@ -133,6 +133,16 @@ function ApplicationCard({
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState("");
 
+  const [showResearch, setShowResearch] = useState(false);
+  const [researchNotes, setResearchNotes] = useState(job.company_research_notes || "");
+  const [editingResearch, setEditingResearch] = useState(false);
+  const [researchValue, setResearchValue] = useState(job.company_research_notes || "");
+  const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [aiContext, setAiContext] = useState("");
+  const [isResearching, setIsResearching] = useState(false);
+  const [researchSaving, setResearchSaving] = useState(false);
+  const [researchError, setResearchError] = useState("");
+
   const handleStageChange = async (newStage) => {
     if (newStage === job.stage || updatingStage) return;
     const previousStage = job.stage;
@@ -432,6 +442,54 @@ function ApplicationCard({
       setNotesError("Failed to save notes.");
     }
     setNotesSaving(false);
+  };
+
+  const saveResearch = async () => {
+    setResearchSaving(true);
+    setResearchError("");
+    try {
+      const res = await api.put(
+        `/jobs/${job.job_id}`,
+        { company_research_notes: researchValue },
+        { caller: "Applications.saveResearch", action: "save_research_notes" }
+      );
+      if (res.ok) {
+        setResearchNotes(researchValue);
+        setEditingResearch(false);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        setResearchError(errBody.detail || "Failed to save.");
+      }
+    } catch {
+      setResearchError("Failed to save.");
+    }
+    setResearchSaving(false);
+  };
+
+  const generateResearch = async () => {
+    setIsResearching(true);
+    setResearchError("");
+    try {
+      const res = await api.post(
+        `/jobs/${job.job_id}/research`,
+        { context: aiContext },
+        { caller: "Applications.generateResearch", action: "generate_company_research" }
+      );
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        setResearchError(errBody.detail || "Failed to generate research.");
+      } else {
+        const data = await res.json();
+        const notes = data.company_research_notes || "";
+        setResearchNotes(notes);
+        setResearchValue(notes);
+        setShowAiPrompt(false);
+        setAiContext("");
+      }
+    } catch {
+      setResearchError("Failed to reach server.");
+    }
+    setIsResearching(false);
   };
 
   return (
@@ -862,6 +920,128 @@ function ApplicationCard({
                   </li>
                 ))}
               </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Company Research */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={() => setShowResearch((v) => !v)}
+        >
+          Company Research {showResearch ? "▾" : "▸"}
+        </button>
+        {showResearch && (
+          <div className="followup-body">
+            {editingResearch ? (
+              <div className="followup-add-form">
+                <textarea
+                  className="followup-input"
+                  rows={6}
+                  value={researchValue}
+                  onChange={(e) => setResearchValue(e.target.value)}
+                  style={{ resize: "vertical" }}
+                />
+                {researchError && (
+                  <p style={{ color: "#ef4444", fontSize: "13px", margin: "4px 0" }}>
+                    {researchError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={saveResearch}
+                    disabled={researchSaving}
+                  >
+                    {researchSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setEditingResearch(false);
+                      setResearchValue(researchNotes);
+                      setResearchError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {researchNotes ? (
+                  <p className="followup-desc" style={{ whiteSpace: "pre-wrap" }}>
+                    {researchNotes}
+                  </p>
+                ) : (
+                  <p className="followup-empty">No company research yet.</p>
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setEditingResearch(true);
+                      setShowAiPrompt(false);
+                      setResearchError("");
+                    }}
+                  >
+                    {researchNotes ? "Edit" : "Add Manually"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setShowAiPrompt((v) => !v);
+                      setEditingResearch(false);
+                      setResearchError("");
+                    }}
+                  >
+                    {showAiPrompt ? "Cancel AI" : "Research with AI ✦"}
+                  </button>
+                </div>
+                {showAiPrompt && (
+                  <div className="followup-add-form" style={{ marginTop: "8px" }}>
+                    <label className="details-label">
+                      Context for AI (optional)
+                    </label>
+                    <textarea
+                      className="followup-input"
+                      rows={3}
+                      placeholder="What do you already know? Role details, why you're interested, etc."
+                      value={aiContext}
+                      onChange={(e) => setAiContext(e.target.value)}
+                      style={{ resize: "vertical" }}
+                      disabled={isResearching}
+                    />
+                    {researchError && (
+                      <p style={{ color: "#ef4444", fontSize: "13px", margin: "4px 0" }}>
+                        {researchError}
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="app-history-btn"
+                        onClick={generateResearch}
+                        disabled={isResearching}
+                      >
+                        {isResearching ? "Researching…" : "Generate Research"}
+                      </button>
+                      <button
+                        className="app-history-btn"
+                        onClick={() => {
+                          setShowAiPrompt(false);
+                          setAiContext("");
+                          setResearchError("");
+                        }}
+                        disabled={isResearching}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

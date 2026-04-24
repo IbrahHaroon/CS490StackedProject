@@ -164,6 +164,10 @@ class JobCreate(BaseModel):
     notes: str | None = None
 
 
+class CompanyResearchRequest(BaseModel):
+    context: str | None = None
+
+
 class JobUpdate(BaseModel):
     title: str | None = None
     company_name: str | None = None
