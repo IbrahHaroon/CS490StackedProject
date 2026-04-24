@@ -108,6 +108,7 @@ function Dashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [metrics, setMetrics] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
@@ -193,24 +194,29 @@ function Dashboard() {
           setLoading(false);
           return;
         }
-        const [jobsRes, docRes, metricsRes, meRes] = await Promise.all([
-          api.get("/jobs/dashboard", {
-            caller: "Dashboard.fetchAll",
-            action: "load_jobs",
-          }),
-          api.get("/documents/me", {
-            caller: "Dashboard.fetchAll",
-            action: "load_documents",
-          }),
-          api.get("/dashboard/metrics", {
-            caller: "Dashboard.fetchAll",
-            action: "load_metrics",
-          }),
-          api.get("/profile/me", {
-            caller: "Dashboard.fetchAll",
-            action: "load_profile",
-          }),
-        ]);
+        const [jobsRes, docRes, metricsRes, meRes, analyticsRes] =
+          await Promise.all([
+            api.get("/jobs/dashboard", {
+              caller: "Dashboard.fetchAll",
+              action: "load_jobs",
+            }),
+            api.get("/documents/me", {
+              caller: "Dashboard.fetchAll",
+              action: "load_documents",
+            }),
+            api.get("/dashboard/metrics", {
+              caller: "Dashboard.fetchAll",
+              action: "load_metrics",
+            }),
+            api.get("/profile/me", {
+              caller: "Dashboard.fetchAll",
+              action: "load_profile",
+            }),
+            api.get("/dashboard/analytics", {
+              caller: "Dashboard.fetchAll",
+              action: "load_analytics",
+            }),
+          ]);
         if (jobsRes.ok) setJobs(await jobsRes.json());
         if (docRes.ok) setDocuments(await docRes.json());
         if (metricsRes.ok) setMetrics(await metricsRes.json());
@@ -218,6 +224,7 @@ function Dashboard() {
           const profile = await meRes.json();
           setFirstName(profile.first_name || "");
         }
+        if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
       } catch {
         // handled by api client
       } finally {
@@ -493,6 +500,46 @@ function Dashboard() {
                       <span className="metrics-stage-name">{stage}</span>
                     </div>
                   ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {analytics && (
+        <div className="analytics-section">
+          <div className="analytics-panel">
+            <h3 className="metrics-heading">Conversion Funnel</h3>
+            <div className="analytics-cards">
+              <div className="analytics-card">
+                <span className="analytics-card-value">
+                  {analytics.overall_conversion_rate}%
+                </span>
+                <span className="analytics-card-label">Overall</span>
+              </div>
+              {Object.entries(analytics.conversion_funnel).map(
+                ([label, rate]) => (
+                  <div key={label} className="analytics-card">
+                    <span className="analytics-card-value">{rate}%</span>
+                    <span className="analytics-card-label">{label}</span>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          {Object.keys(analytics.avg_days_in_stage).length > 0 && (
+            <div className="analytics-panel">
+              <h3 className="metrics-heading">Avg Time in Stage</h3>
+              <div className="analytics-cards">
+                {Object.entries(analytics.avg_days_in_stage).map(
+                  ([stage, days]) => (
+                    <div key={stage} className="analytics-card">
+                      <span className="analytics-card-value">{days}d</span>
+                      <span className="analytics-card-label">{stage}</span>
+                    </div>
+                  )
+                )}
               </div>
             </div>
           )}

@@ -496,3 +496,9 @@ class DashboardMetricsResponse(BaseModel):
     stage_counts: dict[str, int]
     outcome_counts: dict[str, int]
     response_rate: float
+
+
+class AnalyticsResponse(BaseModel):
+    conversion_funnel: dict[str, float]
+    overall_conversion_rate: float
+    avg_days_in_stage: dict[str, float]
