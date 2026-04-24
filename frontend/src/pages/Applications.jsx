@@ -120,8 +120,14 @@ function ApplicationCard({
   const [newInterview, setNewInterview] = useState({
     round_type: "",
     scheduled_at: "",
+    prep_notes: "",
   });
   const [interviewError, setInterviewError] = useState("");
+  const [expandedInterviewId, setExpandedInterviewId] = useState(null);
+  const [editingPrepId, setEditingPrepId] = useState(null);
+  const [prepNotesDraft, setPrepNotesDraft] = useState("");
+  const [prepNotesSaving, setPrepNotesSaving] = useState(false);
+  const [prepNotesError, setPrepNotesError] = useState("");
 
   const [showDocs, setShowDocs] = useState(false);
   const [docLinks, setDocLinks] = useState([]);
@@ -371,13 +377,14 @@ function ApplicationCard({
         {
           round_type: newInterview.round_type,
           scheduled_at: newInterview.scheduled_at,
+          prep_notes: newInterview.prep_notes || null,
         },
         { caller: "Applications.createInterview", action: "create_interview" }
       );
       if (res.ok) {
         const created = await res.json();
         setInterviews((prev) => [...prev, created]);
-        setNewInterview({ round_type: "", scheduled_at: "" });
+        setNewInterview({ round_type: "", scheduled_at: "", prep_notes: "" });
         setInterviewError("");
         setAddingInterview(false);
         setActivity(null);
@@ -405,6 +412,34 @@ function ApplicationCard({
     } catch {
       // silently fail
     }
+  };
+
+  const savePrepNotes = async (interview_id) => {
+    setPrepNotesSaving(true);
+    setPrepNotesError("");
+    try {
+      const res = await api.put(
+        `/interviews/${interview_id}`,
+        { prep_notes: prepNotesDraft },
+        { caller: "Applications.savePrepNotes", action: "save_prep_notes" }
+      );
+      if (res.ok) {
+        setInterviews((prev) =>
+          prev.map((iv) =>
+            iv.interview_id === interview_id
+              ? { ...iv, prep_notes: prepNotesDraft }
+              : iv
+          )
+        );
+        setEditingPrepId(null);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        setPrepNotesError(errBody.detail || "Failed to save.");
+      }
+    } catch {
+      setPrepNotesError("Failed to save.");
+    }
+    setPrepNotesSaving(false);
   };
 
   const loadDocLinks = async () => {
@@ -810,20 +845,121 @@ function ApplicationCard({
             {interviews.length === 0 ? (
               <p className="followup-empty">No interviews scheduled yet.</p>
             ) : (
-              <ul className="followup-list">
+              <ul className="followup-list" style={{ flexDirection: "column" }}>
                 {interviews.map((iv) => (
-                  <li key={iv.interview_id} className="followup-item">
-                    <span className="followup-desc">📅 {iv.round_type}</span>
-                    <span className="followup-date">
-                      {new Date(iv.scheduled_at).toLocaleString()}
-                    </span>
-                    <button
-                      className="followup-delete-btn"
-                      onClick={() => deleteInterview(iv.interview_id)}
-                      title="Delete"
+                  <li
+                    key={iv.interview_id}
+                    style={{
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                    }}
+                    className="followup-item"
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        width: "100%",
+                      }}
                     >
-                      ✕
-                    </button>
+                      <span className="followup-desc">📅 {iv.round_type}</span>
+                      <span className="followup-date">
+                        {new Date(iv.scheduled_at).toLocaleString()}
+                      </span>
+                      <button
+                        className="app-history-btn"
+                        style={{ marginLeft: "auto", fontSize: "12px" }}
+                        onClick={() =>
+                          setExpandedInterviewId((prev) =>
+                            prev === iv.interview_id ? null : iv.interview_id
+                          )
+                        }
+                      >
+                        Prep Notes{" "}
+                        {expandedInterviewId === iv.interview_id ? "▾" : "▸"}
+                      </button>
+                      <button
+                        className="followup-delete-btn"
+                        onClick={() => deleteInterview(iv.interview_id)}
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {expandedInterviewId === iv.interview_id && (
+                      <div style={{ width: "100%", marginTop: "8px" }}>
+                        {editingPrepId === iv.interview_id ? (
+                          <div className="followup-add-form">
+                            <textarea
+                              className="followup-input"
+                              rows={4}
+                              placeholder="Add prep notes, questions to ask, topics to review…"
+                              value={prepNotesDraft}
+                              onChange={(e) =>
+                                setPrepNotesDraft(e.target.value)
+                              }
+                              style={{ resize: "vertical" }}
+                            />
+                            {prepNotesError && (
+                              <p
+                                style={{
+                                  color: "#ef4444",
+                                  fontSize: "13px",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                {prepNotesError}
+                              </p>
+                            )}
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button
+                                className="app-history-btn"
+                                onClick={() => savePrepNotes(iv.interview_id)}
+                                disabled={prepNotesSaving}
+                              >
+                                {prepNotesSaving ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                className="app-history-btn"
+                                onClick={() => {
+                                  setEditingPrepId(null);
+                                  setPrepNotesError("");
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {iv.prep_notes ? (
+                              <p
+                                className="followup-desc"
+                                style={{ whiteSpace: "pre-wrap" }}
+                              >
+                                {iv.prep_notes}
+                              </p>
+                            ) : (
+                              <p className="followup-empty">
+                                No prep notes yet.
+                              </p>
+                            )}
+                            <button
+                              className="app-history-btn"
+                              style={{ marginTop: "6px" }}
+                              onClick={() => {
+                                setEditingPrepId(iv.interview_id);
+                                setPrepNotesDraft(iv.prep_notes || "");
+                                setPrepNotesError("");
+                              }}
+                            >
+                              {iv.prep_notes ? "Edit Notes" : "+ Add Notes"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -853,6 +989,19 @@ function ApplicationCard({
                     }))
                   }
                 />
+                <textarea
+                  className="followup-input"
+                  rows={3}
+                  placeholder="Prep notes (optional) — topics to review, questions to ask…"
+                  value={newInterview.prep_notes}
+                  onChange={(e) =>
+                    setNewInterview((prev) => ({
+                      ...prev,
+                      prep_notes: e.target.value,
+                    }))
+                  }
+                  style={{ resize: "vertical" }}
+                />
                 {interviewError && (
                   <p
                     style={{
@@ -872,7 +1021,11 @@ function ApplicationCard({
                     className="app-history-btn"
                     onClick={() => {
                       setAddingInterview(false);
-                      setNewInterview({ round_type: "", scheduled_at: "" });
+                      setNewInterview({
+                        round_type: "",
+                        scheduled_at: "",
+                        prep_notes: "",
+                      });
                       setInterviewError("");
                     }}
                   >
