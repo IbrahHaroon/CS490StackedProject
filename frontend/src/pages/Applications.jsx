@@ -132,6 +132,15 @@ function ApplicationCard({
   const [showDocs, setShowDocs] = useState(false);
   const [docLinks, setDocLinks] = useState([]);
   const [docLinksLoading, setDocLinksLoading] = useState(false);
+  const [addingLink, setAddingLink] = useState(false);
+  const [availableDocs, setAvailableDocs] = useState([]);
+  const [newLink, setNewLink] = useState({ document_id: "", role: "resume" });
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [unlinkingId, setUnlinkingId] = useState(null);
+  const [viewingLink, setViewingLink] = useState(null);
+  const [viewingContent, setViewingContent] = useState("");
+  const [viewingLoading, setViewingLoading] = useState(false);
 
   const [showNotes, setShowNotes] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -458,6 +467,106 @@ function ApplicationCard({
       }
     }
     setShowDocs((v) => !v);
+  };
+
+  const handleOpenLinkForm = async () => {
+    setAddingLink(true);
+    setLinkError("");
+    if (availableDocs.length === 0) {
+      const res = await api.get("/documents/me", {
+        caller: "Applications.handleOpenLinkForm",
+        action: "fetch_docs_for_link_picker",
+      });
+      if (res.ok) {
+        const docs = await res.json();
+        setAvailableDocs(
+          docs.filter((d) => !d.is_deleted && d.current_version_id)
+        );
+      }
+    }
+  };
+
+  const handleLinkDoc = async () => {
+    if (!newLink.document_id) {
+      setLinkError("Pick a document first.");
+      return;
+    }
+    const doc = availableDocs.find(
+      (d) => String(d.document_id) === String(newLink.document_id)
+    );
+    if (!doc?.current_version_id) {
+      setLinkError("This document has no saved version yet.");
+      return;
+    }
+    const alreadyLinked = docLinks.some(
+      (l) =>
+        l.document_id === doc.document_id && (l.role || "") === newLink.role
+    );
+    if (alreadyLinked) {
+      setLinkError(
+        "This document is already linked to this job under that role."
+      );
+      return;
+    }
+    setLinkSaving(true);
+    setLinkError("");
+    const res = await api.post(
+      "/documents/links",
+      {
+        job_id: job.job_id,
+        version_id: doc.current_version_id,
+        role: newLink.role,
+      },
+      { caller: "Applications.handleLinkDoc", action: "link_document_to_job" }
+    );
+    setLinkSaving(false);
+    if (!res.ok) {
+      setLinkError(
+        "Failed to link — that document may already be linked under that role."
+      );
+      return;
+    }
+    const refreshed = await api.get(
+      `/documents/links/by-job/${job.job_id}/detailed`,
+      { caller: "Applications.handleLinkDoc", action: "refresh_doc_links" }
+    );
+    if (refreshed.ok) setDocLinks(await refreshed.json());
+    setAddingLink(false);
+    setNewLink({ document_id: "", role: "resume" });
+  };
+
+  const handleViewLinkedDoc = async (link) => {
+    setViewingLink(link);
+    setViewingContent("");
+    setViewingLoading(true);
+    const res = await api.get(
+      `/documents/${link.document_id}/versions/${link.version_id}/content`,
+      {
+        caller: "Applications.handleViewLinkedDoc",
+        action: "view_linked_document_version",
+      }
+    );
+    setViewingLoading(false);
+    if (res.ok) {
+      const data = await res.json();
+      setViewingContent(data.content || "");
+    } else {
+      setViewingContent("(Could not load this document version.)");
+    }
+  };
+
+  const handleUnlinkDoc = async (link) => {
+    const label = link.document_title || `Version #${link.version_id}`;
+    if (!window.confirm(`Unlink "${label}" from this job?`)) return;
+    setUnlinkingId(link.link_id);
+    const res = await api.delete(`/documents/links/${link.link_id}`, {
+      caller: "Applications.handleUnlinkDoc",
+      action: "unlink_document_from_job",
+    });
+    setUnlinkingId(null);
+    if (res.ok) {
+      setDocLinks((prev) => prev.filter((l) => l.link_id !== link.link_id));
+    }
   };
 
   const saveNotes = async () => {
@@ -1077,9 +1186,97 @@ function ApplicationCard({
                     >
                       {(link.role || "—").replace("_", " ")}
                     </span>
+                    <button
+                      className="app-history-btn"
+                      onClick={() => handleViewLinkedDoc(link)}
+                      style={{ padding: "2px 10px", fontSize: "12px" }}
+                      title="View this document"
+                    >
+                      View
+                    </button>
+                    <button
+                      className="followup-delete-btn"
+                      onClick={() => handleUnlinkDoc(link)}
+                      disabled={unlinkingId === link.link_id}
+                      title="Unlink this document"
+                    >
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+            {addingLink ? (
+              <div className="followup-add-form">
+                <select
+                  className="followup-input"
+                  value={newLink.document_id}
+                  onChange={(e) =>
+                    setNewLink((prev) => ({
+                      ...prev,
+                      document_id: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">— Pick a document —</option>
+                  {availableDocs.map((d) => (
+                    <option key={d.document_id} value={d.document_id}>
+                      {d.title} ({d.document_type})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="followup-input"
+                  value={newLink.role}
+                  onChange={(e) =>
+                    setNewLink((prev) => ({ ...prev, role: e.target.value }))
+                  }
+                >
+                  <option value="resume">Resume</option>
+                  <option value="cover_letter">Cover Letter</option>
+                  <option value="transcript">Transcript</option>
+                  <option value="certificate">Certificate</option>
+                  <option value="other">Other</option>
+                </select>
+                {linkError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {linkError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={handleLinkDoc}
+                    disabled={linkSaving}
+                  >
+                    {linkSaving ? "Linking…" : "Link"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setAddingLink(false);
+                      setLinkError("");
+                      setNewLink({ document_id: "", role: "resume" });
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="app-history-btn"
+                onClick={handleOpenLinkForm}
+                style={{ marginTop: "8px" }}
+              >
+                + Link a document
+              </button>
             )}
           </div>
         )}
@@ -1400,6 +1597,63 @@ function ApplicationCard({
               No history yet.
             </p>
           )}
+        </div>
+      )}
+
+      {viewingLink && (
+        <div
+          className="history-overlay"
+          onClick={() => {
+            setViewingLink(null);
+            setViewingContent("");
+          }}
+        >
+          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="history-close-btn"
+              onClick={() => {
+                setViewingLink(null);
+                setViewingContent("");
+              }}
+            >
+              ✕
+            </button>
+            <h2 className="history-modal-title">
+              📄{" "}
+              {viewingLink.document_title ||
+                `Version #${viewingLink.version_id}`}
+              <span
+                style={{
+                  marginLeft: 10,
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                  textTransform: "capitalize",
+                }}
+              >
+                {(viewingLink.role || "—").replace("_", " ")} · v
+                {viewingLink.version_id}
+              </span>
+            </h2>
+            {viewingLoading ? (
+              <p>Loading…</p>
+            ) : (
+              <pre
+                style={{
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  background: "var(--surface-2)",
+                  padding: "1rem",
+                  borderRadius: 8,
+                  maxHeight: "50vh",
+                  overflowY: "auto",
+                  fontSize: "13px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {viewingContent}
+              </pre>
+            )}
+          </div>
         </div>
       )}
     </div>
