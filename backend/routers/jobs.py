@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
+from database.database import get_settings
 from database.models.job import (
     PIPELINE_STAGES,
     create_job,
@@ -18,6 +20,7 @@ from database.models.job import (
 from database.models.job_activity import create_job_activity, get_job_activities
 from database.models.user import User
 from schemas import (
+    CompanyResearchRequest,
     JobActivityResponse,
     JobCreate,
     JobResponse,
@@ -188,3 +191,75 @@ def get_activity(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
     return get_job_activities(session, job_id)
+
+
+@router.post("/{job_id}/research")
+def generate_company_research(
+    job_id: int,
+    body: CompanyResearchRequest,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import openai
+
+    job = get_job(session, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if job.user_id != current_user.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    settings = get_settings()
+    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OpenAI API key is not configured.",
+        )
+
+    job_info = f"Job Title: {job.title}\nCompany: {job.company_name}"
+    if job.location:
+        job_info += f"\nLocation: {job.location}"
+    if job.description:
+        job_info += f"\nJob Description:\n{job.description}"
+
+    user_context = (body.context or "").strip()
+    system_prompt = (
+        "You are a career research assistant. Write comprehensive company research notes "
+        "for a job applicant. Cover: company overview, culture and values, recent news, "
+        "products/services, what interviewers typically look for, and tips to stand out. "
+        "Use plain text with clear section headings."
+    )
+    user_message = f"Generate company research notes for this application:\n\n{job_info}"
+    if user_context:
+        user_message += f"\n\nContext from the applicant:\n{user_context}"
+
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            max_tokens=2048,
+            temperature=0.7,
+        )
+        notes = response.choices[0].message.content.strip()
+    except openai.AuthenticationError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid OpenAI API key.",
+        )
+    except openai.RateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="OpenAI rate limit reached. Try again shortly.",
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI research failed: {e}",
+        )
+
+    updated = update_job(session, job_id, company_research_notes=notes)
+    return {"company_research_notes": updated.company_research_notes}
