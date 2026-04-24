@@ -204,9 +204,13 @@ def generate_company_research(
 
     job = get_job(session, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
     if job.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
     settings = get_settings()
     api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
@@ -229,7 +233,9 @@ def generate_company_research(
         "products/services, what interviewers typically look for, and tips to stand out. "
         "Use plain text with clear section headings."
     )
-    user_message = f"Generate company research notes for this application:\n\n{job_info}"
+    user_message = (
+        f"Generate company research notes for this application:\n\n{job_info}"
+    )
     if user_context:
         user_message += f"\n\nContext from the applicant:\n{user_context}"
 
