@@ -129,9 +129,7 @@ def get_stage_analytics(session: Session, user_id: int) -> dict:
         conversion_funnel[f"{from_s}→{to_s}"] = rate
 
     # Overall conversion: jobs ever in Offer or Accepted / total
-    ever_converted = len(
-        entered.get("Offer", set()) | entered.get("Accepted", set())
-    )
+    ever_converted = len(entered.get("Offer", set()) | entered.get("Accepted", set()))
     overall_conversion_rate = (
         round(ever_converted / total_jobs * 100, 1) if total_jobs else 0.0
     )
