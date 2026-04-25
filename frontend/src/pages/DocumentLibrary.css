@@ -11,14 +11,14 @@
 .doclibrary h2 {
   color: var(--text-strong);
   font-size: 1.1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.35rem;
 }
 
 .doclibrary-upload {
   background-color: var(--surface);
   border: 1px solid var(--border-light);
   padding: 1.5rem;
-  border-radius: 8px;
+  border-radius: 10px;
   max-width: 480px;
   margin-bottom: 2.5rem;
 }
@@ -36,8 +36,8 @@
 
 .doclibrary-upload-form select,
 .doclibrary-upload-form input[type="file"] {
-  padding: 0.5rem;
-  border-radius: 4px;
+  padding: 0.55rem;
+  border-radius: 6px;
   border: 1px solid var(--border);
   background-color: var(--surface-2);
   color: var(--text);
@@ -50,9 +50,10 @@
   background-color: #4f8ef7;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 1rem;
   cursor: pointer;
+  transition: 0.2s ease;
 }
 
 .doclibrary-upload-btn:disabled {
@@ -76,6 +77,78 @@
 
 .doclibrary-empty {
   color: var(--text-muted);
+  font-style: italic;
+}
+
+.doclibrary-list {
+  background-color: var(--surface);
+  border: 1px solid var(--border-light);
+  padding: 1.5rem;
+  border-radius: 10px;
+}
+
+.doclibrary-list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.doclibrary-helper {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.doclibrary-count {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.doclibrary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.doclibrary-controls select,
+.doclibrary-search {
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.doclibrary-search {
+  min-width: 240px;
+  flex: 1;
+}
+
+.doclibrary-search::placeholder {
+  color: var(--text-muted);
+}
+
+.doclibrary-clear-btn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.doclibrary-clear-btn:hover {
+  border-color: var(--text-muted);
+  color: var(--text-strong);
 }
 
 .doclibrary-table {
@@ -87,9 +160,10 @@
 .doclibrary-table th,
 .doclibrary-table td {
   text-align: left;
-  padding: 0.6rem 1rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-light);
   color: var(--text);
+  vertical-align: middle;
 }
 
 .doclibrary-table th {
@@ -101,4 +175,30 @@
   color: #4caf50;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.doclibrary-archived {
+  color: #f59e0b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.doclibrary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.doclibrary-tag {
+  background-color: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+}
+
+.doclibrary-muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
