@@ -420,7 +420,7 @@ def read_version_content(
             status_code=404, detail="Version not found for this document"
         )
     if version.content:
-        return {"content": version.content, "format": "text"}
+        return {"content": version.content, "format": "text", "editable": True}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
             return _read_file(
@@ -479,7 +479,7 @@ def read_current_content(
     if version is None:
         raise HTTPException(status_code=404, detail="Current version missing")
     if version.content:
-        return {"content": version.content, "format": "text"}
+        return {"content": version.content, "format": "text", "editable": True}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
             return _read_file(
