@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Document, Page, pdfjs } from "react-pdf";
-import { api } from "../lib/apiClient";
-import { logAction } from "../lib/actionLogger";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./DocumentLibrary.css";
+import { Document, Page, pdfjs } from "react-pdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -17,8 +14,46 @@ const DOCUMENT_TYPES = [
   "Certificate",
   "Other",
 ];
+const STATUS_FILTERS = ["All", "In System", "Archived"];
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest updated" },
+  { value: "oldest", label: "Oldest updated" },
+  { value: "name", label: "Name A-Z" },
+  { value: "type", label: "Type A-Z" },
+];
 
-const STATUS_OPTIONS = ["Draft", "Final", "In Review", "Archived"];
+function getDocumentName(doc) {
+  return (
+    doc.title ||
+    doc.name ||
+    doc.file_name ||
+    doc.filename ||
+    doc.document_location?.split("/").pop() ||
+    "Untitled Document"
+  );
+}
+
+function getDocumentStatus(doc) {
+  if (doc.archived || doc.is_archived) return "Archived";
+  return doc.status || "In System";
+}
+
+function getDocumentUpdatedDate(doc) {
+  return (
+    doc.updated_at || doc.modified_at || doc.created_at || doc.uploaded_at || ""
+  );
+}
+
+function getDocumentTags(doc) {
+  if (Array.isArray(doc.tags)) return doc.tags;
+  if (typeof doc.tags === "string") {
+    return doc.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
 
 function DocumentLibrary() {
   const navigate = useNavigate();
@@ -32,57 +67,13 @@ function DocumentLibrary() {
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
 
-  const [viewingDoc, setViewingDoc] = useState(null);
-  const [viewContent, setViewContent] = useState("");
-  const [viewFormat, setViewFormat] = useState("");
-  const [viewBinaryData, setViewBinaryData] = useState(null);
-  const [pdfNumPages, setPdfNumPages] = useState(0);
-
-  const [editingDoc, setEditingDoc] = useState(null);
-  const [editContent, setEditContent] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [editError, setEditError] = useState("");
-
-  const [genResumeOpen, setGenResumeOpen] = useState(false);
-  const [genResumeJobId, setGenResumeJobId] = useState("");
-  const [genResumeInstructions, setGenResumeInstructions] = useState("");
-  const [genResumeLoading, setGenResumeLoading] = useState(false);
-  const [genResumeContent, setGenResumeContent] = useState("");
-  const [genResumeDocName, setGenResumeDocName] = useState("");
-  const [genResumeError, setGenResumeError] = useState("");
-
-  const [genCoverOpen, setGenCoverOpen] = useState(false);
-  const [genCoverJobId, setGenCoverJobId] = useState("");
-  const [genCoverInstructions, setGenCoverInstructions] = useState("");
-  const [genCoverLoading, setGenCoverLoading] = useState(false);
-  const [genCoverContent, setGenCoverContent] = useState("");
-  const [genCoverDocName, setGenCoverDocName] = useState("");
-  const [genCoverError, setGenCoverError] = useState("");
-
-  // Filtering / sorting (S3-006)
-  const [filterType, setFilterType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterIncludeArchived, setFilterIncludeArchived] = useState(false);
-  const [sortBy, setSortBy] = useState("updated_desc");
-
-  const [jobs, setJobs] = useState([]);
-  const [docJobMap, setDocJobMap] = useState({});
-  const [deletingId, setDeletingId] = useState(null);
-  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
-  const [renameDoc, setRenameDoc] = useState(null);
-  const [renamingId, setRenamingId] = useState(null);
-  const [newTitle, setNewTitle] = useState("");
-
-  // S3-003: version history modal
-  const [historyDoc, setHistoryDoc] = useState(null);
-  const [versions, setVersions] = useState([]);
-  const [versionsLoading, setVersionsLoading] = useState(false);
-  const [restoringVersionId, setRestoringVersionId] = useState(null);
-  const [viewingVersion, setViewingVersion] = useState(null);
-  const [versionContent, setVersionContent] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [tagFilter, setTagFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
 
   const fileInputRef = useRef(null);
-
   const token = localStorage.getItem("token");
 
   const fetchDocuments = async () => {
@@ -90,29 +81,18 @@ function DocumentLibrary() {
       setLoadError("You must be signed in to view documents.");
       return;
     }
-    try {
-      const params = new URLSearchParams();
-      if (filterIncludeArchived) params.set("include_archived", "true");
-      if (filterType) params.set("document_type", filterType);
-      if (filterStatus) params.set("status_filter", filterStatus);
-      const url =
-        "/documents/me" + (params.toString() ? `?${params.toString()}` : "");
-      const res = await api.get(url, {
-        caller: "DocumentLibrary.fetchDocuments",
-        action: "load_documents",
-      });
-      if (!res.ok) {
-        setLoadError("Failed to load documents. Please sign in again.");
-        return;
-      }
-      const docs = await res.json();
-      logAction("DocumentLibrary.fetchDocuments", "documents_loaded", {
-        count: docs.length,
-      });
-      setDocuments(docs);
-    } catch (err) {
-      setLoadError("Failed to load documents.");
+
+    const res = await fetch(`${API}/documents/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      setLoadError("Failed to load documents. Please sign in again.");
+      return;
     }
+
+    setDocuments(await res.json());
+    setLoadError("");
   };
 
   useEffect(() => {
@@ -164,6 +144,58 @@ function DocumentLibrary() {
     return 0;
   });
 
+  const availableTags = useMemo(() => {
+    const tags = documents.flatMap((doc) => getDocumentTags(doc));
+    return ["All", ...new Set(tags)];
+  }, [documents]);
+
+  const filteredDocuments = useMemo(() => {
+    const query = search.toLowerCase().trim();
+
+    return [...documents]
+      .filter((doc) => {
+        const name = getDocumentName(doc);
+        const status = getDocumentStatus(doc);
+        const tags = getDocumentTags(doc);
+        const updatedDate = getDocumentUpdatedDate(doc);
+
+        const matchesSearch =
+          query === "" ||
+          name.toLowerCase().includes(query) ||
+          doc.document_type?.toLowerCase().includes(query) ||
+          status.toLowerCase().includes(query) ||
+          tags.some((tag) => tag.toLowerCase().includes(query));
+
+        const matchesType =
+          typeFilter === "All" || doc.document_type === typeFilter;
+        const matchesStatus = statusFilter === "All" || status === statusFilter;
+        const matchesTag = tagFilter === "All" || tags.includes(tagFilter);
+
+        return matchesSearch && matchesType && matchesStatus && matchesTag;
+      })
+      .sort((a, b) => {
+        const nameA = getDocumentName(a).toLowerCase();
+        const nameB = getDocumentName(b).toLowerCase();
+        const typeA = a.document_type || "";
+        const typeB = b.document_type || "";
+        const dateA = new Date(getDocumentUpdatedDate(a) || 0);
+        const dateB = new Date(getDocumentUpdatedDate(b) || 0);
+
+        if (sortBy === "oldest") return dateA - dateB;
+        if (sortBy === "name") return nameA.localeCompare(nameB);
+        if (sortBy === "type") return typeA.localeCompare(typeB);
+        return dateB - dateA;
+      });
+  }, [documents, search, typeFilter, statusFilter, tagFilter, sortBy]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setTypeFilter("All");
+    setStatusFilter("All");
+    setTagFilter("All");
+    setSortBy("newest");
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
     setUploadError("");
@@ -173,6 +205,7 @@ function DocumentLibrary() {
       setUploadError("Please select a file.");
       return;
     }
+
     if (!token) {
       setUploadError("You must be signed in to upload.");
       return;
@@ -185,10 +218,13 @@ function DocumentLibrary() {
     form.append("status_value", docStatus);
 
     setUploading(true);
-    const res = await api.post("/documents/upload", form, {
-      caller: "DocumentLibrary.handleUpload",
-      action: "upload_document",
+
+    const res = await fetch(`${API}/documents/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
     });
+
     setUploading(false);
 
     if (!res.ok) {
@@ -199,8 +235,9 @@ function DocumentLibrary() {
 
     setUploadSuccess("File uploaded successfully.");
     setFile(null);
-    setDocTitle("");
+
     if (fileInputRef.current) fileInputRef.current.value = "";
+
     fetchDocuments();
   };
 
@@ -1159,6 +1196,7 @@ function DocumentLibrary() {
 
       <section className="doclibrary-upload">
         <h2>Upload Document</h2>
+
         <form onSubmit={handleUpload} className="doclibrary-upload-form">
           <label>Document Type</label>
           <select value={docType} onChange={(e) => setDocType(e.target.value)}>
@@ -1213,203 +1251,143 @@ function DocumentLibrary() {
       </section>
 
       <section className="doclibrary-list">
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-          }}
-        >
-          <h2>Your Documents</h2>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              title="Filter by type"
-            >
-              <option value="">All types</option>
-              {DOCUMENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              title="Filter by status"
-            >
-              <option value="">All statuses</option>
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              title="Sort"
-            >
-              <option value="updated_desc">Newest first</option>
-              <option value="updated_asc">Oldest first</option>
-              <option value="title_asc">Title A→Z</option>
-              <option value="title_desc">Title Z→A</option>
-            </select>
-            <label
-              style={{ display: "flex", alignItems: "center", gap: "4px" }}
-            >
-              <input
-                type="checkbox"
-                checked={filterIncludeArchived}
-                onChange={(e) => setFilterIncludeArchived(e.target.checked)}
-              />
-              Show archived
-            </label>
+        <div className="doclibrary-list-header">
+          <div>
+            <h2>Your Documents</h2>
+            <p className="doclibrary-helper">
+              Search, filter, and sort your uploaded documents.
+            </p>
           </div>
+
+          <span className="doclibrary-count">
+            {filteredDocuments.length} of {documents.length} shown
+          </span>
         </div>
+
+        <div className="doclibrary-controls">
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="doclibrary-search"
+          />
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="All">All Types</option>
+            {DOCUMENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            {STATUS_FILTERS.map((status) => (
+              <option key={status} value={status}>
+                {status === "All" ? "All Statuses" : status}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+          >
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag === "All" ? "All Tags" : tag}
+              </option>
+            ))}
+          </select>
+
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                Sort: {option.label}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            className="doclibrary-clear-btn"
+            onClick={clearFilters}
+          >
+            Clear
+          </button>
+        </div>
+
         {loadError && <p className="doclibrary-error">{loadError}</p>}
-        {!loadError && sortedDocuments.length === 0 && (
-          <p className="doclibrary-empty">No documents.</p>
+
+        {!loadError && documents.length === 0 && (
+          <p className="doclibrary-empty">No documents uploaded yet.</p>
         )}
-        {sortedDocuments.length > 0 && (
+
+        {!loadError &&
+          documents.length > 0 &&
+          filteredDocuments.length === 0 && (
+            <p className="doclibrary-empty">No documents match your filters.</p>
+          )}
+
+        {filteredDocuments.length > 0 && (
           <table className="doclibrary-table">
             <thead>
               <tr>
                 <th>Title</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Tags</th>
                 <th>Updated</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedDocuments.map((doc) => {
-                const linkedJobs = docJobMap[doc.document_id] || [];
+              {filteredDocuments.map((doc) => {
+                const tags = getDocumentTags(doc);
+                const updatedDate = getDocumentUpdatedDate(doc);
+
                 return (
-                  <tr
-                    key={doc.document_id}
-                    style={doc.is_deleted ? { opacity: 0.5 } : {}}
-                  >
+                  <tr key={doc.doc_id}>
+                    <td>{getDocumentName(doc)}</td>
+                    <td>{doc.document_type || "Other"}</td>
                     <td>
-                      <div>{doc.title}</div>
-                      {linkedJobs.length > 0 && (
-                        <div
-                          style={{
-                            marginTop: "4px",
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: "4px",
-                          }}
-                        >
-                          {linkedJobs.map((lj) => (
-                            <button
-                              key={lj.job_id}
-                              onClick={() =>
-                                navigate(`/applications?job=${lj.job_id}`)
-                              }
-                              title={`Go to ${lj.job_title} @ ${lj.company_name}`}
-                              style={{
-                                background: "none",
-                                border: "1px solid #4f8ef7",
-                                borderRadius: "4px",
-                                color: "#4f8ef7",
-                                cursor: "pointer",
-                                fontSize: "0.72rem",
-                                padding: "1px 6px",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              → {lj.job_title} @ {lj.company_name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td>{doc.document_type}</td>
-                    <td>
-                      <select
-                        value={doc.status}
-                        onChange={(e) =>
-                          handleStatusChange(doc, e.target.value)
+                      <span
+                        className={
+                          getDocumentStatus(doc) === "Archived"
+                            ? "doclibrary-archived"
+                            : "doclibrary-confirmed"
                         }
-                        style={{ padding: "2px 4px" }}
                       >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        {getDocumentStatus(doc) === "Archived"
+                          ? "Archived"
+                          : "✓ In System"}
+                      </span>
                     </td>
                     <td>
-                      {doc.updated_at
-                        ? new Date(doc.updated_at).toLocaleDateString()
-                        : "—"}
-                    </td>
-                    <td>
-                      <div className="doclibrary-actions">
-                        <button
-                          className="doclibrary-action-btn doclibrary-view-btn"
-                          onClick={() => handleView(doc)}
-                          disabled={deletingId !== null}
-                          title="View Document"
-                        >
-                          View
-                        </button>
-                        <button
-                          className="doclibrary-action-btn doclibrary-edit-btn"
-                          onClick={() => handleEdit(doc)}
-                          disabled={deletingId !== null}
-                          title="Edit content (creates a new version)"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="doclibrary-action-btn"
-                          onClick={() => handleRenameClick(doc)}
-                          disabled={deletingId !== null}
-                          title="Rename"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          className="doclibrary-action-btn"
-                          onClick={() => handleDuplicate(doc)}
-                          disabled={deletingId !== null}
-                          title="Duplicate"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          className="doclibrary-action-btn"
-                          onClick={() => handleArchive(doc)}
-                          disabled={deletingId !== null}
-                          title={doc.is_deleted ? "Restore" : "Archive"}
-                        >
-                          {doc.is_deleted ? "Restore" : "Archive"}
-                        </button>
-                        <button
-                          className="doclibrary-action-btn"
-                          onClick={() => handleOpenHistory(doc)}
-                          disabled={deletingId !== null}
-                          title="View version history"
-                        >
-                          History
-                        </button>
-                        <button
-                          className="doclibrary-action-btn doclibrary-delete-btn"
-                          onClick={() => handleDeleteClick(doc)}
-                          disabled={deletingId === doc.document_id}
-                          title="Permanently delete"
-                        >
-                          {deletingId === doc.document_id
-                            ? "Deleting…"
-                            : "Delete"}
-                        </button>
+                      <div className="doclibrary-tags">
+                        {tags.length > 0 ? (
+                          tags.map((tag) => (
+                            <span key={tag} className="doclibrary-tag">
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="doclibrary-muted">No tags</span>
+                        )}
                       </div>
+                    </td>
+                    <td>
+                      {updatedDate ? (
+                        new Date(updatedDate).toLocaleDateString()
+                      ) : (
+                        <span className="doclibrary-muted">Unknown</span>
+                      )}
                     </td>
                   </tr>
                 );
