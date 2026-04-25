@@ -63,9 +63,9 @@ function DocumentLibrary() {
 
   const fetchDocuments = async () => {
     if (!token) {
-      setLoadError("You must be signed in to view documents.");
-      return;
-    }
+  setLoadError("You must be signed in to view documents.");
+  return;
+}
 
     const res = await fetch(`${API}/documents/me`, {
       headers: { Authorization: `Bearer ${token}` },
