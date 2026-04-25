@@ -1,7 +1,6 @@
 """Tests for POST /profile/, GET /profile/{id}, and PUT /profile/{id}."""
 
 PROFILE_URL = "/profile"
-ADDRESS_PAYLOAD = {"address": "123 Main St", "state": "TX", "zip_code": 73301}
 
 
 def _profile_payload(user_id, **overrides):
@@ -10,7 +9,9 @@ def _profile_payload(user_id, **overrides):
         "first_name": "Jane",
         "last_name": "Doe",
         "dob": "1990-06-15",
-        "address": ADDRESS_PAYLOAD,
+        "address_line": "123 Main St",
+        "state": "TX",
+        "zip_code": "73301",
     }
     base.update(overrides)
     return base

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -20,10 +20,12 @@ class CareerPreferences(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.user_id"), nullable=False, unique=True
     )
-    target_roles: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    location_preferences: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    work_mode: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    salary_preference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_roles: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    location_preferences: Mapped[Optional[str]] = mapped_column(
+        String(500), nullable=True
+    )
+    work_mode: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    salary_preference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="career_preferences")

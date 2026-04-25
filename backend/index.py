@@ -9,48 +9,64 @@ from fastapi.middleware.cors import CORSMiddleware
 # `schemas` are always importable regardless of where the process is launched from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# from database import Base, engine
-from routers import (
+from logging_config import setup_logging  # noqa: E402, I001
+from middleware.error_handler import register_exception_handlers  # noqa: E402
+from middleware.request_logger import RequestLoggingMiddleware  # noqa: E402
+from routers import (  # noqa: E402
     auth,
-    company,
+    career_preferences,
     documents,
     education,
     experience,
+    follow_ups,
+    frontend_logs,
+    interviews,
     jobs,
+    jobs_sorter,
+    library,
     profile,
-    recruiter,
+    skills,
     users,
 )
+
+setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create tables if they don't exist
-    # Base.metadata.create_all(bind=engine)
     yield
-    # Shutdown logic goes here if needed
 
 
-app = FastAPI(title="ATS API", lifespan=lifespan)
+app = FastAPI(title="Candidate Job Tracker API", lifespan=lifespan)
 
+register_exception_handlers(app)
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Include Routers
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
+app.include_router(jobs_sorter.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(interviews.router, prefix="", tags=["Interviews"])
 app.include_router(profile.router, prefix="/profile", tags=["Profile"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(education.router, prefix="/education", tags=["Education"])
 app.include_router(documents.router, prefix="/documents", tags=["Documents"])
-app.include_router(company.router, prefix="/company", tags=["Company"])
-app.include_router(recruiter.router, prefix="/recruiter", tags=["Recruiter"])
 app.include_router(experience.router, prefix="/experience", tags=["Experience"])
+app.include_router(skills.router, prefix="/skills", tags=["Skills"])
+app.include_router(
+    career_preferences.router, prefix="/career-preferences", tags=["Career Preferences"]
+)
+app.include_router(follow_ups.router, prefix="", tags=["Follow-Ups"])
+app.include_router(library.router, prefix="/library", tags=["Library"])
+app.include_router(frontend_logs.router, prefix="/logs", tags=["Logs"])
 
 
 @app.get("/")

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../lib/apiClient";
+import { logAction } from "../lib/actionLogger";
 import "./SignIn.css";
-
-const API = "http://localhost:8000";
 
 const EMPTY_SIGNUP = {
   firstName: "",
@@ -32,13 +32,15 @@ function SignIn() {
     setError("");
     setSuccess("");
 
+    logAction("form_submit", { component: "SignIn", action: mode });
+
     if (mode === "signup") {
       // 1. Register
-      const regRes = await fetch(`${API}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const regRes = await api.post(
+        "/auth/register",
+        { email, password },
+        { caller: "SignIn.register", action: "user_register" }
+      );
 
       if (!regRes.ok) {
         const err = await regRes.json().catch(() => ({}));
@@ -52,33 +54,28 @@ function SignIn() {
       const form = new URLSearchParams();
       form.append("username", email);
       form.append("password", password);
-      const loginRes = await fetch(`${API}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
+      const loginRes = await api.post("/auth/login", form, {
+        caller: "SignIn.loginAfterRegister",
+        action: "user_login",
       });
       const loginData = await loginRes.json();
       const token = loginData.access_token;
 
-      // 3. Create profile
-      const profileRes = await fetch(`${API}/profile/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      // 3. Create profile (v2 shape — address fields inlined)
+      localStorage.setItem("token", token);
+      const profileRes = await api.post(
+        "/profile/",
+        {
           user_id: newUser.user_id,
           first_name: signup.firstName,
           last_name: signup.lastName,
           dob: signup.dob,
-          address: {
-            address: signup.address,
-            state: signup.state,
-            zip_code: parseInt(signup.zipCode, 10),
-          },
-        }),
-      });
+          address_line: signup.address,
+          state: signup.state,
+          zip_code: signup.zipCode,
+        },
+        { caller: "SignIn.createProfile", action: "create_profile" }
+      );
 
       if (!profileRes.ok) {
         const err = await profileRes.json().catch(() => ({}));
@@ -87,7 +84,6 @@ function SignIn() {
       }
 
       setSuccess("Account created! Signing you in…");
-      localStorage.setItem("token", token);
       navigate("/");
       return;
     }
@@ -97,10 +93,9 @@ function SignIn() {
     form.append("username", email);
     form.append("password", password);
 
-    const res = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: form.toString(),
+    const res = await api.post("/auth/login", form, {
+      caller: "SignIn.login",
+      action: "user_login",
     });
 
     if (!res.ok) {
@@ -175,7 +170,7 @@ function SignIn() {
               />
               <label>Zip Code</label>
               <input
-                type="number"
+                type="text"
                 name="zipCode"
                 value={signup.zipCode}
                 onChange={handleSignupField}
@@ -206,7 +201,9 @@ function SignIn() {
           </button>
         </form>
         <p className="signin-switch">
-          {mode === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
+          {mode === "signin"
+            ? "Don't have an account?"
+            : "Already have an account?"}{" "}
           <button className="signin-switch-btn" onClick={switchMode}>
             {mode === "signin" ? "Sign Up" : "Sign In"}
           </button>

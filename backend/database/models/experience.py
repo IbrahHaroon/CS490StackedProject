@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Date, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -21,9 +21,10 @@ class Experience(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.user_id"), nullable=False)
     company: Mapped[str] = mapped_column(String(255), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
@@ -44,12 +45,14 @@ def create_experience(
     end_date: date | None = None,
     description: str | None = None,
     sort_order: int = 0,
+    location: str | None = None,
 ) -> "Experience":
     """Create a new Experience row and return the persisted object."""
     experience = Experience(
         user_id=user_id,
         company=company,
         title=title,
+        location=location,
         start_date=start_date,
         end_date=end_date,
         description=description,
@@ -90,6 +93,7 @@ def update_experience(
     clear_end_date: bool = False,
     description: str | None = None,
     sort_order: int | None = None,
+    location: str | None = None,
 ) -> "Experience | None":
     """Update mutable fields on an existing experience. Returns None if not found.
 
@@ -102,6 +106,8 @@ def update_experience(
         experience.company = company
     if title is not None:
         experience.title = title
+    if location is not None:
+        experience.location = location
     if start_date is not None:
         experience.start_date = start_date
     if clear_end_date:

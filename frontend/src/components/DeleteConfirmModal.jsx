@@ -15,10 +15,18 @@ export default function DeleteConfirmModal({
         <p style={styles.message}>{message}</p>
 
         <div style={styles.actions}>
-          <button style={styles.cancelBtn} onClick={onCancel} disabled={isDeleting}>
+          <button
+            style={styles.cancelBtn}
+            onClick={onCancel}
+            disabled={isDeleting}
+          >
             Cancel
           </button>
-          <button style={styles.deleteBtn} onClick={onConfirm} disabled={isDeleting}>
+          <button
+            style={styles.deleteBtn}
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
             {isDeleting ? "Deleting..." : "Delete"}
           </button>
         </div>

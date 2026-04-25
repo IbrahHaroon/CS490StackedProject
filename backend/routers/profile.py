@@ -39,19 +39,20 @@ def create_profile_endpoint(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot create profile for another user",
         )
-    profile = create_profile(
+    return create_profile(
         session,
         user_id=body.user_id,
         first_name=body.first_name,
         last_name=body.last_name,
         dob=body.dob,
-        address=body.address.address,
-        state=body.address.state,
-        zip_code=body.address.zip_code,
         phone_number=body.phone_number,
         summary=body.summary,
+        address_line=body.address_line,
+        city=body.city,
+        state=body.state,
+        zip_code=body.zip_code,
+        country=body.country,
     )
-    return profile
 
 
 @router.get("/{profile_id}", response_model=ProfileResponse)
@@ -89,16 +90,21 @@ def update_profile_endpoint(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
-    if body.first_name is not None:
-        profile.first_name = body.first_name
-    if body.last_name is not None:
-        profile.last_name = body.last_name
-    if body.dob is not None:
-        profile.dob = body.dob
-    if body.phone_number is not None:
-        profile.phone_number = body.phone_number
-    if body.summary is not None:
-        profile.summary = body.summary
+    for field in (
+        "first_name",
+        "last_name",
+        "dob",
+        "phone_number",
+        "summary",
+        "address_line",
+        "city",
+        "state",
+        "zip_code",
+        "country",
+    ):
+        value = getattr(body, field)
+        if value is not None:
+            setattr(profile, field, value)
 
     update_profile(session, profile)
     return get_profile(session, profile_id)

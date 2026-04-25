@@ -3,12 +3,14 @@ Tests for the Skills model and its CRUD helper functions.
 Covers S2-018 (Skills Section CRUD).
 """
 
-from database.models.skills import (
+from database.models.skill import (
     create_skill,
     delete_skill,
     get_skill,
-    get_skills_by_user,
     update_skill,
+)
+from database.models.skill import (
+    get_skills_for_user as get_skills_by_user,
 )
 from database.models.user import create_user
 

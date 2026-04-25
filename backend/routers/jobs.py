@@ -1,244 +1,271 @@
+from __future__ import annotations
+
+import os
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 from database.auth import get_current_user
-from database.models.applied_jobs import (
+from database.database import get_settings
+from database.models.job import (
     PIPELINE_STAGES,
-    create_applied_jobs,
-    delete_applied_job,
-    get_all_applied_jobs,
-    get_applied_jobs,
-    update_applied_job,
+    create_job,
+    delete_job,
+    get_job,
+    get_jobs_for_user,
+    update_job,
 )
 from database.models.job_activity import create_job_activity, get_job_activities
-from database.models.position import (
-    LOCATION_TYPES,
-    create_position,
-    get_all_positions,
-    get_position,
-    update_position,
-)
 from database.models.user import User
 from schemas import (
-    ApplicationCreate,
-    ApplicationResponse,
-    ApplicationUpdate,
+    CompanyResearchRequest,
     JobActivityResponse,
-    PositionCreate,
-    PositionResponse,
-    PositionUpdate,
-    PositionWithCompanyResponse,
+    JobCreate,
+    JobResponse,
+    JobUpdate,
 )
 
 router = APIRouter()
 
 
 # --------------------------------------------------------------------------- #
-#  Positions                                                                    #
+#  Job CRUD (scoped to the authenticated user)                                  #
 # --------------------------------------------------------------------------- #
 
 
-@router.get("/positions/", response_model=list[PositionWithCompanyResponse])
-def read_all_positions(
-    location_type: str | None = None,
-    session: Session = Depends(get_db),
-):
-    if location_type is not None and location_type not in LOCATION_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid location_type. Must be one of: {LOCATION_TYPES}",
-        )
-    positions = get_all_positions(session)
-    if location_type is not None:
-        positions = [p for p in positions if p.location_type == location_type]
-    result = []
-    for p in positions:
-        result.append(
-            PositionWithCompanyResponse(
-                position_id=p.position_id,
-                company_id=p.company_id,
-                company_name=p.company.name if p.company else "Unknown",
-                title=p.title,
-                listing_date=p.listing_date,
-                salary=p.salary,
-                education_req=p.education_req,
-                experience_req=p.experience_req,
-                description=p.description,
-                location_type=p.location_type,
-                location=p.location,
-            )
-        )
-    return result
-
-
-@router.post(
-    "/positions/", response_model=PositionResponse, status_code=status.HTTP_201_CREATED
-)
-def create_position_endpoint(body: PositionCreate, session: Session = Depends(get_db)):
-    return create_position(
-        session,
-        company_id=body.company_id,
-        title=body.title,
-        salary=body.salary,
-        education_req=body.education_req,
-        experience_req=body.experience_req,
-        description=body.description,
-        listing_date=body.listing_date,
-        location=body.location,
-        location_type=body.location_type,
-    )
-
-
-@router.get("/positions/{position_id}", response_model=PositionResponse)
-def read_position(position_id: int, session: Session = Depends(get_db)):
-    position = get_position(session, position_id)
-    if not position:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Position not found"
-        )
-    return position
-
-
-@router.put("/positions/{position_id}", response_model=PositionResponse)
-def update_position_endpoint(
-    position_id: int,
-    body: PositionUpdate,
-    session: Session = Depends(get_db),
-):
-    position = get_position(session, position_id)
-    if not position:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Position not found"
-        )
-    if body.company_id is not None:
-        position.company_id = body.company_id
-    if body.title is not None:
-        position.title = body.title
-    if body.listing_date is not None:
-        position.listing_date = body.listing_date
-    if body.salary is not None:
-        position.salary = body.salary
-    if body.education_req is not None:
-        position.education_req = body.education_req
-    if body.experience_req is not None:
-        position.experience_req = body.experience_req
-    if body.description is not None:
-        position.description = body.description
-    if body.location_type is not None:
-        position.location_type = body.location_type
-    if body.location is not None:
-        position.location = body.location
-    if not update_position(session, position):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update position",
-        )
-    return get_position(session, position_id)
-
-
-# --------------------------------------------------------------------------- #
-#  Applications                                                                 #
-# --------------------------------------------------------------------------- #
-
-
-@router.get("/dashboard", response_model=list[ApplicationResponse])
+@router.get("/dashboard", response_model=list[JobResponse])
 def get_dashboard(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return all job applications for the currently authenticated user."""
-    return list(get_all_applied_jobs(session, current_user.user_id))
+    """Return all jobs for the currently authenticated user."""
+    return get_jobs_for_user(session, current_user.user_id)
 
 
-@router.get("/applications/{user_id}", response_model=list[ApplicationResponse])
-def read_applications(user_id: int, session: Session = Depends(get_db)):
-    return list(get_all_applied_jobs(session, user_id))
-
-
-@router.post(
-    "/applications/",
-    response_model=ApplicationResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def apply_for_job(body: ApplicationCreate, session: Session = Depends(get_db)):
-    job = create_applied_jobs(
-        session, body.user_id, body.position_id, body.years_of_experience
-    )
-    create_job_activity(session, job.job_id, "Interested")
-    return job
-
-
-@router.put("/applications/{job_id}", response_model=ApplicationResponse)
-def update_application(
-    job_id: int,
-    body: ApplicationUpdate,
+@router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
+def create_job_endpoint(
+    body: JobCreate,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    job = get_applied_jobs(session, job_id)
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
-        )
-    if job.user_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
-    if (
-        body.application_status is not None
-        and body.application_status not in PIPELINE_STAGES
-    ):
+    if body.stage not in PIPELINE_STAGES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid stage. Must be one of: {PIPELINE_STAGES}",
         )
-    if body.application_status is not None:
-        create_job_activity(session, job_id, body.application_status)
-    updated = update_applied_job(
+
+    # Default application_date to today when the user is creating an Applied+ stage
+    application_date = body.application_date
+    if application_date is None and body.stage in (
+        "Applied",
+        "Interview",
+        "Offer",
+        "Rejected",
+        "Accepted",
+        "Withdrawn",
+    ):
+        application_date = date.today()
+
+    job = create_job(
         session,
-        job_id,
-        application_status=body.application_status,
+        user_id=current_user.user_id,
+        title=body.title,
+        company_name=body.company_name,
+        location=body.location,
+        source_url=body.source_url,
+        description=body.description,
+        stage=body.stage,
+        application_date=application_date,
+        deadline=body.deadline,
+        priority=body.priority,
+        salary=body.salary,
         years_of_experience=body.years_of_experience,
+        notes=body.notes,
     )
-    return updated
+    create_job_activity(session, job.job_id, to_stage=body.stage, notes="created")
+    return job
 
 
-@router.delete("/applications/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_application(
+@router.get("/{job_id}", response_model=JobResponse)
+def read_job(
     job_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    job = get_applied_jobs(session, job_id)
+    job = get_job(session, job_id)
     if not job:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )
     if job.user_id != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    # Record withdrawal in history before deleting (delete_applied_job will
-    # then purge job_activity rows to satisfy the FK constraint)
-    create_job_activity(session, job_id, "Withdrawn")
-    delete_applied_job(session, job_id)
+    return job
 
 
-@router.get("/applications/{job_id}/activity", response_model=list[JobActivityResponse])
-def get_application_activity(
+@router.put("/{job_id}", response_model=JobResponse)
+def update_job_endpoint(
+    job_id: int,
+    body: JobUpdate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = get_job(session, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
+    if job.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+    if body.stage is not None and body.stage not in PIPELINE_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid stage. Must be one of: {PIPELINE_STAGES}",
+        )
+
+    previous_stage = job.stage
+    updated = update_job(
+        session,
+        job_id,
+        title=body.title,
+        company_name=body.company_name,
+        location=body.location,
+        source_url=body.source_url,
+        description=body.description,
+        stage=body.stage,
+        application_date=body.application_date,
+        deadline=body.deadline,
+        priority=body.priority,
+        salary=body.salary,
+        years_of_experience=body.years_of_experience,
+        notes=body.notes,
+        company_research_notes=body.company_research_notes,
+        outcome_notes=body.outcome_notes,
+    )
+    if body.stage is not None and body.stage != previous_stage:
+        create_job_activity(
+            session,
+            job_id,
+            from_stage=previous_stage,
+            to_stage=body.stage,
+        )
+    return updated
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job_endpoint(
     job_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return the stage history for a job application."""
-    job = get_applied_jobs(session, job_id)
+    job = get_job(session, job_id)
     if not job:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
+    if job.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+    delete_job(session, job_id)
+
+
+@router.get("/{job_id}/activity", response_model=list[JobActivityResponse])
+def get_activity(
+    job_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = get_job(session, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )
     if job.user_id != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
     return get_job_activities(session, job_id)
+
+
+@router.post("/{job_id}/research")
+def generate_company_research(
+    job_id: int,
+    body: CompanyResearchRequest,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    import openai
+
+    job = get_job(session, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
+    if job.user_id != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+    settings = get_settings()
+    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OpenAI API key is not configured.",
+        )
+
+    job_info = f"Job Title: {job.title}\nCompany: {job.company_name}"
+    if job.location:
+        job_info += f"\nLocation: {job.location}"
+    if job.description:
+        job_info += f"\nJob Description:\n{job.description}"
+
+    user_context = (body.context or "").strip()
+    system_prompt = (
+        "You are a career research assistant. Write comprehensive company research notes "
+        "for a job applicant. Cover: company overview, culture and values, recent news, "
+        "products/services, what interviewers typically look for, and tips to stand out. "
+        "Use plain text with clear section headings."
+    )
+    user_message = (
+        f"Generate company research notes for this application:\n\n{job_info}"
+    )
+    if user_context:
+        user_message += f"\n\nContext from the applicant:\n{user_context}"
+
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            max_tokens=2048,
+            temperature=0.7,
+        )
+        notes = response.choices[0].message.content.strip()
+    except openai.AuthenticationError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid OpenAI API key.",
+        )
+    except openai.RateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="OpenAI rate limit reached. Try again shortly.",
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI research failed: {e}",
+        )
+
+    updated = update_job(session, job_id, company_research_notes=notes)
+    return {"company_research_notes": updated.company_research_notes}

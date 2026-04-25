@@ -21,12 +21,26 @@ sys.path.insert(0, _backend_dir)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
+# Patch httpx.Client to handle Starlette 0.36 TestClient compatibility issue
+import httpx
+
+_original_init = httpx.Client.__init__
+
+
+def _patched_init(self, *args, **kwargs):
+    # Remove 'app' kwarg if present (from Starlette TestClient)
+    kwargs.pop("app", None)
+    _original_init(self, *args, **kwargs)
+
+
+httpx.Client.__init__ = _patched_init
+
 import pytest
-from fastapi.testclient import TestClient
 from index import app
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+from starlette.testclient import TestClient
 
 import database.models  # noqa: F401 — registers all ORM classes with Base
 from database import get_db
@@ -62,8 +76,13 @@ def engine():
 
 @pytest.fixture(scope="function")
 def session(engine):
-    Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    # Disable FK enforcement during the wipe so the document <-> document_version
+    # circular FK (use_alter=True) doesn't block drop_all.
+    with engine.begin() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        Base.metadata.drop_all(conn)
+        Base.metadata.create_all(conn)
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
     db = Session(engine)
     try:
         yield db
@@ -82,8 +101,8 @@ def client(session):
         yield session
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
+    client = TestClient(app)
+    yield client
     app.dependency_overrides.clear()
 
 

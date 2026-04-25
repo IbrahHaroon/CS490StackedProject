@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -7,7 +9,6 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-# Ensure these imports point to your actual file locations
 from database import get_db, get_settings
 from database.models.token_blacklist import TokenBlacklist
 from database.models.user import User
@@ -19,7 +20,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 def get_password_hash(password: str) -> str:
     """Strictly synchronous password hashing."""
     pwd_bytes = password.encode("utf-8")
-    # Use bcrypt directly to avoid passlib incompatibility on Python 3.13
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
@@ -32,7 +32,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(data: dict) -> str:
-    """Generates a synchronous JWT access token."""
+    """Generate a JWT access token. `data` must include `sub` (the email)."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
@@ -43,7 +43,6 @@ def create_access_token(data: dict) -> str:
 
 
 def decode_access_token(token: str) -> dict | None:
-    """Decodes a JWT token synchronously."""
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except JWTError:
@@ -71,24 +70,11 @@ def get_current_user(
     if jti and db.query(TokenBlacklist).filter(TokenBlacklist.jti == jti).first():
         raise credentials_exception
 
-    user = db.query(User).filter(User.email == email).first()
-
-    if user is None:
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            raise credentials_exception
+    except Exception:
         raise credentials_exception
 
     return user
-
-
-def get_current_recruiter(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    from database.models.recruiter import get_recruiter_by_user_id
-
-    recruiter = get_recruiter_by_user_id(db, current_user.user_id)
-    if recruiter is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter profile not found",
-        )
-    return recruiter
