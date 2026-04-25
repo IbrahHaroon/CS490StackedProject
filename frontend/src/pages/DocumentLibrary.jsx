@@ -6,7 +6,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).href;
 
-const DOCUMENT_TYPES = ["Resume", "Cover Letter", "Transcript", "Certificate", "Other"];
+const DOCUMENT_TYPES = [
+  "Resume",
+  "Cover Letter",
+  "Transcript",
+  "Certificate",
+  "Other",
+];
 const STATUS_FILTERS = ["All", "In System", "Archived"];
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest updated" },
@@ -32,7 +38,9 @@ function getDocumentStatus(doc) {
 }
 
 function getDocumentUpdatedDate(doc) {
-  return doc.updated_at || doc.modified_at || doc.created_at || doc.uploaded_at || "";
+  return (
+    doc.updated_at || doc.modified_at || doc.created_at || doc.uploaded_at || ""
+  );
 }
 
 function getDocumentTags(doc) {
@@ -69,9 +77,9 @@ function DocumentLibrary() {
 
   const fetchDocuments = async () => {
     if (!token) {
-  setLoadError("You must be signed in to view documents.");
-  return;
-}
+      setLoadError("You must be signed in to view documents.");
+      return;
+    }
 
     const res = await fetch(`${API}/documents/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -157,7 +165,8 @@ function DocumentLibrary() {
           status.toLowerCase().includes(query) ||
           tags.some((tag) => tag.toLowerCase().includes(query));
 
-        const matchesType = typeFilter === "All" || doc.document_type === typeFilter;
+        const matchesType =
+          typeFilter === "All" || doc.document_type === typeFilter;
         const matchesStatus = statusFilter === "All" || status === statusFilter;
         const matchesTag = tagFilter === "All" || tags.includes(tagFilter);
 
@@ -1263,7 +1272,10 @@ function DocumentLibrary() {
             className="doclibrary-search"
           />
 
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
             <option value="All">All Types</option>
             {DOCUMENT_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -1272,7 +1284,10 @@ function DocumentLibrary() {
             ))}
           </select>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
             {STATUS_FILTERS.map((status) => (
               <option key={status} value={status}>
                 {status === "All" ? "All Statuses" : status}
@@ -1280,7 +1295,10 @@ function DocumentLibrary() {
             ))}
           </select>
 
-          <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+          >
             {availableTags.map((tag) => (
               <option key={tag} value={tag}>
                 {tag === "All" ? "All Tags" : tag}
@@ -1296,7 +1314,11 @@ function DocumentLibrary() {
             ))}
           </select>
 
-          <button type="button" className="doclibrary-clear-btn" onClick={clearFilters}>
+          <button
+            type="button"
+            className="doclibrary-clear-btn"
+            onClick={clearFilters}
+          >
             Clear
           </button>
         </div>
@@ -1307,9 +1329,11 @@ function DocumentLibrary() {
           <p className="doclibrary-empty">No documents uploaded yet.</p>
         )}
 
-        {!loadError && documents.length > 0 && filteredDocuments.length === 0 && (
-          <p className="doclibrary-empty">No documents match your filters.</p>
-        )}
+        {!loadError &&
+          documents.length > 0 &&
+          filteredDocuments.length === 0 && (
+            <p className="doclibrary-empty">No documents match your filters.</p>
+          )}
 
         {filteredDocuments.length > 0 && (
           <table className="doclibrary-table">
