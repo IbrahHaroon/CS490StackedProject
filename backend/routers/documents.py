@@ -423,7 +423,10 @@ def read_version_content(
         return {"content": version.content, "format": "text"}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
-            return _read_file(version.storage_location, doc.title)
+            return _read_file(
+                version.storage_location,
+                os.path.basename(version.storage_location),
+            )
         except Exception as e:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -479,7 +482,10 @@ def read_current_content(
         return {"content": version.content, "format": "text"}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
-            return _read_file(version.storage_location, doc.title)
+            return _read_file(
+                version.storage_location,
+                os.path.basename(version.storage_location),
+            )
         except Exception as e:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -575,6 +581,16 @@ async def upload_document(
     with open(dest_path, "wb") as f:
         f.write(contents)
 
+    # For text-based formats, cache extracted content in the DB so the document
+    # remains readable even if the file path is later inaccessible (e.g. different server).
+    extracted_content = None
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext in (".txt", ".md", ".docx"):
+        try:
+            extracted_content = _read_file(dest_path, file.filename).get("content")
+        except Exception:
+            pass  # content stays None; storage_location is the fallback
+
     doc = create_document(
         session,
         current_user.user_id,
@@ -586,6 +602,7 @@ async def upload_document(
         session,
         doc.document_id,
         storage_location=dest_path,
+        content=extracted_content,
         source="upload",
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
