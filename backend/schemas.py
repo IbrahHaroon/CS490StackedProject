@@ -335,6 +335,7 @@ class DocumentResponse(BaseModel):
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
+    tags: list[str] = []
 
 
 class DocumentVersionCreate(BaseModel):

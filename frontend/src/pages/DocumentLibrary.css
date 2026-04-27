@@ -278,6 +278,35 @@
   background-color: inherit;
 }
 
+.doclibrary-download-btn {
+  background-color: #4f8ef7;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(79, 142, 247, 0.2);
+}
+
+.doclibrary-download-btn:hover:not(:disabled) {
+  background-color: #3a7be0;
+  box-shadow: 0 4px 8px rgba(79, 142, 247, 0.3);
+  transform: translateY(-1px);
+}
+
+.doclibrary-download-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(79, 142, 247, 0.2);
+}
+
+.doclibrary-download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Modal Overlay */
 .doclibrary-modal-overlay {
   position: fixed;
@@ -350,20 +379,21 @@
 
 .doclibrary-viewer {
   flex: 1;
-  padding: 1.5rem;
+  padding: 2rem;
   border: none;
   overflow-y: auto;
-  background-color: var(--surface-2);
-  color: var(--text);
+  background-color: #ffffff;
+  color: #000000;
 }
 
 .doclibrary-viewer pre {
   margin: 0;
-  font-family: "Monaco", "Courier New", monospace;
+  font-family: "Georgia", serif;
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-wrap: break-word;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: #000000;
 }
 
 .doclibrary-modal-actions {
@@ -621,20 +651,30 @@
 /* DOCX Viewer Styles */
 .doclibrary-docx-content {
   flex: 1;
-  padding: 1.5rem;
+  padding: 2rem;
   border: none;
   overflow-y: auto;
-  background-color: var(--surface-2);
-  color: var(--text);
+  background-color: #ffffff;
+  color: #000000;
 }
 
 .doclibrary-docx-content pre {
   margin: 0;
-  font-family: "Monaco", "Courier New", monospace;
+  font-family: "Georgia", serif;
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-wrap: break-word;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: #000000;
+}
+
+.doclibrary-resume-content {
+  font-family: "Georgia", serif;
+  font-size: 0.95rem;
+  color: #000000;
+  line-height: 1.6;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .doclibrary-linked-job {
@@ -660,4 +700,70 @@
 .doclibrary-unlinked {
   color: var(--text-muted, #6b7280);
   font-size: 0.82rem;
+}
+
+.doclibrary-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.doclibrary-filters select,
+.doclibrary-filters input[type="date"] {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #000000;
+  cursor: pointer;
+}
+
+.doclibrary-filters select::placeholder,
+.doclibrary-filters input[type="date"]::placeholder {
+  color: #6b7280;
+}
+
+.doclibrary-filters select:focus,
+.doclibrary-filters input[type="date"]:focus {
+  outline: none;
+  border-color: #4f8ef7;
+  box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.1);
+}
+
+.doclibrary-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid #a5b4fc;
+  background: #ede9fe;
+  color: #4c1d95;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.doclibrary-tag-pill:hover {
+  background: #c4b5fd;
+  border-color: #8b5cf6;
+}
+
+.doclibrary-clear-filters-btn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  transition: background 0.15s;
+}
+
+.doclibrary-clear-filters-btn:hover {
+  background: #f3f4f6;
+  border-color: #a78bfa;
 }

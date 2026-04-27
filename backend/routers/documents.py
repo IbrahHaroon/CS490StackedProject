@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import base64
 import os
+import tempfile
 from datetime import date as date_class
 
 from docx import Document as DocxDocument
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from PyPDF2 import PdfReader
 from sqlalchemy.orm import Session
 
@@ -90,9 +92,171 @@ def _extract_docx_content(file_path: str) -> str:
 
 
 def _write_docx_content(file_path: str, content: str) -> None:
+    from docx.shared import Inches, Pt
+
     doc = DocxDocument()
+
+    # Set margins (1 inch all around)
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    # Add content with proper formatting
     for line in content.split("\n"):
-        doc.add_paragraph(line)
+        p = doc.add_paragraph(line)
+        p.paragraph_format.space_after = Pt(6)
+        for run in p.runs:
+            run.font.size = Pt(11)
+            run.font.name = "Georgia"
+
+    doc.save(file_path)
+
+
+def _write_resume_docx(file_path: str, content: str) -> None:
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Inches, Pt
+
+    doc = DocxDocument()
+
+    # Set margins (1 inch all around)
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    lines = content.split("\n")
+    i = 0
+    first_content = True
+
+    while i < len(lines):
+        line = lines[i].strip()
+        i += 1
+
+        if not line:
+            if not first_content:
+                doc.add_paragraph()
+            continue
+
+        first_content = False
+
+        # Check if it's a name (first non-empty line)
+        if (
+            i == 1
+            and line
+            and not line.startswith(
+                ("Phone:", "Email:", "SUMMARY", "EXPERIENCE", "EDUCATION", "SKILLS")
+            )
+        ):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(line)
+            run.bold = True
+            run.font.size = Pt(14)
+            run.font.name = "Georgia"
+            p.paragraph_format.space_after = Pt(3)
+            continue
+
+        # Section headers (all caps lines like SUMMARY, EXPERIENCE, etc.)
+        if line.isupper() and len(line.split()) <= 3:
+            p = doc.add_paragraph()
+            run = p.add_run(line)
+            run.bold = True
+            run.font.size = Pt(11)
+            run.font.name = "Georgia"
+            p.paragraph_format.space_before = Pt(6)
+            p.paragraph_format.space_after = Pt(3)
+            continue
+
+        # Job titles or education (pattern: Title at Company or Degree - School)
+        if (" at " in line or " - " in line) and not line.startswith(
+            ("Location:", "Phone:", "Email:", "GPA:")
+        ):
+            if " at " in line:
+                parts = line.split(" at ", 1)
+                p = doc.add_paragraph()
+                run = p.add_run(parts[0])
+                run.bold = True
+                run.font.size = Pt(10)
+                run.font.name = "Georgia"
+                run = p.add_run(" at ")
+                run.font.name = "Georgia"
+                run = p.add_run(parts[1])
+                run.font.name = "Georgia"
+                p.paragraph_format.space_after = Pt(0)
+            elif " - " in line:
+                parts = line.split(" - ", 1)
+                p = doc.add_paragraph()
+                run = p.add_run(parts[0])
+                run.bold = True
+                run.font.size = Pt(10)
+                run.font.name = "Georgia"
+                run = p.add_run(" - ")
+                run.font.name = "Georgia"
+                run = p.add_run(parts[1])
+                run.italic = True
+                run.font.name = "Georgia"
+                p.paragraph_format.space_after = Pt(0)
+            continue
+
+        # Dates line (e.g., "Jun 2022 - Present")
+        if any(
+            month in line
+            for month in [
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+                "Present",
+            ]
+        ):
+            p = doc.add_paragraph()
+            run = p.add_run(line)
+            run.italic = True
+            run.font.size = Pt(10)
+            run.font.name = "Georgia"
+            p.paragraph_format.space_after = Pt(3)
+            continue
+
+        # Bullet points (lines starting with dash)
+        if line.startswith("- "):
+            p = doc.add_paragraph(line[2:], style="List Bullet")
+            p_format = p.paragraph_format
+            p_format.left_indent = Inches(0.25)
+            p_format.space_after = Pt(0)
+            for run in p.runs:
+                run.font.size = Pt(10)
+                run.font.name = "Georgia"
+            continue
+
+        # Contact info (Phone, Email, etc.)
+        if line.startswith(("Phone:", "Email:", "Location:")):
+            p = doc.add_paragraph()
+            run = p.add_run(line)
+            run.font.size = Pt(10)
+            run.font.name = "Georgia"
+            p.paragraph_format.space_after = Pt(0)
+            continue
+
+        # Default paragraph
+        p = doc.add_paragraph(line)
+        p.paragraph_format.space_after = Pt(2)
+        for run in p.runs:
+            run.font.size = Pt(10)
+            run.font.name = "Georgia"
+
     doc.save(file_path)
 
 
@@ -182,6 +346,14 @@ def _ensure_owns(document, current_user: User) -> None:
         )
 
 
+def _media_type(filename: str) -> str:
+    ext = os.path.splitext(filename or "")[1].lower()
+    return {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }.get(ext, "application/octet-stream")
+
+
 def _build_job_context(job) -> str:
     parts = [
         "\nTARGET JOB:",
@@ -211,10 +383,11 @@ def list_my_documents(
     include_archived: bool = False,
     document_type: str | None = None,
     status_filter: str | None = None,
+    tag_filter: str | None = None,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List the user's documents. Supports S3-006 filtering by type and status."""
+    """List the user's documents. Supports filtering by type, status, and tag."""
     docs = get_documents_for_user(
         session, current_user.user_id, include_deleted=include_archived
     )
@@ -222,7 +395,27 @@ def list_my_documents(
         docs = [d for d in docs if d.document_type == document_type]
     if status_filter:
         docs = [d for d in docs if d.status == status_filter]
-    return docs
+
+    result = []
+    for d in docs:
+        tag_labels = [t.label for t in get_tags_for_document(session, d.document_id)]
+        if tag_filter and tag_filter.lower() not in [t.lower() for t in tag_labels]:
+            continue
+        result.append(
+            DocumentResponse(
+                document_id=d.document_id,
+                user_id=d.user_id,
+                title=d.title,
+                document_type=d.document_type,
+                status=d.status,
+                current_version_id=d.current_version_id,
+                is_deleted=d.is_deleted,
+                created_at=d.created_at,
+                updated_at=d.updated_at,
+                tags=tag_labels,
+            )
+        )
+    return result
 
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -331,9 +524,26 @@ def duplicate_document(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """S3-007: duplicate an existing document (copies the current version content)."""
+    """S3-007: duplicate an existing document (copies the current version content and file)."""
+    import shutil
+
     src = get_document(session, document_id)
     _ensure_owns(src, current_user)
+
+    if not src.current_version_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot duplicate: source document has no version",
+        )
+
+    cv = get_document_version(session, src.current_version_id)
+    if not cv:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot duplicate: source version not found",
+        )
+
+    # Create the duplicate document
     new_doc = create_document(
         session,
         current_user.user_id,
@@ -341,20 +551,44 @@ def duplicate_document(
         src.document_type,
         status=src.status,
     )
-    # Copy the current version's content forward as v1 of the new document.
-    if src.current_version_id:
-        cv = get_document_version(session, src.current_version_id)
-        if cv:
-            new_version = create_document_version(
-                session,
-                new_doc.document_id,
-                storage_location=None,  # new doc gets its own file lifecycle
-                content=cv.content,
-                source="duplicate",
-            )
-            update_document(
-                session, new_doc.document_id, current_version_id=new_version.version_id
-            )
+    session.flush()  # Ensure new_doc.document_id is available
+
+    new_storage_location = None
+
+    # If the original has a file, copy it to a new path for the duplicate
+    if cv.storage_location and os.path.exists(cv.storage_location):
+        src_path = cv.storage_location
+        src_dir = os.path.dirname(src_path)
+        src_name = os.path.basename(src_path)
+
+        # Add "_copy" to filename before extension
+        name_parts = os.path.splitext(src_name)
+        dup_name = f"{name_parts[0]}_copy{name_parts[1]}"
+        new_storage_location = os.path.join(src_dir, dup_name)
+
+        # Copy the file to new path
+        try:
+            shutil.copy2(src_path, new_storage_location)
+        except Exception:
+            # If copy fails, still continue with content
+            new_storage_location = None
+
+    # Create version for the duplicate
+    new_version = create_document_version(
+        session,
+        new_doc.document_id,
+        storage_location=new_storage_location,
+        content=cv.content,
+        source="duplicate",
+    )
+    session.flush()  # Ensure new_version.version_id is available
+
+    # Link the version to the document
+    update_document(
+        session, new_doc.document_id, current_version_id=new_version.version_id
+    )
+    session.commit()
+
     return get_document(session, new_doc.document_id)
 
 
@@ -545,6 +779,125 @@ def edit_current_content(
         )
     update_document(session, document_id, current_version_id=new_version.version_id)
     return new_version
+
+
+# --------------------------------------------------------------------------- #
+#  Download / Export                                                            #
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download the current version of a document as a file.
+
+    If storage_location exists, stream the file. Otherwise, generate a DOCX
+    on-the-fly from the content text.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    if doc.current_version_id is None:
+        raise HTTPException(status_code=404, detail="Document has no version yet")
+    version = get_document_version(session, doc.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Current version missing")
+
+    # If file-backed, stream it
+    if version.storage_location and os.path.exists(version.storage_location):
+        filename = os.path.basename(version.storage_location)
+        media = _media_type(filename)
+        return FileResponse(
+            path=version.storage_location,
+            filename=filename,
+            media_type=media,
+        )
+
+    # Otherwise, generate DOCX from content
+    if version.content:
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            _write_docx_content(tmp_path, version.content)
+            filename = (
+                f"{doc.title}.docx" if not doc.title.endswith(".docx") else doc.title
+            )
+            return FileResponse(
+                path=tmp_path,
+                filename=filename,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        except Exception as e:  # noqa: BLE001
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate document: {e}",
+            )
+
+    raise HTTPException(status_code=404, detail="No content available")
+
+
+@router.get("/{document_id}/versions/{version_id}/download")
+def download_document_version(
+    document_id: int,
+    version_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download a specific version of a document as a file.
+
+    Same logic as current-version download, but for a specified version.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    version = get_document_version(session, version_id)
+    if version is None or version.document_id != document_id:
+        raise HTTPException(
+            status_code=404, detail="Version not found for this document"
+        )
+
+    # If file-backed, stream it
+    if version.storage_location and os.path.exists(version.storage_location):
+        filename = os.path.basename(version.storage_location)
+        media = _media_type(filename)
+        return FileResponse(
+            path=version.storage_location,
+            filename=filename,
+            media_type=media,
+        )
+
+    # Otherwise, generate DOCX from content
+    if version.content:
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            _write_docx_content(tmp_path, version.content)
+            filename = f"{doc.title} (v{version.version_number}).docx"
+            if doc.title.endswith(".docx"):
+                filename = f"{doc.title[:-5]} (v{version.version_number}).docx"
+            return FileResponse(
+                path=tmp_path,
+                filename=filename,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        except Exception as e:  # noqa: BLE001
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to generate document: {e}",
+            )
+
+    raise HTTPException(status_code=404, detail="No content available")
 
 
 # --------------------------------------------------------------------------- #
@@ -939,8 +1292,27 @@ def _generate_doc(
     doc = create_document(
         session, user.user_id, doc_title, document_type, status="Draft"
     )
+
+    # Get user profile for file path generation
+    profile = get_profile_by_user_id(session, user.user_id)
+    filename = f"{doc_title.replace('/', '_').replace(':', '-')}.docx"
+    dest_path = _build_upload_path(
+        UPLOAD_BASE,
+        profile.first_name if profile else "",
+        profile.last_name if profile else "",
+        user.user_id,
+        filename,
+    )
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    # Write content to DOCX file with appropriate formatting
+    if document_type == "Resume":
+        _write_resume_docx(dest_path, content)
+    else:
+        _write_docx_content(dest_path, content)
+
     version = create_document_version(
-        session, doc.document_id, content=content, source="ai"
+        session, doc.document_id, storage_location=dest_path, source="ai"
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
     if job is not None:
