@@ -1,14 +1,65 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Document, Page, pdfjs } from "react-pdf";
 import { api } from "../lib/apiClient";
 import { logAction } from "../lib/actionLogger";
 import "./DocumentLibrary.css";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).href;
+function renderDocContent(text) {
+  const lines = text.split("\n");
+  let nameRendered = false;
+  return lines.map((line, i) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      return <div key={i} className="doc-spacer" />;
+    }
+
+    // First non-empty line → name/title
+    if (!nameRendered) {
+      nameRendered = true;
+      return (
+        <div key={i} className="doc-name">
+          {trimmed}
+        </div>
+      );
+    }
+
+    // ALL CAPS line (section header)
+    if (
+      trimmed === trimmed.toUpperCase() &&
+      trimmed.length > 2 &&
+      /[A-Z]/.test(trimmed) &&
+      !/^[-•*]/.test(trimmed)
+    ) {
+      return (
+        <div key={i} className="doc-section-header">
+          {trimmed}
+        </div>
+      );
+    }
+
+    // Bullet point
+    if (/^[-•*]\s/.test(trimmed)) {
+      return (
+        <div key={i} className="doc-bullet">
+          <span className="doc-bullet-marker">•</span>
+          {trimmed.slice(2)}
+        </div>
+      );
+    }
+
+    // Separator line
+    if (/^[-=]{3,}$/.test(trimmed)) {
+      return <hr key={i} className="doc-divider" />;
+    }
+
+    return (
+      <div key={i} className="doc-line">
+        {trimmed}
+      </div>
+    );
+  });
+}
 
 const DOCUMENT_TYPES = [
   "Resume",
@@ -36,7 +87,7 @@ function DocumentLibrary() {
   const [viewContent, setViewContent] = useState("");
   const [viewFormat, setViewFormat] = useState("");
   const [viewBinaryData, setViewBinaryData] = useState(null);
-  const [pdfNumPages, setPdfNumPages] = useState(0);
+  const viewerRef = useRef(null);
 
   const [editingDoc, setEditingDoc] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -194,9 +245,44 @@ function DocumentLibrary() {
       setViewContent(data.content || "");
       setViewFormat(data.format || "text");
       setViewBinaryData(data.binary_data || null);
-      setPdfNumPages(0);
     } catch (err) {
       setEditError("Failed to load document.");
+    }
+  };
+
+  const handleDownload = async (doc) => {
+    if (!token) {
+      setEditError("You must be signed in to download.");
+      return;
+    }
+    try {
+      const res = await api.get(`/documents/${doc.document_id}/download`, {
+        caller: "DocumentLibrary.handleDownload",
+        action: "download_document",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEditError(err.detail || "Download failed.");
+        return;
+      }
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("Content-Disposition") || "";
+      const filenameMatch = contentDisposition.match(
+        /filename="?([^";\n]+)"?/i
+      );
+      const filename = filenameMatch
+        ? filenameMatch[1]
+        : doc.title || "document";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setEditError("Download failed.");
     }
   };
 
@@ -387,8 +473,6 @@ function DocumentLibrary() {
     setDeleteConfirmDoc(null);
   };
 
-  const onPdfLoadSuccess = ({ numPages }) => setPdfNumPages(numPages);
-
   const handleOpenGenResume = () => {
     setGenResumeOpen(true);
     setGenResumeJobId("");
@@ -537,26 +621,31 @@ function DocumentLibrary() {
                 ✕
               </button>
             </div>
-            <div className="doclibrary-viewer">
+            <div className="doclibrary-viewer" ref={viewerRef}>
               {viewFormat === "pdf" && viewBinaryData ? (
-                <Document
-                  file={`data:application/pdf;base64,${viewBinaryData}`}
-                  onLoadSuccess={onPdfLoadSuccess}
-                  className="doclibrary-pdf-document"
-                >
-                  {Array.from(new Array(pdfNumPages), (_, index) => (
-                    <Page key={`page_${index + 1}`} pageNumber={index + 1} />
-                  ))}
-                </Document>
-              ) : viewFormat === "docx" ? (
-                <div className="doclibrary-docx-content">
-                  <pre>{viewContent}</pre>
-                </div>
+                <iframe
+                  src={`data:application/pdf;base64,${viewBinaryData}`}
+                  title={viewingDoc?.title}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    minHeight: "520px",
+                  }}
+                />
               ) : (
-                <pre>{viewContent}</pre>
+                <div className="doclibrary-doc-page">
+                  {renderDocContent(viewContent)}
+                </div>
               )}
             </div>
             <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-action-btn doclibrary-view-btn"
+                onClick={() => handleDownload(viewingDoc)}
+              >
+                Download
+              </button>
               <button
                 className="doclibrary-close-btn"
                 onClick={() => {

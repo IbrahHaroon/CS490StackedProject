@@ -14,11 +14,13 @@ so the upload + edit workflow keeps its existing semantics.
 from __future__ import annotations
 
 import base64
+import io
 import os
 from datetime import date as date_class
 
 from docx import Document as DocxDocument
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse, Response
 from PyPDF2 import PdfReader
 from sqlalchemy.orm import Session
 
@@ -122,6 +124,102 @@ def _write_pdf_content(file_path: str, content: str) -> None:
     buffer.seek(0)
     with open(file_path, "wb") as f:
         f.write(buffer.read())
+
+
+def _generate_professional_docx(content: str, title: str) -> bytes:
+    """Convert plain-text AI content to a professional-grade DOCX file."""
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Inches, Pt, RGBColor
+
+    doc = DocxDocument()
+
+    # 1-inch margins on all sides
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    # Default Normal style: Calibri 11pt black
+    normal = doc.styles["Normal"]
+    normal.font.name = "Calibri"
+    normal.font.size = Pt(11)
+    normal.font.color.rgb = RGBColor(0, 0, 0)
+
+    lines = content.splitlines()
+    first_content_line = True
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Blank line → small spacer
+        if not stripped:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(2)
+            continue
+
+        # Separator lines (e.g. "---", "===") → thin horizontal rule via empty bold para
+        if set(stripped) <= set("-=_"):
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after = Pt(2)
+            continue
+
+        # First non-empty line: treat as document title (name / doc heading)
+        if first_content_line:
+            first_content_line = False
+            p = doc.add_paragraph()
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.name = "Calibri"
+            run.font.size = Pt(16)
+            run.font.color.rgb = RGBColor(0, 0, 0)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(6)
+            continue
+
+        # Detect bullet points
+        is_bullet = stripped[:2] in ("- ", "* ", "• ", "● ", "· ")
+        if not is_bullet and stripped[0] in ("-", "*", "•", "●", "·"):
+            is_bullet = True
+
+        # Detect section headings: ALL CAPS line, or short line ending with ':'
+        is_heading = (stripped.isupper() and len(stripped) > 2) or (
+            stripped.endswith(":") and len(stripped) < 60 and not is_bullet
+        )
+
+        if is_bullet:
+            bullet_text = stripped[2:].strip() if len(stripped) > 1 else stripped
+            p = doc.add_paragraph(style="List Bullet")
+            run = p.add_run(bullet_text)
+            run.font.name = "Calibri"
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0, 0, 0)
+            p.paragraph_format.space_before = Pt(1)
+            p.paragraph_format.space_after = Pt(1)
+        elif is_heading:
+            p = doc.add_paragraph()
+            run = p.add_run(stripped)
+            run.bold = True
+            run.font.name = "Calibri"
+            run.font.size = Pt(12)
+            run.font.color.rgb = RGBColor(0, 0, 0)
+            p.paragraph_format.space_before = Pt(10)
+            p.paragraph_format.space_after = Pt(3)
+        else:
+            p = doc.add_paragraph()
+            run = p.add_run(stripped)
+            run.font.name = "Calibri"
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0, 0, 0)
+            p.paragraph_format.space_before = Pt(1)
+            p.paragraph_format.space_after = Pt(1)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def _update_file_content(file_path: str, filename: str, content: str) -> None:
@@ -420,13 +518,82 @@ def read_current_content(
         return {"content": version.content, "format": "text"}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
-            return _read_file(version.storage_location, doc.title)
+            return _read_file(
+                version.storage_location,
+                os.path.basename(version.storage_location),
+            )
         except Exception as e:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to read file: {e}",
             )
     raise HTTPException(status_code=404, detail="No content available")
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Download the current version of a document.
+
+    Returns FileResponse for file-backed documents (PDF/DOCX/TXT/MD) or
+    a plain text Response for AI-generated text content.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+
+    if doc.current_version_id is None:
+        raise HTTPException(status_code=404, detail="Document has no version yet")
+    version = get_document_version(session, doc.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Current version missing")
+
+    # File-backed document
+    if version.storage_location:
+        if not os.path.exists(version.storage_location):
+            raise HTTPException(
+                status_code=404,
+                detail="File not found on disk. It may have been moved or deleted.",
+            )
+        filename = os.path.basename(version.storage_location)
+        ext = os.path.splitext(filename)[1].lower()
+        mime_map = {
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".txt": "text/plain",
+            ".md": "text/plain",
+        }
+        media_type = mime_map.get(ext, "application/octet-stream")
+        return FileResponse(
+            path=version.storage_location,
+            media_type=media_type,
+            filename=filename,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # AI-generated text document → serve as professional DOCX
+    if version.content:
+        safe_title = (
+            "".join(
+                c for c in (doc.title or "document") if c.isalnum() or c in " _-"
+            ).strip()
+            or "document"
+        )
+        download_filename = f"{safe_title}.docx"
+        docx_bytes = _generate_professional_docx(
+            version.content, doc.title or "document"
+        )
+        return Response(
+            content=docx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_filename}"'
+            },
+        )
+
+    raise HTTPException(status_code=404, detail="No content available for download")
 
 
 @router.put("/{document_id}/content", response_model=DocumentVersionResponse)
