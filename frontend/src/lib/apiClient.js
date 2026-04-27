@@ -188,4 +188,6 @@ export const api = {
   },
 
   delete: (path, context) => apiRequest(path, { method: "DELETE" }, context),
+
+  download: (path, context) => apiRequest(path, {}, context),
 };

@@ -1,14 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Document, Page, pdfjs } from "react-pdf";
 import { api } from "../lib/apiClient";
 import { logAction } from "../lib/actionLogger";
 import "./DocumentLibrary.css";
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).href;
 
 const DOCUMENT_TYPES = [
   "Resume",
@@ -19,6 +13,156 @@ const DOCUMENT_TYPES = [
 ];
 
 const STATUS_OPTIONS = ["Draft", "Final", "In Review", "Archived"];
+
+function formatResumeContent(text) {
+  const lines = text.split("\n");
+  const elements = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Empty line
+    if (!trimmed) {
+      elements.push(<div key={`empty-${i}`} style={{ height: "0.5rem" }} />);
+      continue;
+    }
+
+    // ALL CAPS section headers (EXPERIENCE, EDUCATION, SKILLS, etc.)
+    if (
+      trimmed === trimmed.toUpperCase() &&
+      trimmed.length > 2 &&
+      /[A-Z]/.test(trimmed)
+    ) {
+      elements.push(
+        <div
+          key={`header-${i}`}
+          style={{
+            fontSize: "1.1rem",
+            fontWeight: "bold",
+            marginTop: "1rem",
+            marginBottom: "0.5rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            color: "#000",
+          }}
+        >
+          {trimmed}
+        </div>
+      );
+      continue;
+    }
+
+    // Bullet points
+    if (/^[-•*]\s/.test(trimmed)) {
+      const content = trimmed.slice(2);
+      elements.push(
+        <div
+          key={`bullet-${i}`}
+          style={{
+            marginLeft: "1.5rem",
+            marginBottom: "0.4rem",
+            lineHeight: "1.5",
+          }}
+        >
+          <span style={{ marginRight: "0.5rem" }}>•</span>
+          {content}
+        </div>
+      );
+      continue;
+    }
+
+    // Job title/company line (contains company name in different formatting)
+    if (
+      (trimmed.includes("@") ||
+        trimmed.includes(" - ") ||
+        /^\w+.*[A-Z]{2,}.*\d{4}/.test(trimmed)) &&
+      trimmed.length > 5
+    ) {
+      // Make company names and dates bold
+      let formatted = trimmed
+        .replace(/(@|–|—|\|)(.*?)($|@|–|—|\|)/g, (match) => {
+          return `<strong>${match}</strong>`;
+        })
+        .replace(/\b\d{4}\b/g, (match) => {
+          return `<strong>${match}</strong>`;
+        });
+
+      elements.push(
+        <div
+          key={`company-${i}`}
+          style={{
+            fontWeight: "500",
+            marginTop: "0.6rem",
+            marginBottom: "0.3rem",
+            lineHeight: "1.5",
+          }}
+          dangerouslySetInnerHTML={{ __html: formatted }}
+        />
+      );
+      continue;
+    }
+
+    // Name/title at the very top (first non-empty line, all letters/spaces)
+    if (
+      i === 0 ||
+      (i < 3 && elements.length < 2 && /^[A-Za-z\s]+$/.test(trimmed))
+    ) {
+      elements.push(
+        <div
+          key={`name-${i}`}
+          style={{
+            fontSize: "1.3rem",
+            fontWeight: "bold",
+            marginBottom: "0.3rem",
+            color: "#000",
+          }}
+        >
+          {trimmed}
+        </div>
+      );
+      continue;
+    }
+
+    // Contact info line (emails, phone, links)
+    if (
+      trimmed.includes("@") ||
+      trimmed.includes("linkedin") ||
+      /\(\d{3}\)|\d{3}-\d{4}/.test(trimmed)
+    ) {
+      elements.push(
+        <div
+          key={`contact-${i}`}
+          style={{
+            fontSize: "0.9rem",
+            marginBottom: "0.3rem",
+            color: "#333",
+            lineHeight: "1.5",
+          }}
+        >
+          {trimmed}
+        </div>
+      );
+      continue;
+    }
+
+    // Default text
+    elements.push(
+      <div
+        key={`text-${i}`}
+        style={{
+          marginBottom: "0.4rem",
+          lineHeight: "1.5",
+          color: "#000",
+        }}
+      >
+        {trimmed}
+      </div>
+    );
+  }
+
+  return elements;
+}
 
 function DocumentLibrary() {
   const navigate = useNavigate();
@@ -36,7 +180,6 @@ function DocumentLibrary() {
   const [viewContent, setViewContent] = useState("");
   const [viewFormat, setViewFormat] = useState("");
   const [viewBinaryData, setViewBinaryData] = useState(null);
-  const [pdfNumPages, setPdfNumPages] = useState(0);
 
   const [editingDoc, setEditingDoc] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -64,6 +207,9 @@ function DocumentLibrary() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterIncludeArchived, setFilterIncludeArchived] = useState(false);
   const [sortBy, setSortBy] = useState("updated_desc");
+  const [filterTag, setFilterTag] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   const [jobs, setJobs] = useState([]);
   const [docJobMap, setDocJobMap] = useState({});
@@ -95,6 +241,7 @@ function DocumentLibrary() {
       if (filterIncludeArchived) params.set("include_archived", "true");
       if (filterType) params.set("document_type", filterType);
       if (filterStatus) params.set("status_filter", filterStatus);
+      if (filterTag) params.set("tag_filter", filterTag);
       const url =
         "/documents/me" + (params.toString() ? `?${params.toString()}` : "");
       const res = await api.get(url, {
@@ -149,20 +296,50 @@ function DocumentLibrary() {
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, filterType, filterStatus, filterIncludeArchived]);
+  }, [token, filterType, filterStatus, filterIncludeArchived, filterTag]);
 
-  // Sorting in JS — backend returns updated_at desc by default
-  const sortedDocuments = [...documents].sort((a, b) => {
-    if (sortBy === "updated_desc")
-      return new Date(b.updated_at) - new Date(a.updated_at);
-    if (sortBy === "updated_asc")
-      return new Date(a.updated_at) - new Date(b.updated_at);
-    if (sortBy === "title_asc")
-      return (a.title || "").localeCompare(b.title || "");
-    if (sortBy === "title_desc")
-      return (b.title || "").localeCompare(a.title || "");
-    return 0;
-  });
+  // Derive unique tags from all documents
+  const allTags = useMemo(() => {
+    const set = new Set();
+    documents.forEach((d) => (d.tags || []).forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [documents]);
+
+  // Sorting and date filtering in JS
+  const sortedDocuments = useMemo(() => {
+    let list = [...documents];
+
+    // Date range filtering
+    if (filterDateFrom) {
+      list = list.filter(
+        (d) => new Date(d.updated_at) >= new Date(filterDateFrom)
+      );
+    }
+    if (filterDateTo) {
+      list = list.filter(
+        (d) => new Date(d.updated_at) <= new Date(filterDateTo + "T23:59:59")
+      );
+    }
+
+    // Sorting
+    list.sort((a, b) => {
+      if (sortBy === "updated_desc")
+        return new Date(b.updated_at) - new Date(a.updated_at);
+      if (sortBy === "updated_asc")
+        return new Date(a.updated_at) - new Date(b.updated_at);
+      if (sortBy === "title_asc")
+        return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "title_desc")
+        return (b.title || "").localeCompare(a.title || "");
+      if (sortBy === "type_asc")
+        return (a.document_type || "").localeCompare(b.document_type || "");
+      if (sortBy === "status_asc")
+        return (a.status || "").localeCompare(b.status || "");
+      return 0;
+    });
+
+    return list;
+  }, [documents, sortBy, filterDateFrom, filterDateTo]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -225,7 +402,6 @@ function DocumentLibrary() {
       setViewContent(data.content || "");
       setViewFormat(data.format || "text");
       setViewBinaryData(data.binary_data || null);
-      setPdfNumPages(0);
     } catch (err) {
       setEditError("Failed to load document.");
     }
@@ -317,6 +493,63 @@ function DocumentLibrary() {
       setUploadSuccess("Document duplicated.");
       setTimeout(() => setUploadSuccess(""), 3000);
       fetchDocuments();
+    }
+  };
+
+  const handleDownload = async (doc) => {
+    try {
+      const res = await api.get(`/documents/${doc.document_id}/download`, {
+        caller: "DocumentLibrary.handleDownload",
+        action: "download_document",
+      });
+      if (!res.ok) {
+        setEditError("Failed to download document.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = doc.title.endsWith(".docx")
+        ? doc.title
+        : `${doc.title}.docx`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setEditError("Failed to download document.");
+    }
+  };
+
+  const handleDownloadVersion = async (doc, versionId) => {
+    try {
+      const res = await api.get(
+        `/documents/${doc.document_id}/versions/${versionId}/download`,
+        {
+          caller: "DocumentLibrary.handleDownloadVersion",
+          action: "download_document_version",
+        }
+      );
+      if (!res.ok) {
+        setEditError("Failed to download version.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = doc.title.endsWith(".docx")
+        ? doc.title
+        : `${doc.title}.docx`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setEditError("Failed to download version.");
     }
   };
 
@@ -487,8 +720,6 @@ function DocumentLibrary() {
     setDeleteConfirmDoc(null);
   };
 
-  const onPdfLoadSuccess = ({ numPages }) => setPdfNumPages(numPages);
-
   const handleOpenGenResume = () => {
     setGenResumeOpen(true);
     setGenResumeJobId("");
@@ -528,6 +759,26 @@ function DocumentLibrary() {
       setGenResumeContent(data.content);
       setGenResumeDocName(data.title || data.document_name || "");
       fetchDocuments();
+
+      // Auto-download the generated DOCX
+      const downloadRes = await api.get(
+        `/documents/${data.document_id}/versions/${data.version_id}/download`,
+        {
+          caller: "DocumentLibrary.handleGenResumeGenerate",
+          action: "download_generated_resume",
+        }
+      );
+      if (downloadRes.ok) {
+        const blob = await downloadRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${data.title || "resume"}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
     } catch {
       setGenResumeError("Request failed. Check console for details.");
     } finally {
@@ -583,6 +834,26 @@ function DocumentLibrary() {
       setGenCoverContent(data.content);
       setGenCoverDocName(data.title || data.document_name || "");
       fetchDocuments();
+
+      // Auto-download the generated DOCX
+      const downloadRes = await api.get(
+        `/documents/${data.document_id}/versions/${data.version_id}/download`,
+        {
+          caller: "DocumentLibrary.handleGenCoverGenerate",
+          action: "download_generated_cover_letter",
+        }
+      );
+      if (downloadRes.ok) {
+        const blob = await downloadRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${data.title || "cover_letter"}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
     } catch {
       setGenCoverError("Request failed. Check console for details.");
     } finally {
@@ -639,24 +910,35 @@ function DocumentLibrary() {
             </div>
             <div className="doclibrary-viewer">
               {viewFormat === "pdf" && viewBinaryData ? (
-                <Document
-                  file={`data:application/pdf;base64,${viewBinaryData}`}
-                  onLoadSuccess={onPdfLoadSuccess}
-                  className="doclibrary-pdf-document"
-                >
-                  {Array.from(new Array(pdfNumPages), (_, index) => (
-                    <Page key={`page_${index + 1}`} pageNumber={index + 1} />
-                  ))}
-                </Document>
+                <iframe
+                  src={`data:application/pdf;base64,${viewBinaryData}`}
+                  title={viewingDoc?.title}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    minHeight: "520px",
+                  }}
+                />
               ) : viewFormat === "docx" ? (
                 <div className="doclibrary-docx-content">
                   <pre>{viewContent}</pre>
+                </div>
+              ) : viewingDoc?.document_type === "Resume" ? (
+                <div className="doclibrary-resume-content">
+                  {formatResumeContent(viewContent)}
                 </div>
               ) : (
                 <pre>{viewContent}</pre>
               )}
             </div>
             <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-download-btn"
+                onClick={() => handleDownload(viewingDoc)}
+              >
+                Download
+              </button>
               <button
                 className="doclibrary-close-btn"
                 onClick={() => {
@@ -1089,6 +1371,14 @@ function DocumentLibrary() {
                             >
                               View
                             </button>
+                            <button
+                              className="doclibrary-action-btn"
+                              onClick={() =>
+                                handleDownloadVersion(historyDoc, v.version_id)
+                              }
+                            >
+                              Download
+                            </button>
                             {!isCurrent && (
                               <button
                                 className="doclibrary-action-btn"
@@ -1143,6 +1433,14 @@ function DocumentLibrary() {
               <pre>{versionContent}</pre>
             </div>
             <div className="doclibrary-modal-actions">
+              <button
+                className="doclibrary-download-btn"
+                onClick={() =>
+                  handleDownloadVersion(historyDoc, viewingVersion.version_id)
+                }
+              >
+                Download
+              </button>
               <button
                 className="doclibrary-close-btn"
                 onClick={() => {
@@ -1223,7 +1521,7 @@ function DocumentLibrary() {
           }}
         >
           <h2>Your Documents</h2>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div className="doclibrary-filters">
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
@@ -1249,6 +1547,18 @@ function DocumentLibrary() {
               ))}
             </select>
             <select
+              value={filterTag}
+              onChange={(e) => setFilterTag(e.target.value)}
+              title="Filter by tag"
+            >
+              <option value="">All tags</option>
+              {allTags.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               title="Sort"
@@ -1257,9 +1567,28 @@ function DocumentLibrary() {
               <option value="updated_asc">Oldest first</option>
               <option value="title_asc">Title A→Z</option>
               <option value="title_desc">Title Z→A</option>
+              <option value="type_asc">Type A→Z</option>
+              <option value="status_asc">Status A→Z</option>
             </select>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              title="Updated from"
+            />
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              title="Updated to"
+            />
             <label
-              style={{ display: "flex", alignItems: "center", gap: "4px" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                color: "#000000",
+              }}
             >
               <input
                 type="checkbox"
@@ -1268,6 +1597,19 @@ function DocumentLibrary() {
               />
               Show archived
             </label>
+            <button
+              className="doclibrary-clear-filters-btn"
+              onClick={() => {
+                setFilterType("");
+                setFilterStatus("");
+                setFilterTag("");
+                setFilterDateFrom("");
+                setFilterDateTo("");
+                setSortBy("updated_desc");
+              }}
+            >
+              Clear filters
+            </button>
           </div>
         </div>
         {loadError && <p className="doclibrary-error">{loadError}</p>}
@@ -1323,6 +1665,33 @@ function DocumentLibrary() {
                               }}
                             >
                               → {lj.job_title} @ {lj.company_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {(doc.tags || []).length > 0 && (
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "4px",
+                          }}
+                        >
+                          {doc.tags.map((tag) => (
+                            <button
+                              key={tag}
+                              className="doclibrary-tag-pill"
+                              onClick={() =>
+                                setFilterTag(tag === filterTag ? "" : tag)
+                              }
+                              title={
+                                filterTag === tag
+                                  ? "Clear tag filter"
+                                  : `Filter by "${tag}"`
+                              }
+                            >
+                              {tag}
                             </button>
                           ))}
                         </div>

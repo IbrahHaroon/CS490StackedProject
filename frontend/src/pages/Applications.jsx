@@ -555,6 +555,36 @@ function ApplicationCard({
     }
   };
 
+  const handleDownloadLinkedDoc = async (link) => {
+    try {
+      const res = await api.download(
+        `/documents/${link.document_id}/versions/${link.version_id}/download`,
+        {
+          caller: "Applications.handleDownloadLinkedDoc",
+          action: "download_linked_document_version",
+        }
+      );
+      if (!res.ok) {
+        alert("Failed to download document.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = link.document_title?.endsWith(".docx")
+        ? link.document_title
+        : `${link.document_title || "document"}.docx`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Failed to download document.");
+    }
+  };
+
   const handleUnlinkDoc = async (link) => {
     const label = link.document_title || `Version #${link.version_id}`;
     if (!window.confirm(`Unlink "${label}" from this job?`)) return;
@@ -1195,6 +1225,14 @@ function ApplicationCard({
                       View
                     </button>
                     <button
+                      className="app-history-btn"
+                      onClick={() => handleDownloadLinkedDoc(link)}
+                      style={{ padding: "2px 10px", fontSize: "12px" }}
+                      title="Download this document"
+                    >
+                      Download
+                    </button>
+                    <button
                       className="followup-delete-btn"
                       onClick={() => handleUnlinkDoc(link)}
                       disabled={unlinkingId === link.link_id}
@@ -1653,6 +1691,25 @@ function ApplicationCard({
                 {viewingContent}
               </pre>
             )}
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+              <button
+                className="app-history-btn"
+                onClick={() => handleDownloadLinkedDoc(viewingLink)}
+                style={{ padding: "6px 12px", fontSize: "14px" }}
+              >
+                Download
+              </button>
+              <button
+                className="history-close-btn"
+                onClick={() => {
+                  setViewingLink(null);
+                  setViewingContent("");
+                }}
+                style={{ padding: "6px 12px", fontSize: "14px" }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
