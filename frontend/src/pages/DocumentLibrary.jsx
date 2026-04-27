@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient";
 import { logAction } from "../lib/actionLogger";
@@ -69,6 +69,7 @@ const DOCUMENT_TYPES = [
   "Certificate",
   "Other",
 ];
+const STATUS_OPTIONS = ["Draft", "Final", "In Review", "Archived"];
 const STATUS_FILTERS = ["All", "In System", "Archived"];
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest updated" },
@@ -133,6 +134,10 @@ function DocumentLibrary() {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
+  const [historyDoc, setHistoryDoc] = useState(null);
+  const [viewingVersion, setViewingVersion] = useState(null);
+  const [restoringVersionId, setRestoringVersionId] = useState(null);
+
   const [genResumeOpen, setGenResumeOpen] = useState(false);
   const [genResumeJobId, setGenResumeJobId] = useState("");
   const [genResumeInstructions, setGenResumeInstructions] = useState("");
@@ -155,6 +160,11 @@ function DocumentLibrary() {
   const [filterIncludeArchived, setFilterIncludeArchived] = useState(false);
   const [sortBy, setSortBy] = useState("updated_desc");
 
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [tagFilter, setTagFilter] = useState("All");
+
   const [jobs, setJobs] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
@@ -171,8 +181,9 @@ function DocumentLibrary() {
       return;
     }
 
-    const res = await fetch(`${API}/documents/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await api.get(`/documents/me`, {
+      caller: "DocumentLibrary.fetchDocuments",
+      action: "load_documents",
     });
 
     if (!res.ok) {
