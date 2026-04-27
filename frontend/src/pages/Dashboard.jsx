@@ -162,42 +162,6 @@ function Dashboard() {
     }
   };
 
-  const handleDashboardDownload = async (link) => {
-    const doc = documents.find((d) => d.current_version_id === link.version_id);
-    if (!doc) {
-      setActionMessage("Cannot resolve document for download.");
-      setTimeout(() => setActionMessage(""), 3000);
-      return;
-    }
-    try {
-      const res = await api.get(`/documents/${doc.document_id}/download`, {
-        caller: "Dashboard.handleDashboardDownload",
-        action: "download_linked_document",
-      });
-      if (!res.ok) {
-        return;
-      }
-      const blob = await res.blob();
-      const contentDisposition = res.headers.get("Content-Disposition") || "";
-      const filenameMatch = contentDisposition.match(
-        /filename="?([^";\n]+)"?/i
-      );
-      const filename = filenameMatch
-        ? filenameMatch[1]
-        : doc.title || "document";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      // silent; api client logs it
-    }
-  };
-
   const handleSaveJobEdit = async () => {
     if (!editingJob) return;
     setIsSavingJob(true);
@@ -851,81 +815,32 @@ function Dashboard() {
                 )}
 
                 {jobDocuments.length > 0 && (
-                  <div className="job-documents-section">
-                    <div className="job-documents-header">
-                      <h3>Linked Documents</h3>
-                    </div>
-                    <table className="job-documents-table">
-                      <thead>
-                        <tr>
-                          <th>Title</th>
-                          <th>Type</th>
-                          <th>Linked</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {jobDocuments.map((link) => {
-                          const doc = documents.find(
-                            (d) => d.current_version_id === link.version_id
-                          );
-                          return (
-                            <tr key={link.link_id}>
-                              <td>
-                                {doc
-                                  ? doc.title
-                                  : `Version #${link.version_id}`}
-                              </td>
-                              <td>
-                                {doc ? doc.document_type : link.role || "—"}
-                              </td>
-                              <td>
-                                {link.linked_at
-                                  ? new Date(
-                                      link.linked_at
-                                    ).toLocaleDateString()
-                                  : "—"}
-                              </td>
-                              <td>
-                                <div className="job-documents-actions">
-                                  {doc && (
-                                    <button
-                                      className="doclibrary-action-btn doclibrary-view-btn"
-                                      onClick={() => setViewingDoc(doc)}
-                                      title="View"
-                                    >
-                                      View
-                                    </button>
-                                  )}
-                                  {doc && (
-                                    <button
-                                      className="doclibrary-action-btn"
-                                      style={{
-                                        background: "#22c55e",
-                                        color: "#fff",
-                                      }}
-                                      onClick={() =>
-                                        handleDashboardDownload(link)
-                                      }
-                                      title="Download"
-                                    >
-                                      Download
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {jobDocuments.length === 0 && (
-                  <div className="job-documents-section">
-                    <p className="job-documents-empty">
-                      No documents linked to this job.
-                    </p>
+                  <div className="job-detail-section">
+                    <h3>Linked Documents</h3>
+                    {jobDocuments.map((link) => (
+                      <div
+                        key={link.link_id}
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--text-muted)",
+                          marginBottom: "0.25rem",
+                        }}
+                      >
+                        📄{" "}
+                        {link.document_title || `Version #${link.version_id}`}
+                        {link.role && (
+                          <span
+                            style={{
+                              marginLeft: "0.5rem",
+                              opacity: 0.6,
+                              textTransform: "capitalize",
+                            }}
+                          >
+                            ({link.role.replace("_", " ")})
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -986,81 +901,32 @@ function Dashboard() {
                   )}
 
                   {jobDocuments.length > 0 && (
-                    <div className="job-documents-section">
-                      <div className="job-documents-header">
-                        <h3>Linked Documents</h3>
-                      </div>
-                      <table className="job-documents-table">
-                        <thead>
-                          <tr>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th>Linked</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {jobDocuments.map((link) => {
-                            const doc = documents.find(
-                              (d) => d.current_version_id === link.version_id
-                            );
-                            return (
-                              <tr key={link.link_id}>
-                                <td>
-                                  {doc
-                                    ? doc.title
-                                    : `Version #${link.version_id}`}
-                                </td>
-                                <td>
-                                  {doc ? doc.document_type : link.role || "—"}
-                                </td>
-                                <td>
-                                  {link.linked_at
-                                    ? new Date(
-                                        link.linked_at
-                                      ).toLocaleDateString()
-                                    : "—"}
-                                </td>
-                                <td>
-                                  <div className="job-documents-actions">
-                                    {doc && (
-                                      <button
-                                        className="doclibrary-action-btn doclibrary-view-btn"
-                                        onClick={() => setViewingDoc(doc)}
-                                        title="View"
-                                      >
-                                        View
-                                      </button>
-                                    )}
-                                    {doc && (
-                                      <button
-                                        className="doclibrary-action-btn"
-                                        style={{
-                                          background: "#22c55e",
-                                          color: "#fff",
-                                        }}
-                                        onClick={() =>
-                                          handleDashboardDownload(link)
-                                        }
-                                        title="Download"
-                                      >
-                                        Download
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {jobDocuments.length === 0 && (
-                    <div className="job-documents-section">
-                      <p className="job-documents-empty">
-                        No documents linked to this job.
-                      </p>
+                    <div className="job-detail-section">
+                      <h3>Linked Documents</h3>
+                      {jobDocuments.map((link) => (
+                        <div
+                          key={link.link_id}
+                          style={{
+                            fontSize: "0.85rem",
+                            color: "var(--text-muted)",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          📄{" "}
+                          {link.document_title || `Version #${link.version_id}`}
+                          {link.role && (
+                            <span
+                              style={{
+                                marginLeft: "0.5rem",
+                                opacity: 0.6,
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              ({link.role.replace("_", " ")})
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
 
