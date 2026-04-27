@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "./Applications.css";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { api } from "../lib/apiClient";
@@ -74,7 +75,13 @@ function Pipeline({ current }) {
   );
 }
 
-function ApplicationCard({ job, onRemove, onStageChange }) {
+function ApplicationCard({
+  job,
+  onRemove,
+  onStageChange,
+  isHighlighted,
+  cardRef,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
@@ -113,18 +120,47 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
   const [newInterview, setNewInterview] = useState({
     round_type: "",
     scheduled_at: "",
+    prep_notes: "",
   });
   const [interviewError, setInterviewError] = useState("");
+  const [expandedInterviewId, setExpandedInterviewId] = useState(null);
+  const [editingPrepId, setEditingPrepId] = useState(null);
+  const [prepNotesDraft, setPrepNotesDraft] = useState("");
+  const [prepNotesSaving, setPrepNotesSaving] = useState(false);
+  const [prepNotesError, setPrepNotesError] = useState("");
 
   const [showDocs, setShowDocs] = useState(false);
   const [docLinks, setDocLinks] = useState([]);
-  const [docLinksLoaded, setDocLinksLoaded] = useState(false);
+  const [docLinksLoading, setDocLinksLoading] = useState(false);
+  const [addingLink, setAddingLink] = useState(false);
+  const [availableDocs, setAvailableDocs] = useState([]);
+  const [newLink, setNewLink] = useState({ document_id: "", role: "resume" });
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [unlinkingId, setUnlinkingId] = useState(null);
+  const [viewingLink, setViewingLink] = useState(null);
+  const [viewingContent, setViewingContent] = useState("");
+  const [viewingLoading, setViewingLoading] = useState(false);
 
   const [showNotes, setShowNotes] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState(job.outcome_notes || "");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesError, setNotesError] = useState("");
+
+  const [showResearch, setShowResearch] = useState(false);
+  const [researchNotes, setResearchNotes] = useState(
+    job.company_research_notes || ""
+  );
+  const [editingResearch, setEditingResearch] = useState(false);
+  const [researchValue, setResearchValue] = useState(
+    job.company_research_notes || ""
+  );
+  const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [aiContext, setAiContext] = useState("");
+  const [isResearching, setIsResearching] = useState(false);
+  const [researchSaving, setResearchSaving] = useState(false);
+  const [researchError, setResearchError] = useState("");
 
   const handleStageChange = async (newStage) => {
     if (newStage === job.stage || updatingStage) return;
@@ -350,13 +386,14 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
         {
           round_type: newInterview.round_type,
           scheduled_at: newInterview.scheduled_at,
+          prep_notes: newInterview.prep_notes || null,
         },
         { caller: "Applications.createInterview", action: "create_interview" }
       );
       if (res.ok) {
         const created = await res.json();
         setInterviews((prev) => [...prev, created]);
-        setNewInterview({ round_type: "", scheduled_at: "" });
+        setNewInterview({ round_type: "", scheduled_at: "", prep_notes: "" });
         setInterviewError("");
         setAddingInterview(false);
         setActivity(null);
@@ -386,20 +423,150 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
     }
   };
 
+  const savePrepNotes = async (interview_id) => {
+    setPrepNotesSaving(true);
+    setPrepNotesError("");
+    try {
+      const res = await api.put(
+        `/interviews/${interview_id}`,
+        { prep_notes: prepNotesDraft },
+        { caller: "Applications.savePrepNotes", action: "save_prep_notes" }
+      );
+      if (res.ok) {
+        setInterviews((prev) =>
+          prev.map((iv) =>
+            iv.interview_id === interview_id
+              ? { ...iv, prep_notes: prepNotesDraft }
+              : iv
+          )
+        );
+        setEditingPrepId(null);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        setPrepNotesError(errBody.detail || "Failed to save.");
+      }
+    } catch {
+      setPrepNotesError("Failed to save.");
+    }
+    setPrepNotesSaving(false);
+  };
+
   const loadDocLinks = async () => {
-    if (!showDocs && !docLinksLoaded) {
+    if (!showDocs) {
+      setDocLinksLoading(true);
       try {
-        const res = await api.get(`/documents/links/by-job/${job.job_id}`, {
-          caller: "Applications.loadDocLinks",
-          action: "fetch_doc_links",
-        });
+        const res = await api.get(
+          `/documents/links/by-job/${job.job_id}/detailed`,
+          { caller: "Applications.loadDocLinks", action: "fetch_doc_links" }
+        );
         if (res.ok) setDocLinks(await res.json());
       } catch {
         // leave empty
+      } finally {
+        setDocLinksLoading(false);
       }
-      setDocLinksLoaded(true);
     }
     setShowDocs((v) => !v);
+  };
+
+  const handleOpenLinkForm = async () => {
+    setAddingLink(true);
+    setLinkError("");
+    if (availableDocs.length === 0) {
+      const res = await api.get("/documents/me", {
+        caller: "Applications.handleOpenLinkForm",
+        action: "fetch_docs_for_link_picker",
+      });
+      if (res.ok) {
+        const docs = await res.json();
+        setAvailableDocs(
+          docs.filter((d) => !d.is_deleted && d.current_version_id)
+        );
+      }
+    }
+  };
+
+  const handleLinkDoc = async () => {
+    if (!newLink.document_id) {
+      setLinkError("Pick a document first.");
+      return;
+    }
+    const doc = availableDocs.find(
+      (d) => String(d.document_id) === String(newLink.document_id)
+    );
+    if (!doc?.current_version_id) {
+      setLinkError("This document has no saved version yet.");
+      return;
+    }
+    const alreadyLinked = docLinks.some(
+      (l) =>
+        l.document_id === doc.document_id && (l.role || "") === newLink.role
+    );
+    if (alreadyLinked) {
+      setLinkError(
+        "This document is already linked to this job under that role."
+      );
+      return;
+    }
+    setLinkSaving(true);
+    setLinkError("");
+    const res = await api.post(
+      "/documents/links",
+      {
+        job_id: job.job_id,
+        version_id: doc.current_version_id,
+        role: newLink.role,
+      },
+      { caller: "Applications.handleLinkDoc", action: "link_document_to_job" }
+    );
+    setLinkSaving(false);
+    if (!res.ok) {
+      setLinkError(
+        "Failed to link — that document may already be linked under that role."
+      );
+      return;
+    }
+    const refreshed = await api.get(
+      `/documents/links/by-job/${job.job_id}/detailed`,
+      { caller: "Applications.handleLinkDoc", action: "refresh_doc_links" }
+    );
+    if (refreshed.ok) setDocLinks(await refreshed.json());
+    setAddingLink(false);
+    setNewLink({ document_id: "", role: "resume" });
+  };
+
+  const handleViewLinkedDoc = async (link) => {
+    setViewingLink(link);
+    setViewingContent("");
+    setViewingLoading(true);
+    const res = await api.get(
+      `/documents/${link.document_id}/versions/${link.version_id}/content`,
+      {
+        caller: "Applications.handleViewLinkedDoc",
+        action: "view_linked_document_version",
+      }
+    );
+    setViewingLoading(false);
+    if (res.ok) {
+      const data = await res.json();
+      setViewingContent(data.content || "");
+    } else {
+      setViewingContent("(Could not load this document version.)");
+    }
+  };
+
+  const handleUnlinkDoc = async (link) => {
+    const label = link.document_title || `Version #${link.version_id}`;
+    if (!window.confirm(`Unlink "${label}" from this job?`)) return;
+    setUnlinkingId(link.link_id);
+    const res = await api.delete(`/documents/links/${link.link_id}`, {
+      caller: "Applications.handleUnlinkDoc",
+      action: "unlink_document_from_job",
+    });
+    setUnlinkingId(null);
+    if (res.ok) {
+      setDocLinks((prev) => prev.filter((l) => l.link_id !== link.link_id));
+    }
   };
 
   const saveNotes = async () => {
@@ -425,20 +592,73 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
     setNotesSaving(false);
   };
 
+  const saveResearch = async () => {
+    setResearchSaving(true);
+    setResearchError("");
+    try {
+      const res = await api.put(
+        `/jobs/${job.job_id}`,
+        { company_research_notes: researchValue },
+        { caller: "Applications.saveResearch", action: "save_research_notes" }
+      );
+      if (res.ok) {
+        setResearchNotes(researchValue);
+        setEditingResearch(false);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        setResearchError(errBody.detail || "Failed to save.");
+      }
+    } catch {
+      setResearchError("Failed to save.");
+    }
+    setResearchSaving(false);
+  };
+
+  const generateResearch = async () => {
+    setIsResearching(true);
+    setResearchError("");
+    try {
+      const res = await api.post(
+        `/jobs/${job.job_id}/research`,
+        { context: aiContext },
+        {
+          caller: "Applications.generateResearch",
+          action: "generate_company_research",
+        }
+      );
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        setResearchError(errBody.detail || "Failed to generate research.");
+      } else {
+        const data = await res.json();
+        const notes = data.company_research_notes || "";
+        setResearchNotes(notes);
+        setResearchValue(notes);
+        setShowAiPrompt(false);
+        setAiContext("");
+      }
+    } catch {
+      setResearchError("Failed to reach server.");
+    }
+    setIsResearching(false);
+  };
+
   return (
     <div
+      ref={cardRef}
       className="app-card"
       style={{
-        border:
-          job.stage === "Interview"
+        border: isHighlighted
+          ? "2px solid #4f8ef7"
+          : job.stage === "Interview"
             ? "2px solid orange"
             : job.stage === "Offer" || job.stage === "Accepted"
               ? "2px solid green"
               : job.stage === "Rejected" || job.stage === "Withdrawn"
                 ? "2px solid red"
                 : "1px solid #333",
-        boxShadow: "none",
-        transition: "0.2s ease-in-out",
+        boxShadow: isHighlighted ? "0 0 0 3px rgba(79,142,247,0.25)" : "none",
+        transition: "border 0.3s ease, box-shadow 0.3s ease",
       }}
     >
       <div className="app-card-header">
@@ -734,20 +954,121 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
             {interviews.length === 0 ? (
               <p className="followup-empty">No interviews scheduled yet.</p>
             ) : (
-              <ul className="followup-list">
+              <ul className="followup-list" style={{ flexDirection: "column" }}>
                 {interviews.map((iv) => (
-                  <li key={iv.interview_id} className="followup-item">
-                    <span className="followup-desc">📅 {iv.round_type}</span>
-                    <span className="followup-date">
-                      {new Date(iv.scheduled_at).toLocaleString()}
-                    </span>
-                    <button
-                      className="followup-delete-btn"
-                      onClick={() => deleteInterview(iv.interview_id)}
-                      title="Delete"
+                  <li
+                    key={iv.interview_id}
+                    style={{
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                    }}
+                    className="followup-item"
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        width: "100%",
+                      }}
                     >
-                      ✕
-                    </button>
+                      <span className="followup-desc">📅 {iv.round_type}</span>
+                      <span className="followup-date">
+                        {new Date(iv.scheduled_at).toLocaleString()}
+                      </span>
+                      <button
+                        className="app-history-btn"
+                        style={{ marginLeft: "auto", fontSize: "12px" }}
+                        onClick={() =>
+                          setExpandedInterviewId((prev) =>
+                            prev === iv.interview_id ? null : iv.interview_id
+                          )
+                        }
+                      >
+                        Prep Notes{" "}
+                        {expandedInterviewId === iv.interview_id ? "▾" : "▸"}
+                      </button>
+                      <button
+                        className="followup-delete-btn"
+                        onClick={() => deleteInterview(iv.interview_id)}
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {expandedInterviewId === iv.interview_id && (
+                      <div style={{ width: "100%", marginTop: "8px" }}>
+                        {editingPrepId === iv.interview_id ? (
+                          <div className="followup-add-form">
+                            <textarea
+                              className="followup-input"
+                              rows={4}
+                              placeholder="Add prep notes, questions to ask, topics to review…"
+                              value={prepNotesDraft}
+                              onChange={(e) =>
+                                setPrepNotesDraft(e.target.value)
+                              }
+                              style={{ resize: "vertical" }}
+                            />
+                            {prepNotesError && (
+                              <p
+                                style={{
+                                  color: "#ef4444",
+                                  fontSize: "13px",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                {prepNotesError}
+                              </p>
+                            )}
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button
+                                className="app-history-btn"
+                                onClick={() => savePrepNotes(iv.interview_id)}
+                                disabled={prepNotesSaving}
+                              >
+                                {prepNotesSaving ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                className="app-history-btn"
+                                onClick={() => {
+                                  setEditingPrepId(null);
+                                  setPrepNotesError("");
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {iv.prep_notes ? (
+                              <p
+                                className="followup-desc"
+                                style={{ whiteSpace: "pre-wrap" }}
+                              >
+                                {iv.prep_notes}
+                              </p>
+                            ) : (
+                              <p className="followup-empty">
+                                No prep notes yet.
+                              </p>
+                            )}
+                            <button
+                              className="app-history-btn"
+                              style={{ marginTop: "6px" }}
+                              onClick={() => {
+                                setEditingPrepId(iv.interview_id);
+                                setPrepNotesDraft(iv.prep_notes || "");
+                                setPrepNotesError("");
+                              }}
+                            >
+                              {iv.prep_notes ? "Edit Notes" : "+ Add Notes"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -777,6 +1098,19 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
                     }))
                   }
                 />
+                <textarea
+                  className="followup-input"
+                  rows={3}
+                  placeholder="Prep notes (optional) — topics to review, questions to ask…"
+                  value={newInterview.prep_notes}
+                  onChange={(e) =>
+                    setNewInterview((prev) => ({
+                      ...prev,
+                      prep_notes: e.target.value,
+                    }))
+                  }
+                  style={{ resize: "vertical" }}
+                />
                 {interviewError && (
                   <p
                     style={{
@@ -796,7 +1130,11 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
                     className="app-history-btn"
                     onClick={() => {
                       setAddingInterview(false);
-                      setNewInterview({ round_type: "", scheduled_at: "" });
+                      setNewInterview({
+                        round_type: "",
+                        scheduled_at: "",
+                        prep_notes: "",
+                      });
                       setInterviewError("");
                     }}
                   >
@@ -828,7 +1166,9 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
         </button>
         {showDocs && (
           <div className="followup-body">
-            {docLinks.length === 0 ? (
+            {docLinksLoading ? (
+              <p className="followup-empty">Loading…</p>
+            ) : docLinks.length === 0 ? (
               <p className="followup-empty">
                 No documents linked to this job yet. Generate a resume or cover
                 letter from the Dashboard or Document Library.
@@ -838,12 +1178,245 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
                 {docLinks.map((link) => (
                   <li key={link.link_id} className="followup-item">
                     <span className="followup-desc">
-                      Version #{link.version_id}
+                      📄 {link.document_title || `Version #${link.version_id}`}
                     </span>
-                    <span className="followup-date">{link.role || "—"}</span>
+                    <span
+                      className="followup-date"
+                      style={{ textTransform: "capitalize" }}
+                    >
+                      {(link.role || "—").replace("_", " ")}
+                    </span>
+                    <button
+                      className="app-history-btn"
+                      onClick={() => handleViewLinkedDoc(link)}
+                      style={{ padding: "2px 10px", fontSize: "12px" }}
+                      title="View this document"
+                    >
+                      View
+                    </button>
+                    <button
+                      className="followup-delete-btn"
+                      onClick={() => handleUnlinkDoc(link)}
+                      disabled={unlinkingId === link.link_id}
+                      title="Unlink this document"
+                    >
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ul>
+            )}
+            {addingLink ? (
+              <div className="followup-add-form">
+                <select
+                  className="followup-input"
+                  value={newLink.document_id}
+                  onChange={(e) =>
+                    setNewLink((prev) => ({
+                      ...prev,
+                      document_id: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">— Pick a document —</option>
+                  {availableDocs.map((d) => (
+                    <option key={d.document_id} value={d.document_id}>
+                      {d.title} ({d.document_type})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="followup-input"
+                  value={newLink.role}
+                  onChange={(e) =>
+                    setNewLink((prev) => ({ ...prev, role: e.target.value }))
+                  }
+                >
+                  <option value="resume">Resume</option>
+                  <option value="cover_letter">Cover Letter</option>
+                  <option value="transcript">Transcript</option>
+                  <option value="certificate">Certificate</option>
+                  <option value="other">Other</option>
+                </select>
+                {linkError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {linkError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={handleLinkDoc}
+                    disabled={linkSaving}
+                  >
+                    {linkSaving ? "Linking…" : "Link"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setAddingLink(false);
+                      setLinkError("");
+                      setNewLink({ document_id: "", role: "resume" });
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="app-history-btn"
+                onClick={handleOpenLinkForm}
+                style={{ marginTop: "8px" }}
+              >
+                + Link a document
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Company Research */}
+      <div className="followup-section">
+        <button
+          className="app-history-btn followup-toggle"
+          onClick={() => setShowResearch((v) => !v)}
+        >
+          Company Research {showResearch ? "▾" : "▸"}
+        </button>
+        {showResearch && (
+          <div className="followup-body">
+            {editingResearch ? (
+              <div className="followup-add-form">
+                <textarea
+                  className="followup-input"
+                  rows={6}
+                  value={researchValue}
+                  onChange={(e) => setResearchValue(e.target.value)}
+                  style={{ resize: "vertical" }}
+                />
+                {researchError && (
+                  <p
+                    style={{
+                      color: "#ef4444",
+                      fontSize: "13px",
+                      margin: "4px 0",
+                    }}
+                  >
+                    {researchError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={saveResearch}
+                    disabled={researchSaving}
+                  >
+                    {researchSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setEditingResearch(false);
+                      setResearchValue(researchNotes);
+                      setResearchError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {researchNotes ? (
+                  <p
+                    className="followup-desc"
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {researchNotes}
+                  </p>
+                ) : (
+                  <p className="followup-empty">No company research yet.</p>
+                )}
+                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setEditingResearch(true);
+                      setShowAiPrompt(false);
+                      setResearchError("");
+                    }}
+                  >
+                    {researchNotes ? "Edit" : "Add Manually"}
+                  </button>
+                  <button
+                    className="app-history-btn"
+                    onClick={() => {
+                      setShowAiPrompt((v) => !v);
+                      setEditingResearch(false);
+                      setResearchError("");
+                    }}
+                  >
+                    {showAiPrompt ? "Cancel AI" : "Research with AI ✦"}
+                  </button>
+                </div>
+                {showAiPrompt && (
+                  <div
+                    className="followup-add-form"
+                    style={{ marginTop: "8px" }}
+                  >
+                    <label className="details-label">
+                      Context for AI (optional)
+                    </label>
+                    <textarea
+                      className="followup-input"
+                      rows={3}
+                      placeholder="What do you already know? Role details, why you're interested, etc."
+                      value={aiContext}
+                      onChange={(e) => setAiContext(e.target.value)}
+                      style={{ resize: "vertical" }}
+                      disabled={isResearching}
+                    />
+                    {researchError && (
+                      <p
+                        style={{
+                          color: "#ef4444",
+                          fontSize: "13px",
+                          margin: "4px 0",
+                        }}
+                      >
+                        {researchError}
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        className="app-history-btn"
+                        onClick={generateResearch}
+                        disabled={isResearching}
+                      >
+                        {isResearching ? "Researching…" : "Generate Research"}
+                      </button>
+                      <button
+                        className="app-history-btn"
+                        onClick={() => {
+                          setShowAiPrompt(false);
+                          setAiContext("");
+                          setResearchError("");
+                        }}
+                        disabled={isResearching}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1024,6 +1597,63 @@ function ApplicationCard({ job, onRemove, onStageChange }) {
               No history yet.
             </p>
           )}
+        </div>
+      )}
+
+      {viewingLink && (
+        <div
+          className="history-overlay"
+          onClick={() => {
+            setViewingLink(null);
+            setViewingContent("");
+          }}
+        >
+          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="history-close-btn"
+              onClick={() => {
+                setViewingLink(null);
+                setViewingContent("");
+              }}
+            >
+              ✕
+            </button>
+            <h2 className="history-modal-title">
+              📄{" "}
+              {viewingLink.document_title ||
+                `Version #${viewingLink.version_id}`}
+              <span
+                style={{
+                  marginLeft: 10,
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                  textTransform: "capitalize",
+                }}
+              >
+                {(viewingLink.role || "—").replace("_", " ")} · v
+                {viewingLink.version_id}
+              </span>
+            </h2>
+            {viewingLoading ? (
+              <p>Loading…</p>
+            ) : (
+              <pre
+                style={{
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  background: "var(--surface-2)",
+                  padding: "1rem",
+                  borderRadius: 8,
+                  maxHeight: "50vh",
+                  overflowY: "auto",
+                  fontSize: "13px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {viewingContent}
+              </pre>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -1440,6 +2070,10 @@ function Applications() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showAddJob, setShowAddJob] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const [autoLinkMsg, setAutoLinkMsg] = useState("");
+  const cardRefs = useRef({});
+  const [searchParams, setSearchParams] = useSearchParams();
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -1469,6 +2103,25 @@ function Applications() {
 
     load();
   }, [token]);
+
+  // Scroll to and highlight a card when navigated here with ?job=<id>
+  useEffect(() => {
+    const jobIdParam = searchParams.get("job");
+    if (!jobIdParam || loading || jobs.length === 0) return;
+    const targetId = Number(jobIdParam);
+    if (!jobs.find((j) => j.job_id === targetId)) return;
+    setFilter("All");
+    setSearch("");
+    setHighlightedId(targetId);
+    setSearchParams({}, { replace: true });
+    setTimeout(() => {
+      cardRefs.current[targetId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 120);
+    setTimeout(() => setHighlightedId(null), 3500);
+  }, [searchParams, loading, jobs]);
 
   const filtered = jobs
     .filter((j) => {
@@ -1506,8 +2159,47 @@ function Applications() {
     }
   };
 
-  const handleJobAdded = (newJob) => {
+  const handleJobAdded = async (newJob) => {
     setJobs((prev) => [newJob, ...prev]);
+    try {
+      const docsRes = await api.get("/documents/me", {
+        caller: "Applications.handleJobAdded",
+        action: "fetch_docs_for_autolink",
+      });
+      if (!docsRes.ok) return;
+      const docs = await docsRes.json();
+      const pick = (type) =>
+        [...docs]
+          .filter(
+            (d) =>
+              d.document_type === type && !d.is_deleted && d.current_version_id
+          )
+          .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+      const resume = pick("Resume");
+      const cover = pick("Cover Letter");
+      const toLink = [
+        resume && { version_id: resume.current_version_id, role: "resume" },
+        cover && { version_id: cover.current_version_id, role: "cover_letter" },
+      ].filter(Boolean);
+      await Promise.all(
+        toLink.map(({ version_id, role }) =>
+          api.post(
+            "/documents/links",
+            { job_id: newJob.job_id, version_id, role },
+            { caller: "Applications.handleJobAdded", action: "autolink_doc" }
+          )
+        )
+      );
+      if (toLink.length > 0) {
+        const labels = toLink.map((l) =>
+          l.role === "resume" ? "Resume" : "Cover Letter"
+        );
+        setAutoLinkMsg(`Linked your latest ${labels.join(" & ")} to this job.`);
+        setTimeout(() => setAutoLinkMsg(""), 4000);
+      }
+    } catch {
+      // auto-link is best-effort
+    }
   };
 
   return (
@@ -1542,6 +2234,27 @@ function Applications() {
             )
           }
         />
+      )}
+
+      {autoLinkMsg && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "1.5rem",
+            right: "1.5rem",
+            background: "#22c55e",
+            color: "#fff",
+            padding: "0.75rem 1.25rem",
+            borderRadius: "8px",
+            fontWeight: 500,
+            fontSize: "0.9rem",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            zIndex: 9999,
+            animation: "fadeInUp 0.2s ease",
+          }}
+        >
+          ✓ {autoLinkMsg}
+        </div>
       )}
 
       <div className="app-page-header">
@@ -1624,6 +2337,10 @@ function Applications() {
                       )
                     )
                   }
+                  isHighlighted={job.job_id === highlightedId}
+                  cardRef={(el) => {
+                    cardRefs.current[job.job_id] = el;
+                  }}
                 />
               ))}
             </div>

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from logging_config import setup_logging  # noqa: E402, I001
+from middleware.error_handler import register_exception_handlers  # noqa: E402
 from middleware.request_logger import RequestLoggingMiddleware  # noqa: E402
 from routers import (  # noqa: E402
     auth,
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Candidate Job Tracker API", lifespan=lifespan)
 
+register_exception_handlers(app)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,

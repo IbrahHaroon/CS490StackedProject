@@ -88,3 +88,23 @@ jobs:
       - name: Format check
         working-directory: frontend
         run: npm run format:check
+        
+  deployment-health-check:
+    name: Deployment Health Check
+    runs-on: ubuntu-latest
+    needs:
+      - backend-test
+      - backend-lint
+      - frontend-build
+
+    steps:
+      - name: Confirm build pipeline completed
+        run: |
+          echo "Backend tests passed."
+          echo "Backend lint passed."
+          echo "Frontend build, lint, and format checks passed."
+
+      - name: Run deployment health placeholder
+        run: |
+          echo "Deployment health check placeholder passed."
+          echo "Ready for deployment once production URL is configured."

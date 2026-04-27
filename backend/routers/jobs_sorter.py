@@ -4,11 +4,21 @@ from sqlalchemy.orm import Session
 from database import get_db
 from database.auth import get_current_user
 from database.models.job import get_dashboard_metrics
+from database.models.job_activity import get_stage_analytics
 from database.models.user import User
 from database.services.job_sorter import SortField, SortOrder, get_sorted_jobs
-from schemas import DashboardMetricsResponse, JobResponse
+from schemas import AnalyticsResponse, DashboardMetricsResponse, JobResponse
 
 router = APIRouter()
+
+
+@router.get("/analytics", response_model=AnalyticsResponse)
+def get_analytics(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Conversion funnel and avg time-in-stage from stored job_activity events."""
+    return get_stage_analytics(session, current_user.user_id)
 
 
 @router.get("/metrics", response_model=DashboardMetricsResponse)
