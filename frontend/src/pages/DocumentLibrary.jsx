@@ -163,7 +163,6 @@ function DocumentLibrary() {
   const [newTitle, setNewTitle] = useState("");
   const fileInputRef = useRef(null);
 
-  const fileInputRef = useRef(null);
   const token = localStorage.getItem("token");
 
   const fetchDocuments = async () => {
