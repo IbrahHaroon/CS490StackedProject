@@ -9,6 +9,7 @@ import Settings from "./pages/Settings.jsx";
 import Applications from "./pages/Applications.jsx";
 import SignIn from "./pages/SignIn";
 import DevLogViewer from "./components/DevLogViewer.jsx";
+import Toast from "./components/Toast.jsx";
 import { api } from "./lib/apiClient";
 import { logNavigation } from "./lib/actionLogger";
 import "./App.css";
@@ -93,6 +94,7 @@ function App() {
         </Routes>
       </main>
       {import.meta.env.VITE_SHOW_CONSOLE === "true" && <DevLogViewer />}
+      <Toast />
     </>
   );
 }

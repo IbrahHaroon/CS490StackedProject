@@ -11,6 +11,54 @@
   color: var(--text-strong);
 }
 
+/* ---- Analytics Section ---- */
+.analytics-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-panel {
+  flex: 1;
+  min-width: 260px;
+  background-color: var(--surface-3);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.analytics-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.analytics-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: var(--surface-2);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  min-width: 88px;
+}
+
+.analytics-card-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.analytics-card-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  text-align: center;
+}
+
 /* ---- Metrics Section ---- */
 .metrics-section {
   background-color: var(--surface-3);
@@ -1223,6 +1271,33 @@
 }
 
 .job-card-resume-link:hover {
+  color: #93c5fd;
+}
+
+.preview-linked-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 0.35rem;
+}
+
+.preview-linked-doc-btn {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  font-size: 0.73rem;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.preview-linked-doc-btn:hover {
   color: #93c5fd;
 }
 

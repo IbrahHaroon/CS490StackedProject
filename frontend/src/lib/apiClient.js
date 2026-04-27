@@ -1,4 +1,5 @@
 import { getActionLogs, markActionLogsFlushed } from "./actionLogger";
+import { emitToast } from "./toastBus";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -88,6 +89,12 @@ export async function apiRequest(path, options = {}, context = {}) {
     response.requestId = requestId;
 
     pushLog(logEntry);
+
+    // Auto-toast on server errors. Skip 401 (token expiry handled in App.jsx).
+    if (response.status >= 500) {
+      emitToast({ message: "Server error — please try again in a moment." });
+    }
+
     return response;
   } catch (error) {
     const durationMs = Math.round(performance.now() - startTime);
@@ -96,6 +103,8 @@ export async function apiRequest(path, options = {}, context = {}) {
     logEntry.error = error.message;
     logEntry.stack = error.stack || null;
     pushLog(logEntry);
+
+    emitToast({ message: "Network error — check your connection." });
     throw error;
   }
 }

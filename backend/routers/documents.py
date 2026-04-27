@@ -43,6 +43,7 @@ from database.models.document_version import (
     create_document_version,
     get_document_version,
     get_versions_for_document,
+    restore_version,
 )
 from database.models.education import get_educations_by_user
 from database.models.experience import get_experiences_by_user
@@ -496,6 +497,67 @@ def create_new_version(
     return version
 
 
+@router.get("/{document_id}/versions/{version_id}/content")
+def read_version_content(
+    document_id: int,
+    version_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read the content of a specific version (not necessarily the current one).
+
+    Mirrors `/documents/{id}/content` but operates on the version named in the
+    URL. Returns 404 if the version doesn't exist or doesn't belong to this
+    document, 403 if the document isn't owned by the current user.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    version = get_document_version(session, version_id)
+    if version is None or version.document_id != document_id:
+        raise HTTPException(
+            status_code=404, detail="Version not found for this document"
+        )
+    if version.content:
+        return {"content": version.content, "format": "text", "editable": True}
+    if version.storage_location and os.path.exists(version.storage_location):
+        try:
+            return _read_file(
+                version.storage_location,
+                os.path.basename(version.storage_location),
+            )
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {e}",
+            )
+    raise HTTPException(status_code=404, detail="Version has no readable content")
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/restore",
+    response_model=DocumentResponse,
+)
+def restore_to_version(
+    document_id: int,
+    version_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set `current_version_id` to an existing prior version of this document.
+
+    Returns the updated Document. 404 if the version doesn't belong to the
+    named document, 403 if the document isn't owned by the current user.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+    updated = restore_version(session, document_id, version_id)
+    if updated is None:
+        raise HTTPException(
+            status_code=404, detail="Version not found for this document"
+        )
+    return updated
+
+
 # --------------------------------------------------------------------------- #
 #  Content read / edit (operates on the current version)                        #
 # --------------------------------------------------------------------------- #
@@ -515,7 +577,7 @@ def read_current_content(
     if version is None:
         raise HTTPException(status_code=404, detail="Current version missing")
     if version.content:
-        return {"content": version.content, "format": "text"}
+        return {"content": version.content, "format": "text", "editable": True}
     if version.storage_location and os.path.exists(version.storage_location):
         try:
             return _read_file(
@@ -683,6 +745,16 @@ async def upload_document(
     with open(dest_path, "wb") as f:
         f.write(contents)
 
+    # For text-based formats, cache extracted content in the DB so the document
+    # remains readable even if the file path is later inaccessible (e.g. different server).
+    extracted_content = None
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext in (".txt", ".md", ".docx"):
+        try:
+            extracted_content = _read_file(dest_path, file.filename).get("content")
+        except Exception:
+            pass  # content stays None; storage_location is the fallback
+
     doc = create_document(
         session,
         current_user.user_id,
@@ -694,6 +766,7 @@ async def upload_document(
         session,
         doc.document_id,
         storage_location=dest_path,
+        content=extracted_content,
         source="upload",
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
@@ -811,6 +884,102 @@ def list_links_for_job(
     if not job or job.user_id != current_user.user_id:
         raise HTTPException(status_code=404, detail="Job not found")
     return get_links_for_job(session, job_id)
+
+
+@router.get("/links/by-job/{job_id}/detailed")
+def list_links_for_job_detailed(
+    job_id: int,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Enriched version of /links/by-job that includes document title and type."""
+    from sqlalchemy import select as sa_select
+
+    from database.models.document import Document
+    from database.models.document_version import DocumentVersion
+    from database.models.job_document_link import JobDocumentLink
+
+    job = get_job(session, job_id)
+    if not job or job.user_id != current_user.user_id:
+        raise HTTPException(status_code=404, detail="Job not found")
+    rows = session.execute(
+        sa_select(
+            JobDocumentLink.link_id,
+            JobDocumentLink.job_id,
+            JobDocumentLink.version_id,
+            JobDocumentLink.role,
+            JobDocumentLink.linked_at,
+            Document.document_id,
+            Document.title.label("document_title"),
+            Document.document_type,
+        )
+        .join(DocumentVersion, JobDocumentLink.version_id == DocumentVersion.version_id)
+        .join(Document, DocumentVersion.document_id == Document.document_id)
+        .where(JobDocumentLink.job_id == job_id)
+        .where(Document.is_deleted.is_(False))
+    ).all()
+    return [
+        {
+            "link_id": r.link_id,
+            "job_id": r.job_id,
+            "version_id": r.version_id,
+            "role": r.role,
+            "linked_at": r.linked_at.isoformat() if r.linked_at else None,
+            "document_id": r.document_id,
+            "document_title": r.document_title,
+            "document_type": r.document_type,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/links/me")
+def list_my_links(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """All document-job links for the current user, enriched with doc + job metadata."""
+    from sqlalchemy import select as sa_select
+
+    from database.models.document import Document
+    from database.models.document_version import DocumentVersion
+    from database.models.job import Job
+    from database.models.job_document_link import JobDocumentLink
+
+    rows = session.execute(
+        sa_select(
+            JobDocumentLink.link_id,
+            JobDocumentLink.job_id,
+            JobDocumentLink.version_id,
+            JobDocumentLink.role,
+            JobDocumentLink.linked_at,
+            Document.document_id,
+            Document.title.label("document_title"),
+            Document.document_type,
+            Job.title.label("job_title"),
+            Job.company_name,
+        )
+        .join(DocumentVersion, JobDocumentLink.version_id == DocumentVersion.version_id)
+        .join(Document, DocumentVersion.document_id == Document.document_id)
+        .join(Job, JobDocumentLink.job_id == Job.job_id)
+        .where(Document.user_id == current_user.user_id)
+        .where(Document.is_deleted.is_(False))
+    ).all()
+    return [
+        {
+            "link_id": r.link_id,
+            "job_id": r.job_id,
+            "version_id": r.version_id,
+            "role": r.role,
+            "linked_at": r.linked_at.isoformat() if r.linked_at else None,
+            "document_id": r.document_id,
+            "document_title": r.document_title,
+            "document_type": r.document_type,
+            "job_title": r.job_title,
+            "company_name": r.company_name,
+        }
+        for r in rows
+    ]
 
 
 # --------------------------------------------------------------------------- #
