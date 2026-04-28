@@ -3,6 +3,7 @@
 Set BLOB_READ_WRITE_TOKEN to enable cloud storage. When unset the caller falls
 back to local-disk storage so local development works without any extra setup.
 """
+
 from __future__ import annotations
 
 import os
@@ -26,12 +27,16 @@ def build_pathname(first_name: str, last_name: str, user_id: int, filename: str)
     """Return a structured blob storage path for a user document."""
     last_initial = (last_name or "X")[0].upper()
     first_initial = (first_name or "X")[0].upper()
-    full_name = re.sub(r"[^\w ]", "", f"{first_name} {last_name}".strip()) or f"user_{user_id}"
+    full_name = (
+        re.sub(r"[^\w ]", "", f"{first_name} {last_name}".strip()) or f"user_{user_id}"
+    )
     safe_file = re.sub(r"[^\w.\-]", "_", filename)
     return f"uploads/{last_initial}/{first_initial}/{full_name}/{user_id}/{safe_file}"
 
 
-def upload(pathname: str, data: bytes, content_type: str = "application/octet-stream") -> str:
+def upload(
+    pathname: str, data: bytes, content_type: str = "application/octet-stream"
+) -> str:
     """Upload bytes to Vercel Blob. Returns the public URL."""
     resp = httpx.put(
         f"{_BLOB_API}/{pathname}",

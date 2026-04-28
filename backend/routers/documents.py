@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import base64
 import os
-import re
 import tempfile
 import urllib.parse
 from datetime import date as date_class
@@ -25,6 +24,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import FileResponse, Response
 from PyPDF2 import PdfReader
 from sqlalchemy.orm import Session
+from utils import blob_storage
 
 from database import get_db
 from database.auth import get_current_user
@@ -58,7 +58,6 @@ from database.models.job_document_link import (
 from database.models.profile import get_profile_by_user_id
 from database.models.skill import get_skills_for_user
 from database.models.user import User
-from utils import blob_storage
 from schemas import (
     DocumentCreate,
     DocumentResponse,
@@ -371,7 +370,9 @@ def _mime_for_ext(ext: str) -> str:
 
 def _filename_from_location(storage_location: str) -> str:
     """Extract filename from either a local path or a blob URL."""
-    return urllib.parse.unquote(storage_location.rstrip("/").split("/")[-1].split("?")[0])
+    return urllib.parse.unquote(
+        storage_location.rstrip("/").split("/")[-1].split("?")[0]
+    )
 
 
 def _read_bytes(data: bytes, filename: str) -> dict:
@@ -405,7 +406,11 @@ def _read_bytes(data: bytes, filename: str) -> dict:
             "format": ext[1:],
             "editable": True,
         }
-    return {"content": f"[Unsupported file type: {ext}]", "format": "unknown", "editable": False}
+    return {
+        "content": f"[Unsupported file type: {ext}]",
+        "format": "unknown",
+        "editable": False,
+    }
 
 
 def _build_job_context(job) -> str:
@@ -1054,7 +1059,11 @@ async def upload_document(
             )
     else:
         dest_path = _build_upload_path(
-            UPLOAD_BASE, profile.first_name, profile.last_name, current_user.user_id, file.filename
+            UPLOAD_BASE,
+            profile.first_name,
+            profile.last_name,
+            current_user.user_id,
+            file.filename,
         )
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         with open(dest_path, "wb") as f:
@@ -1459,7 +1468,11 @@ def _generate_doc(
             _write_docx_content(storage_loc, content)
 
     version = create_document_version(
-        session, doc.document_id, storage_location=storage_loc, content=content, source="ai"
+        session,
+        doc.document_id,
+        storage_location=storage_loc,
+        content=content,
+        source="ai",
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
     if job is not None:

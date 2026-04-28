@@ -17,7 +17,6 @@ import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-
 from utils import blob_storage
 
 from database import get_db
@@ -176,7 +175,9 @@ async def upload_library_document(
             profile.first_name, profile.last_name, current_user.user_id, safe_name
         )
         try:
-            dest_path = blob_storage.upload(pathname, contents, _MIME.get(ext, "application/octet-stream"))
+            dest_path = blob_storage.upload(
+                pathname, contents, _MIME.get(ext, "application/octet-stream")
+            )
         except Exception as exc:
             logger.error(
                 "Library upload: failed to upload to blob storage",
