@@ -471,9 +471,18 @@ function DocumentLibrary() {
 
   const handleArchive = async (doc) => {
     const newDeleted = !doc.is_deleted;
+    const storageKey = `doc_prev_status_${doc.document_id}`;
+    let newStatus;
+    if (newDeleted) {
+      localStorage.setItem(storageKey, doc.status);
+      newStatus = "Archived";
+    } else {
+      newStatus = localStorage.getItem(storageKey) || "Draft";
+      localStorage.removeItem(storageKey);
+    }
     const res = await api.put(
       `/documents/${doc.document_id}`,
-      { is_deleted: newDeleted },
+      { is_deleted: newDeleted, status: newStatus },
       { caller: "DocumentLibrary.handleArchive", action: "archive_document" }
     );
     if (res.ok) {
@@ -1640,14 +1649,24 @@ function DocumentLibrary() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "4px",
-                color: "#000000",
+                gap: "6px",
+                color: "#e2e8f0",
+                cursor: "pointer",
+                userSelect: "none",
+                fontSize: "0.875rem",
+                fontWeight: 500,
               }}
             >
               <input
                 type="checkbox"
                 checked={filterIncludeArchived}
                 onChange={(e) => setFilterIncludeArchived(e.target.checked)}
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  accentColor: "#6366f1",
+                  cursor: "pointer",
+                }}
               />
               Show archived
             </label>
