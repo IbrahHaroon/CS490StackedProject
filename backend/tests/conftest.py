@@ -1,7 +1,7 @@
 """Shared test fixtures for analytics testing."""
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from database.base import Base
@@ -18,6 +18,13 @@ def test_db_url():
 def engine(test_db_url):
     """Create test database engine."""
     engine = create_engine(test_db_url, connect_args={"check_same_thread": False})
+
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
