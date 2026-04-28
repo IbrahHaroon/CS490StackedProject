@@ -18,6 +18,8 @@ import re
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from utils import blob_storage
+
 from database import get_db
 from database.auth import get_current_user
 from database.models.document import create_document, get_document, update_document
@@ -162,25 +164,47 @@ async def upload_library_document(
             detail="User profile not found — create a profile before uploading documents.",
         )
 
-    # ── 5. Build destination path and write to disk ───────────────────────────
-    dest_path = _build_upload_path(
-        profile.first_name, profile.last_name, current_user.user_id, safe_name
-    )
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-
-    try:
-        with open(dest_path, "wb") as fh:
-            fh.write(contents)
-    except OSError:
-        logger.error(
-            "Library upload: failed to write file to disk",
-            extra={"user_id": current_user.user_id, "upload_filename": safe_name},
-            exc_info=True,
+    # ── 5. Persist to Vercel Blob (cloud) or local disk ──────────────────────
+    _MIME = {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt": "text/plain",
+        ".md": "text/markdown",
+    }
+    if blob_storage.enabled():
+        pathname = blob_storage.build_pathname(
+            profile.first_name, profile.last_name, current_user.user_id, safe_name
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not save the uploaded file. Please try again.",
+        try:
+            dest_path = blob_storage.upload(pathname, contents, _MIME.get(ext, "application/octet-stream"))
+        except Exception as exc:
+            logger.error(
+                "Library upload: failed to upload to blob storage",
+                extra={"user_id": current_user.user_id, "upload_filename": safe_name},
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Could not save the uploaded file: {exc}",
+            )
+    else:
+        dest_path = _build_upload_path(
+            profile.first_name, profile.last_name, current_user.user_id, safe_name
         )
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        try:
+            with open(dest_path, "wb") as fh:
+                fh.write(contents)
+        except OSError:
+            logger.error(
+                "Library upload: failed to write file to disk",
+                extra={"user_id": current_user.user_id, "upload_filename": safe_name},
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not save the uploaded file. Please try again.",
+            )
 
     # ── 6. Create the v2 document + initial version + tags ───────────────────
     document = create_document(

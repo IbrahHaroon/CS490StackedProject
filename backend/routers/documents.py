@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import tempfile
+import urllib.parse
 from datetime import date as date_class
 
 from docx import Document as DocxDocument
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from PyPDF2 import PdfReader
 from sqlalchemy.orm import Session
 
@@ -56,6 +58,7 @@ from database.models.job_document_link import (
 from database.models.profile import get_profile_by_user_id
 from database.models.skill import get_skills_for_user
 from database.models.user import User
+from utils import blob_storage
 from schemas import (
     DocumentCreate,
     DocumentResponse,
@@ -357,6 +360,54 @@ def _media_type(filename: str) -> str:
     }.get(ext, "application/octet-stream")
 
 
+def _mime_for_ext(ext: str) -> str:
+    return {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt": "text/plain",
+        ".md": "text/markdown",
+    }.get(ext.lower(), "application/octet-stream")
+
+
+def _filename_from_location(storage_location: str) -> str:
+    """Extract filename from either a local path or a blob URL."""
+    return urllib.parse.unquote(storage_location.rstrip("/").split("/")[-1].split("?")[0])
+
+
+def _read_bytes(data: bytes, filename: str) -> dict:
+    """Parse raw bytes into the same dict shape returned by _read_file."""
+    import io
+
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext == ".pdf":
+        try:
+            text = "\n".join(
+                p.extract_text() or "" for p in PdfReader(io.BytesIO(data)).pages
+            ).strip()
+        except Exception:
+            text = ""
+        return {
+            "content": text,
+            "format": "pdf",
+            "binary_data": base64.b64encode(data).decode(),
+            "editable": True,
+        }
+    if ext == ".docx":
+        doc = DocxDocument(io.BytesIO(data))
+        return {
+            "content": "\n".join(p.text for p in doc.paragraphs).strip(),
+            "format": "docx",
+            "editable": True,
+        }
+    if ext in (".txt", ".md"):
+        return {
+            "content": data.decode("utf-8", errors="replace"),
+            "format": ext[1:],
+            "editable": True,
+        }
+    return {"content": f"[Unsupported file type: {ext}]", "format": "unknown", "editable": False}
+
+
 def _build_job_context(job) -> str:
     parts = [
         "\nTARGET JOB:",
@@ -507,9 +558,11 @@ def hard_delete_document_endpoint(
     """Hard delete (cascades to versions/tags/links). Prefer PUT with is_deleted=True for archive."""
     doc = get_document(session, document_id)
     _ensure_owns(doc, current_user)
-    # Best-effort: remove uploaded file if any version stored a file location
+    # Best-effort: remove stored files for all versions
     for version in get_versions_for_document(session, document_id):
-        if version.storage_location and os.path.exists(version.storage_location):
+        if blob_storage.is_blob_url(version.storage_location):
+            blob_storage.delete(version.storage_location)
+        elif version.storage_location and os.path.exists(version.storage_location):
             try:
                 os.remove(version.storage_location)
             except Exception:
@@ -558,22 +611,32 @@ def duplicate_document(
 
     new_storage_location = None
 
-    # If the original has a file, copy it to a new path for the duplicate
-    if cv.storage_location and os.path.exists(cv.storage_location):
+    if blob_storage.is_blob_url(cv.storage_location):
+        # Duplicate the blob under a new name in the same path prefix
+        src_filename = _filename_from_location(cv.storage_location)
+        name_parts = os.path.splitext(src_filename)
+        dup_name = f"{name_parts[0]}_copy{name_parts[1]}"
+        parsed = urllib.parse.urlparse(cv.storage_location)
+        parent = parsed.path.lstrip("/").rsplit("/", 1)[0]
+        dup_pathname = f"{parent}/{dup_name}" if parent else dup_name
+        try:
+            data = blob_storage.fetch(cv.storage_location)
+            new_storage_location = blob_storage.upload(
+                dup_pathname, data, _mime_for_ext(name_parts[1])
+            )
+        except Exception:
+            new_storage_location = None
+    elif cv.storage_location and os.path.exists(cv.storage_location):
+        # Copy the local file to a new path for the duplicate
         src_path = cv.storage_location
         src_dir = os.path.dirname(src_path)
         src_name = os.path.basename(src_path)
-
-        # Add "_copy" to filename before extension
         name_parts = os.path.splitext(src_name)
         dup_name = f"{name_parts[0]}_copy{name_parts[1]}"
         new_storage_location = os.path.join(src_dir, dup_name)
-
-        # Copy the file to new path
         try:
             shutil.copy2(src_path, new_storage_location)
         except Exception:
-            # If copy fails, still continue with content
             new_storage_location = None
 
     # Create version for the duplicate
@@ -658,6 +721,15 @@ def read_version_content(
         )
     if version.content:
         return {"content": version.content, "format": "text", "editable": True}
+    if blob_storage.is_blob_url(version.storage_location):
+        try:
+            data = blob_storage.fetch(version.storage_location)
+            return _read_bytes(data, _filename_from_location(version.storage_location))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch file from storage: {e}",
+            )
     if version.storage_location and os.path.exists(version.storage_location):
         try:
             return _read_file(
@@ -717,6 +789,15 @@ def read_current_content(
         raise HTTPException(status_code=404, detail="Current version missing")
     if version.content:
         return {"content": version.content, "format": "text", "editable": True}
+    if blob_storage.is_blob_url(version.storage_location):
+        try:
+            data = blob_storage.fetch(version.storage_location)
+            return _read_bytes(data, _filename_from_location(version.storage_location))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch file from storage: {e}",
+            )
     if version.storage_location and os.path.exists(version.storage_location):
         try:
             return _read_file(
@@ -808,7 +889,23 @@ def download_document(
     if version is None:
         raise HTTPException(status_code=404, detail="Current version missing")
 
-    # If file-backed, stream it
+    # If stored in Vercel Blob, fetch and stream directly
+    if blob_storage.is_blob_url(version.storage_location):
+        filename = _filename_from_location(version.storage_location)
+        try:
+            data = blob_storage.fetch(version.storage_location)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to fetch file from storage: {e}",
+            )
+        return Response(
+            content=data,
+            media_type=_media_type(filename),
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # If file-backed on disk, stream it
     if version.storage_location and os.path.exists(version.storage_location):
         filename = os.path.basename(version.storage_location)
         media = _media_type(filename)
@@ -865,7 +962,23 @@ def download_document_version(
             status_code=404, detail="Version not found for this document"
         )
 
-    # If file-backed, stream it
+    # If stored in Vercel Blob, fetch and stream directly
+    if blob_storage.is_blob_url(version.storage_location):
+        filename = _filename_from_location(version.storage_location)
+        try:
+            data = blob_storage.fetch(version.storage_location)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to fetch file from storage: {e}",
+            )
+        return Response(
+            content=data,
+            media_type=_media_type(filename),
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # If file-backed on disk, stream it
     if version.storage_location and os.path.exists(version.storage_location):
         filename = os.path.basename(version.storage_location)
         media = _media_type(filename)
@@ -925,25 +1038,33 @@ async def upload_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User profile not found — create a profile before uploading documents",
         )
-    dest_path = _build_upload_path(
-        UPLOAD_BASE,
-        profile.first_name,
-        profile.last_name,
-        current_user.user_id,
-        file.filename,
-    )
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     contents = await file.read()
-    with open(dest_path, "wb") as f:
-        f.write(contents)
-
-    # For text-based formats, cache extracted content in the DB so the document
-    # remains readable even if the file path is later inaccessible (e.g. different server).
-    extracted_content = None
     ext = os.path.splitext(file.filename)[1].lower()
+
+    if blob_storage.enabled():
+        pathname = blob_storage.build_pathname(
+            profile.first_name, profile.last_name, current_user.user_id, file.filename
+        )
+        try:
+            dest_path = blob_storage.upload(pathname, contents, _mime_for_ext(ext))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload file to cloud storage: {exc}",
+            )
+    else:
+        dest_path = _build_upload_path(
+            UPLOAD_BASE, profile.first_name, profile.last_name, current_user.user_id, file.filename
+        )
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(dest_path, "wb") as f:
+            f.write(contents)
+
+    # Cache extracted text in DB so the document is readable without the file.
+    extracted_content = None
     if ext in (".txt", ".md", ".docx"):
         try:
-            extracted_content = _read_file(dest_path, file.filename).get("content")
+            extracted_content = _read_bytes(contents, file.filename).get("content")
         except Exception:
             pass  # content stays None; storage_location is the fallback
 
@@ -1296,26 +1417,49 @@ def _generate_doc(
         session, user.user_id, doc_title, document_type, status="Draft"
     )
 
-    # Get user profile for file path generation
     profile = get_profile_by_user_id(session, user.user_id)
     filename = f"{doc_title.replace('/', '_').replace(':', '-')}.docx"
-    dest_path = _build_upload_path(
-        UPLOAD_BASE,
-        profile.first_name if profile else "",
-        profile.last_name if profile else "",
-        user.user_id,
-        filename,
-    )
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-    # Write content to DOCX file with appropriate formatting
-    if document_type == "Resume":
-        _write_resume_docx(dest_path, content)
+    if blob_storage.enabled():
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+            write_path = tmp.name
+        if document_type == "Resume":
+            _write_resume_docx(write_path, content)
+        else:
+            _write_docx_content(write_path, content)
+        blob_pathname = blob_storage.build_pathname(
+            profile.first_name if profile else "",
+            profile.last_name if profile else "",
+            user.user_id,
+            filename,
+        )
+        with open(write_path, "rb") as f:
+            docx_bytes = f.read()
+        try:
+            os.remove(write_path)
+        except Exception:
+            pass
+        storage_loc = blob_storage.upload(
+            blob_pathname,
+            docx_bytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
     else:
-        _write_docx_content(dest_path, content)
+        storage_loc = _build_upload_path(
+            UPLOAD_BASE,
+            profile.first_name if profile else "",
+            profile.last_name if profile else "",
+            user.user_id,
+            filename,
+        )
+        os.makedirs(os.path.dirname(storage_loc), exist_ok=True)
+        if document_type == "Resume":
+            _write_resume_docx(storage_loc, content)
+        else:
+            _write_docx_content(storage_loc, content)
 
     version = create_document_version(
-        session, doc.document_id, storage_location=dest_path, content=content, source="ai"
+        session, doc.document_id, storage_location=storage_loc, content=content, source="ai"
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
     if job is not None:
