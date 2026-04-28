@@ -202,6 +202,19 @@ function DocumentLibrary() {
   const [genCoverDocName, setGenCoverDocName] = useState("");
   const [genCoverError, setGenCoverError] = useState("");
 
+  // S2-023: AI Rewrite / Improve
+  const [aiImproveOpen, setAiImproveOpen] = useState(false);
+  const [aiImproveInstruction, setAiImproveInstruction] = useState("");
+  const [aiImproveLoading, setAiImproveLoading] = useState(false);
+  const [aiImproveResult, setAiImproveResult] = useState(null);
+  const [aiImproveError, setAiImproveError] = useState("");
+
+  // Tag management
+  const [uploadTags, setUploadTags] = useState([]);
+  const [uploadTagInput, setUploadTagInput] = useState("");
+  const [tagInputDocId, setTagInputDocId] = useState(null);
+  const [newTagInput, setNewTagInput] = useState("");
+
   // Filtering / sorting (S3-006)
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -379,10 +392,56 @@ function DocumentLibrary() {
       return;
     }
 
+    const uploaded = await res.json().catch(() => null);
     setUploadSuccess("File uploaded successfully.");
     setFile(null);
     setDocTitle("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Add any upload-time tags
+    if (uploaded && uploadTags.length > 0) {
+      await Promise.all(
+        uploadTags.map((tag) =>
+          api.post(
+            `/documents/${uploaded.document_id}/tags`,
+            { label: tag },
+            { caller: "DocumentLibrary.handleUpload", action: "add_upload_tag" }
+          )
+        )
+      );
+      setUploadTags([]);
+      setUploadTagInput("");
+    }
+
+    fetchDocuments();
+  };
+
+  const handleAddUploadTag = (raw) => {
+    const tag = raw.trim().replace(/,+$/, "").trim();
+    if (tag && !uploadTags.includes(tag)) {
+      setUploadTags((prev) => [...prev, tag]);
+    }
+    setUploadTagInput("");
+  };
+
+  const handleAddTag = async (docId, label) => {
+    const tag = label.trim();
+    if (!tag) return;
+    await api.post(
+      `/documents/${docId}/tags`,
+      { label: tag },
+      { caller: "DocumentLibrary.handleAddTag", action: "add_tag" }
+    );
+    setTagInputDocId(null);
+    setNewTagInput("");
+    fetchDocuments();
+  };
+
+  const handleRemoveTag = async (docId, label) => {
+    await api.delete(`/documents/${docId}/tags/${encodeURIComponent(label)}`, {
+      caller: "DocumentLibrary.handleRemoveTag",
+      action: "remove_tag",
+    });
     fetchDocuments();
   };
 
@@ -467,6 +526,48 @@ function DocumentLibrary() {
     setUploadSuccess("Document saved successfully!");
     setTimeout(() => setUploadSuccess(""), 3000);
     fetchDocuments();
+  };
+
+  const handleAiImprove = async () => {
+    if (!editingDoc) return;
+    setAiImproveLoading(true);
+    setAiImproveError("");
+    setAiImproveResult(null);
+    try {
+      const res = await api.post(
+        `/documents/${editingDoc.document_id}/ai-rewrite`,
+        { instruction: aiImproveInstruction },
+        { caller: "DocumentLibrary.handleAiImprove", action: "ai_rewrite" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setAiImproveError(err.detail || "AI rewrite failed.");
+      } else {
+        const data = await res.json();
+        setAiImproveResult(data);
+      }
+    } catch {
+      setAiImproveError("Request failed. Please try again.");
+    } finally {
+      setAiImproveLoading(false);
+    }
+  };
+
+  const handleAcceptAiVersion = () => {
+    if (aiImproveResult) {
+      setEditContent(aiImproveResult.rewritten);
+    }
+    setAiImproveOpen(false);
+    setAiImproveResult(null);
+    setAiImproveInstruction("");
+    setAiImproveError("");
+  };
+
+  const handleCloseAiImprove = () => {
+    setAiImproveOpen(false);
+    setAiImproveResult(null);
+    setAiImproveInstruction("");
+    setAiImproveError("");
   };
 
   const handleArchive = async (doc) => {
@@ -991,6 +1092,7 @@ function DocumentLibrary() {
                   setEditingDoc(null);
                   setEditContent("");
                   setEditError("");
+                  handleCloseAiImprove();
                 }}
                 aria-label="Close"
               >
@@ -998,31 +1100,122 @@ function DocumentLibrary() {
               </button>
             </div>
             {editError && <p className="doclibrary-error">{editError}</p>}
-            <textarea
-              className="doclibrary-editor"
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              placeholder="Edit your document content here..."
-            />
-            <div className="doclibrary-modal-actions">
-              <button
-                className="doclibrary-cancel-btn"
-                onClick={() => {
-                  setEditingDoc(null);
-                  setEditContent("");
-                  setEditError("");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="doclibrary-save-btn"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save as new version"}
-              </button>
-            </div>
+
+            {/* S2-023: AI Improve panel */}
+            {aiImproveOpen ? (
+              <div className="doclibrary-ai-improve-panel">
+                {!aiImproveResult ? (
+                  <>
+                    <p className="doclibrary-ai-improve-hint">
+                      Describe what you want improved{" "}
+                      <span style={{ opacity: 0.6 }}>(optional)</span>
+                    </p>
+                    <textarea
+                      className="doclibrary-ai-improve-instruction"
+                      value={aiImproveInstruction}
+                      onChange={(e) => setAiImproveInstruction(e.target.value)}
+                      placeholder='e.g. "Make it more concise" or "Use stronger action verbs"'
+                      rows={2}
+                      disabled={aiImproveLoading}
+                    />
+                    {aiImproveError && (
+                      <p className="doclibrary-error">{aiImproveError}</p>
+                    )}
+                    <div className="doclibrary-modal-actions">
+                      <button
+                        className="doclibrary-cancel-btn"
+                        onClick={handleCloseAiImprove}
+                        disabled={aiImproveLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="doclibrary-ai-improve-btn"
+                        onClick={handleAiImprove}
+                        disabled={aiImproveLoading}
+                      >
+                        {aiImproveLoading
+                          ? "Generating..."
+                          : "Generate improvement"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="doclibrary-ai-compare">
+                      <div className="doclibrary-ai-compare-pane">
+                        <div className="doclibrary-ai-compare-label">
+                          Original
+                        </div>
+                        <textarea
+                          className="doclibrary-editor doclibrary-ai-compare-text"
+                          value={aiImproveResult.original}
+                          readOnly
+                        />
+                      </div>
+                      <div className="doclibrary-ai-compare-pane">
+                        <div className="doclibrary-ai-compare-label doclibrary-ai-compare-label--new">
+                          AI Improved
+                        </div>
+                        <textarea
+                          className="doclibrary-editor doclibrary-ai-compare-text"
+                          value={aiImproveResult.rewritten}
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                    <div className="doclibrary-modal-actions">
+                      <button
+                        className="doclibrary-cancel-btn"
+                        onClick={handleCloseAiImprove}
+                      >
+                        Keep mine
+                      </button>
+                      <button
+                        className="doclibrary-ai-improve-btn"
+                        onClick={handleAcceptAiVersion}
+                      >
+                        Use AI version
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="doclibrary-editor"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="Edit your document content here..."
+                />
+                <div className="doclibrary-modal-actions">
+                  <button
+                    className="doclibrary-cancel-btn"
+                    onClick={() => {
+                      setEditingDoc(null);
+                      setEditContent("");
+                      setEditError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="doclibrary-ai-improve-btn"
+                    onClick={() => setAiImproveOpen(true)}
+                  >
+                    AI Improve
+                  </button>
+                  <button
+                    className="doclibrary-save-btn"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? "Saving..." : "Save as new version"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1550,6 +1743,54 @@ function DocumentLibrary() {
             ))}
           </select>
 
+          <label>Tags</label>
+          <div className="doclibrary-tag-input-wrap">
+            {uploadTags.map((tag) => (
+              <span
+                key={tag}
+                className="doclibrary-tag-pill doclibrary-tag-pill--edit"
+              >
+                {tag}
+                <button
+                  type="button"
+                  className="doclibrary-tag-remove"
+                  onClick={() =>
+                    setUploadTags((prev) => prev.filter((t) => t !== tag))
+                  }
+                  aria-label={`Remove tag ${tag}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              type="text"
+              className="doclibrary-tag-text-input"
+              value={uploadTagInput}
+              onChange={(e) => setUploadTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  handleAddUploadTag(uploadTagInput);
+                } else if (
+                  e.key === "Backspace" &&
+                  uploadTagInput === "" &&
+                  uploadTags.length > 0
+                ) {
+                  setUploadTags((prev) => prev.slice(0, -1));
+                }
+              }}
+              onBlur={() => {
+                if (uploadTagInput.trim()) handleAddUploadTag(uploadTagInput);
+              }}
+              placeholder={
+                uploadTags.length === 0
+                  ? "Type a tag, press Enter"
+                  : "Add another…"
+              }
+            />
+          </div>
+
           <label>File</label>
           <input
             ref={fileInputRef}
@@ -1742,19 +1983,23 @@ function DocumentLibrary() {
                           ))}
                         </div>
                       )}
-                      {(doc.tags || []).length > 0 && (
-                        <div
-                          style={{
-                            marginTop: "4px",
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: "4px",
-                          }}
-                        >
-                          {doc.tags.map((tag) => (
+                      <div
+                        style={{
+                          marginTop: "4px",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "4px",
+                          alignItems: "center",
+                        }}
+                      >
+                        {(doc.tags || []).map((tag) => (
+                          <span
+                            key={tag}
+                            className="doclibrary-tag-pill doclibrary-tag-pill--edit"
+                          >
                             <button
-                              key={tag}
-                              className="doclibrary-tag-pill"
+                              type="button"
+                              className="doclibrary-tag-pill-label"
                               onClick={() =>
                                 setFilterTag(tag === filterTag ? "" : tag)
                               }
@@ -1766,9 +2011,57 @@ function DocumentLibrary() {
                             >
                               {tag}
                             </button>
-                          ))}
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              className="doclibrary-tag-remove"
+                              onClick={() =>
+                                handleRemoveTag(doc.document_id, tag)
+                              }
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        {tagInputDocId === doc.document_id ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            className="doclibrary-tag-text-input doclibrary-tag-text-input--inline"
+                            value={newTagInput}
+                            onChange={(e) => setNewTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === ",") {
+                                e.preventDefault();
+                                handleAddTag(doc.document_id, newTagInput);
+                              } else if (e.key === "Escape") {
+                                setTagInputDocId(null);
+                                setNewTagInput("");
+                              }
+                            }}
+                            onBlur={() => {
+                              if (newTagInput.trim()) {
+                                handleAddTag(doc.document_id, newTagInput);
+                              } else {
+                                setTagInputDocId(null);
+                              }
+                            }}
+                            placeholder="New tag…"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="doclibrary-tag-add-btn"
+                            onClick={() => {
+                              setTagInputDocId(doc.document_id);
+                              setNewTagInput("");
+                            }}
+                            title="Add tag"
+                          >
+                            + tag
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td>{doc.document_type}</td>
                     <td>

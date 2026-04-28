@@ -752,6 +752,92 @@
   border-color: #8b5cf6;
 }
 
+/* Editable pill variant (shows × button) */
+.doclibrary-tag-pill--edit {
+  padding: 2px 4px 2px 8px;
+  gap: 2px;
+  cursor: default;
+}
+
+.doclibrary-tag-pill-label {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.75rem;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.doclibrary-tag-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: #7c3aed;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.doclibrary-tag-remove:hover {
+  opacity: 1;
+}
+
+.doclibrary-tag-add-btn {
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  border-radius: 9999px;
+  border: 1px dashed #a5b4fc;
+  background: transparent;
+  color: #6366f1;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.doclibrary-tag-add-btn:hover {
+  background: #ede9fe;
+  border-color: #8b5cf6;
+}
+
+/* Tag chip input (upload form) */
+.doclibrary-tag-input-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  min-height: 34px;
+}
+
+.doclibrary-tag-text-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 120px;
+}
+
+.doclibrary-tag-text-input--inline {
+  border: 1px solid #a5b4fc;
+  border-radius: 9999px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  background: #ede9fe;
+  color: #4c1d95;
+  min-width: 80px;
+  flex: unset;
+  outline: none;
+}
+
 .doclibrary-clear-filters-btn {
   padding: 4px 10px;
   font-size: 0.8rem;
@@ -766,4 +852,84 @@
 .doclibrary-clear-filters-btn:hover {
   background: #f3f4f6;
   border-color: #a78bfa;
+}
+
+/* S2-023: AI Improve */
+.doclibrary-ai-improve-btn {
+  padding: 0.5rem 1rem;
+  background-color: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.doclibrary-ai-improve-btn:hover:not(:disabled) {
+  background-color: #4f46e5;
+}
+
+.doclibrary-ai-improve-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.doclibrary-ai-improve-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.doclibrary-ai-improve-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.doclibrary-ai-improve-instruction {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.doclibrary-ai-compare {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.doclibrary-ai-compare-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.doclibrary-ai-compare-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #6b7280);
+  margin-bottom: 0.35rem;
+}
+
+.doclibrary-ai-compare-label--new {
+  color: #6366f1;
+}
+
+.doclibrary-ai-compare-text {
+  flex: 1;
+  resize: none;
+  font-size: 0.82rem;
 }

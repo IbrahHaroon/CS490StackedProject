@@ -1531,6 +1531,82 @@ def generate_cover_letter(
 
 
 # --------------------------------------------------------------------------- #
+#  AI Rewrite / Improve (S2-023)                                               #
+# --------------------------------------------------------------------------- #
+
+
+@router.post("/{document_id}/ai-rewrite")
+def ai_rewrite_document(
+    document_id: int,
+    body: dict,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return an AI-improved version of the document for user comparison.
+
+    Does NOT save anything — the caller decides whether to accept or discard.
+    """
+    doc = get_document(session, document_id)
+    _ensure_owns(doc, current_user)
+
+    if doc.current_version_id is None:
+        raise HTTPException(status_code=404, detail="Document has no version yet")
+    version = get_document_version(session, doc.current_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Current version missing")
+
+    # Read content using the same priority as read_current_content
+    content = ""
+    if version.content:
+        content = version.content
+    elif blob_storage.is_blob_url(version.storage_location):
+        try:
+            raw = blob_storage.fetch(version.storage_location)
+            data = _read_bytes(raw, _filename_from_location(version.storage_location))
+            content = data.get("content", "")
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch file from storage: {e}",
+            )
+    elif version.storage_location and os.path.exists(version.storage_location):
+        try:
+            data = _read_file(
+                version.storage_location,
+                os.path.basename(version.storage_location),
+            )
+            content = data.get("content", "")
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read file: {e}",
+            )
+
+    if not content or not content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document has no readable text content to rewrite.",
+        )
+
+    instruction = (body.get("instruction") or "").strip()
+
+    system_prompt = (
+        "You are an expert professional writer and editor. Improve and rewrite the provided "
+        "document to make it more professional, clear, and impactful. Preserve all factual "
+        "details (names, dates, companies, achievements, numbers). Return only the improved "
+        "document text — no preamble, no explanation, no markdown fences."
+    )
+    if instruction:
+        system_prompt += f" Additional user instruction: {instruction}"
+
+    rewritten = _call_openai(
+        system_prompt, f"Rewrite and improve this document:\n\n{content}"
+    )
+
+    return {"original": content, "rewritten": rewritten}
+
+
+# --------------------------------------------------------------------------- #
 #  Backwards-compatible aliases (DocumentCreate shape used by older callers)    #
 # --------------------------------------------------------------------------- #
 
