@@ -11,24 +11,35 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
+_IS_VERCEL = os.environ.get("VERCEL") == "1"
+
 # Set up a dedicated file logger for frontend logs
-_logs_dir = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
-)
+if _IS_VERCEL:
+    _logs_dir = "/tmp/logs"
+else:
+    _logs_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
+    )
 os.makedirs(_logs_dir, exist_ok=True)
 
 _frontend_logger = logging.getLogger("ats.frontend")
 _frontend_logger.setLevel(logging.INFO)
 _frontend_logger.propagate = False
 
-_file_handler = RotatingFileHandler(
-    os.path.join(_logs_dir, "frontend.log"),
-    maxBytes=5 * 1024 * 1024,  # 5 MB per file
-    backupCount=5,
-)
-# Raw formatter — the log message is already JSON, just emit it as-is
-_file_handler.setFormatter(logging.Formatter("%(message)s"))
-_frontend_logger.addHandler(_file_handler)
+if not _IS_VERCEL:
+    _file_handler = RotatingFileHandler(
+        os.path.join(_logs_dir, "frontend.log"),
+        maxBytes=5 * 1024 * 1024,  # 5 MB per file
+        backupCount=5,
+    )
+    # Raw formatter — the log message is already JSON, just emit it as-is
+    _file_handler.setFormatter(logging.Formatter("%(message)s"))
+    _frontend_logger.addHandler(_file_handler)
+else:
+    # On Vercel, emit frontend logs to stdout so they appear in function logs
+    _stream_handler = logging.StreamHandler()
+    _stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    _frontend_logger.addHandler(_stream_handler)
 
 
 class FrontendLogEntry(BaseModel):
@@ -65,7 +76,9 @@ def flush_frontend_logs(batch: FrontendLogBatch):
 
 
 @router.get("/backend")
-def get_backend_logs(tail: int = 100, after: str = Query(default=None)):
+def get_backend_logs(tail: int = 100, after: str = Query(default=None)):  # noqa: ARG001
+    if _IS_VERCEL:
+        return []
     """Return the most recent backend log entries as a JSON array.
 
     If ``after`` is provided (ISO timestamp), only entries with a timestamp
@@ -109,6 +122,8 @@ def get_backend_logs(tail: int = 100, after: str = Query(default=None)):
 
 @router.post("/backend/clear", status_code=200)
 def clear_backend_logs():
+    if _IS_VERCEL:
+        return {"cleared_at": datetime.now(timezone.utc).isoformat()}
     """Archive the current backend.log and start fresh.
 
     The existing file is moved to ``logs/backend.log.archived.<timestamp>``.

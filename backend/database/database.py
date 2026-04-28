@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     gemini_api_key: str = ""
+    # Comma-separated list of allowed CORS origins; "*" permits all origins
+    cors_origins: str = "*"
 
     # Load root .env first, then backend .env — later files override earlier ones
     model_config = SettingsConfigDict(

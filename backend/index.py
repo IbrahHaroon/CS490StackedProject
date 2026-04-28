@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # `schemas` are always importable regardless of where the process is launched from.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from database.database import get_settings  # noqa: E402
 from logging_config import setup_logging  # noqa: E402, I001
 from middleware.error_handler import register_exception_handlers  # noqa: E402
 from middleware.request_logger import RequestLoggingMiddleware  # noqa: E402
@@ -31,6 +32,14 @@ from routers import (  # noqa: E402
 
 setup_logging()
 
+_settings = get_settings()
+_raw_origins = _settings.cors_origins
+_allow_origins = (
+    ["*"]
+    if _raw_origins.strip() == "*"
+    else [o.strip() for o in _raw_origins.split(",") if o.strip()]
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,7 +52,7 @@ register_exception_handlers(app)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

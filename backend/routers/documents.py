@@ -72,7 +72,10 @@ router = APIRouter()
 
 _ROUTERS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_ROUTERS_DIR)
-UPLOAD_BASE = os.path.join(_BACKEND_DIR, "uploads")
+# On Vercel the filesystem is read-only; /tmp is the only writable area.
+# Uploaded files stored here do NOT persist across function invocations.
+_IS_VERCEL = os.environ.get("VERCEL") == "1"
+UPLOAD_BASE = "/tmp/uploads" if _IS_VERCEL else os.path.join(_BACKEND_DIR, "uploads")
 
 
 # --------------------------------------------------------------------------- #

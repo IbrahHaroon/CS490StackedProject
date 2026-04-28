@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+tests/
+*.pyc
+*.pyo
+logs/
+uploads/
+.pytest_cache/
+.ruff_cache/
+scripts/
+run_analytics_tests.bat
+run_analytics_tests.sh

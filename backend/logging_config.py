@@ -44,6 +44,15 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_entry)
 
 
+_IS_VERCEL = os.environ.get("VERCEL") == "1"
+
+
+def _get_logs_dir():
+    if _IS_VERCEL:
+        return "/tmp/logs"
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
+
 def setup_logging():
     """Configure the 'ats' logger with structured JSON output to stdout and logs/ folder."""
     formatter = JSONFormatter()
@@ -52,24 +61,25 @@ def setup_logging():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
 
-    # File handler — rotating log files in backend/logs/
-    logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-    os.makedirs(logs_dir, exist_ok=True)
-
-    file_handler = RotatingFileHandler(
-        os.path.join(logs_dir, "backend.log"),
-        maxBytes=5 * 1024 * 1024,  # 5 MB per file
-        backupCount=5,
-    )
-    file_handler.setFormatter(formatter)
-
     app_logger = logging.getLogger("ats")
     # Prevent duplicate handlers when uvicorn --reload re-runs setup
     if app_logger.handlers:
         app_logger.handlers.clear()
     app_logger.setLevel(logging.INFO)
     app_logger.addHandler(console_handler)
-    app_logger.addHandler(file_handler)
+
+    # File handler — rotating log files; skipped on Vercel (ephemeral /tmp, use stdout)
+    if not _IS_VERCEL:
+        logs_dir = _get_logs_dir()
+        os.makedirs(logs_dir, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            os.path.join(logs_dir, "backend.log"),
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5,
+        )
+        file_handler.setFormatter(formatter)
+        app_logger.addHandler(file_handler)
+
     app_logger.propagate = False
 
     # Quiet down SQLAlchemy's verbose SQL echo
