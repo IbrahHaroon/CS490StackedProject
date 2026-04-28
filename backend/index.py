@@ -34,10 +34,9 @@ setup_logging()
 
 _settings = get_settings()
 _raw_origins = _settings.cors_origins
+_wildcard = _raw_origins.strip() == "*"
 _allow_origins = (
-    ["*"]
-    if _raw_origins.strip() == "*"
-    else [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    ["*"] if _wildcard else [o.strip() for o in _raw_origins.split(",") if o.strip()]
 )
 
 
@@ -53,7 +52,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
-    allow_credentials=True,
+    allow_credentials=not _wildcard,  # credentials + "*" is rejected by browsers
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Request-ID"],
