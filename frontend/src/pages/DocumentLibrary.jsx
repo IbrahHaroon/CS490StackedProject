@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/apiClient";
 import { logAction } from "../lib/actionLogger";
 import "./DocumentLibrary.css";
@@ -166,6 +166,9 @@ function formatResumeContent(text) {
 
 function DocumentLibrary() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [highlightId, setHighlightId] = useState(null);
+  const rowRefs = useRef({});
   const [documents, setDocuments] = useState([]);
   const [loadError, setLoadError] = useState("");
   const [docType, setDocType] = useState(DOCUMENT_TYPES[0]);
@@ -315,6 +318,20 @@ function DocumentLibrary() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, filterType, filterStatus, filterIncludeArchived, filterTag]);
+
+  // Scroll to and highlight a document when ?highlight=<id> is in the URL
+  useEffect(() => {
+    const id = searchParams.get("highlight");
+    if (!id || documents.length === 0) return;
+    const numId = parseInt(id, 10);
+    setHighlightId(numId);
+    setTimeout(() => {
+      const el = rowRefs.current[numId];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    const timer = setTimeout(() => setHighlightId(null), 2500);
+    return () => clearTimeout(timer);
+  }, [searchParams, documents]);
 
   // Derive unique tags from all documents
   const allTags = useMemo(() => {
@@ -1947,6 +1964,12 @@ function DocumentLibrary() {
                 return (
                   <tr
                     key={doc.document_id}
+                    ref={(el) => (rowRefs.current[doc.document_id] = el)}
+                    className={
+                      highlightId === doc.document_id
+                        ? "doclibrary-row-highlight"
+                        : ""
+                    }
                     style={doc.is_deleted ? { opacity: 0.5 } : {}}
                   >
                     <td>

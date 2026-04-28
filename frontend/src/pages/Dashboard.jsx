@@ -870,18 +870,37 @@ function Dashboard() {
                         key={link.link_id}
                         style={{
                           fontSize: "0.85rem",
-                          color: "var(--text-muted)",
                           marginBottom: "0.25rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
                         }}
                       >
-                        📄{" "}
-                        {link.document_title || `Version #${link.version_id}`}
+                        <button
+                          onClick={() =>
+                            navigate(`/documents?highlight=${link.document_id}`)
+                          }
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            color: "#6366f1",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            textDecoration: "underline",
+                            textAlign: "left",
+                          }}
+                          title="View in Document Library"
+                        >
+                          📄{" "}
+                          {link.document_title || `Version #${link.version_id}`}
+                        </button>
                         {link.role && (
                           <span
                             style={{
-                              marginLeft: "0.5rem",
                               opacity: 0.6,
                               textTransform: "capitalize",
+                              color: "var(--text-muted)",
                             }}
                           >
                             ({link.role.replace("_", " ")})
@@ -956,18 +975,40 @@ function Dashboard() {
                           key={link.link_id}
                           style={{
                             fontSize: "0.85rem",
-                            color: "var(--text-muted)",
                             marginBottom: "0.25rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
                           }}
                         >
-                          📄{" "}
-                          {link.document_title || `Version #${link.version_id}`}
+                          <button
+                            onClick={() =>
+                              navigate(
+                                `/documents?highlight=${link.document_id}`
+                              )
+                            }
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              color: "#6366f1",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                              textDecoration: "underline",
+                              textAlign: "left",
+                            }}
+                            title="View in Document Library"
+                          >
+                            📄{" "}
+                            {link.document_title ||
+                              `Version #${link.version_id}`}
+                          </button>
                           {link.role && (
                             <span
                               style={{
-                                marginLeft: "0.5rem",
                                 opacity: 0.6,
                                 textTransform: "capitalize",
+                                color: "var(--text-muted)",
                               }}
                             >
                               ({link.role.replace("_", " ")})

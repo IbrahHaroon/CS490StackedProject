@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./Applications.css";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { api } from "../lib/apiClient";
@@ -1166,9 +1166,15 @@ function ApplicationCard({
               <ul className="followup-list">
                 {docLinks.map((link) => (
                   <li key={link.link_id} className="followup-item">
-                    <span className="followup-desc">
+                    <button
+                      className="followup-desc app-doc-link-btn"
+                      onClick={() =>
+                        navigate(`/documents?highlight=${link.document_id}`)
+                      }
+                      title="View in Document Library"
+                    >
                       📄 {link.document_title || `Version #${link.version_id}`}
-                    </span>
+                    </button>
                     <span
                       className="followup-date"
                       style={{ textTransform: "capitalize" }}
@@ -2000,6 +2006,7 @@ function Applications() {
   const cardRefs = useRef({});
   const timeoutIdsRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   useEffect(() => {

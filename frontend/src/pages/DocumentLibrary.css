@@ -933,3 +933,17 @@
   resize: none;
   font-size: 0.82rem;
 }
+
+/* Highlight row when navigated from job detail */
+@keyframes doclibrary-highlight-fade {
+  0% {
+    background-color: rgba(99, 102, 241, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.doclibrary-row-highlight {
+  animation: doclibrary-highlight-fade 2.5s ease-out forwards;
+}

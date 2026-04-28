@@ -739,3 +739,19 @@
   border-color: #4f8ef7;
   box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.2);
 }
+
+.app-doc-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #6366f1;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+  text-align: left;
+  flex: 1;
+}
+
+.app-doc-link-btn:hover {
+  color: #4f46e5;
+}
