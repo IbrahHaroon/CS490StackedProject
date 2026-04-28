@@ -27,4 +27,6 @@ dependencies = [
     "httpx",
     "tenacity",
     "dnspython",
+    "pytest",
+    "pytest-asyncio",
 ]
