@@ -1229,22 +1229,6 @@ function ApplicationCard({
                       {(link.role || "—").replace("_", " ")}
                     </span>
                     <button
-                      className="app-history-btn"
-                      onClick={() => handleViewLinkedDoc(link)}
-                      style={{ padding: "2px 10px", fontSize: "12px" }}
-                      title="View this document"
-                    >
-                      View
-                    </button>
-                    <button
-                      className="app-history-btn"
-                      onClick={() => handleDownloadLinkedDoc(link)}
-                      style={{ padding: "2px 10px", fontSize: "12px" }}
-                      title="Download this document"
-                    >
-                      Download
-                    </button>
-                    <button
                       className="followup-delete-btn"
                       onClick={() => handleUnlinkDoc(link)}
                       disabled={unlinkingId === link.link_id}
