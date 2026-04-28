@@ -1,0 +1,30 @@
+[project]
+name = "cs490-backend"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy",
+    "pydantic",
+    "pydantic-settings",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "bcrypt",
+    "python-multipart",
+    "python-dotenv",
+    "anthropic",
+    "openai",
+    "google-generativeai",
+    "google-genai",
+    "psycopg2-binary",
+    "aiosqlite",
+    "asyncpg",
+    "python-docx",
+    "pypdf2",
+    "reportlab",
+    "email-validator",
+    "httpx",
+    "tenacity",
+    "dnspython",
+]
