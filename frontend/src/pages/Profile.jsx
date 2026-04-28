@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EditModal from "../components/EditModal";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { api } from "../lib/apiClient";
@@ -24,6 +24,14 @@ function Profile() {
   const [sectionStatus, setSectionStatus] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: "experience"|"education"|"skill", id }
   const [isDeleting, setIsDeleting] = useState(false);
+  const timeoutIdsRef = useRef([]);
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+      timeoutIdsRef.current = [];
+    };
+  }, []);
 
   // Initial fetch — profile, auth, documents
   useEffect(() => {
@@ -135,7 +143,8 @@ function Profile() {
     setProfile(updated);
     setModal(null);
     setStatusMessage("Profile saved.");
-    setTimeout(() => setStatusMessage(""), 3000);
+    const id = setTimeout(() => setStatusMessage(""), 3000);
+    timeoutIdsRef.current.push(id);
     return null;
   };
 
@@ -194,10 +203,11 @@ function Profile() {
     setSectionModal(null);
     setActiveRecord(null);
     setSectionStatus((prev) => ({ ...prev, experience: "Saved!" }));
-    setTimeout(
+    const id = setTimeout(
       () => setSectionStatus((prev) => ({ ...prev, experience: "" })),
       3000
     );
+    timeoutIdsRef.current.push(id);
     return null;
   };
 
@@ -309,10 +319,11 @@ function Profile() {
     setSectionModal(null);
     setActiveRecord(null);
     setSectionStatus((prev) => ({ ...prev, education: "Saved!" }));
-    setTimeout(
+    const id = setTimeout(
       () => setSectionStatus((prev) => ({ ...prev, education: "" })),
       3000
     );
+    timeoutIdsRef.current.push(id);
     return null;
   };
 
@@ -379,10 +390,11 @@ function Profile() {
     setSectionModal(null);
     setActiveRecord(null);
     setSectionStatus((prev) => ({ ...prev, skills: "Saved!" }));
-    setTimeout(
+    const id = setTimeout(
       () => setSectionStatus((prev) => ({ ...prev, skills: "" })),
       3000
     );
+    timeoutIdsRef.current.push(id);
     return null;
   };
 
@@ -451,10 +463,11 @@ function Profile() {
     setCareerPrefs(saved);
     setSectionModal(null);
     setSectionStatus((prev) => ({ ...prev, career: "Saved!" }));
-    setTimeout(
+    const id = setTimeout(
       () => setSectionStatus((prev) => ({ ...prev, career: "" })),
       3000
     );
+    timeoutIdsRef.current.push(id);
     return null;
   };
 

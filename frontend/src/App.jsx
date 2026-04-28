@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { MyAppNav } from "./components/Navbar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -52,13 +52,21 @@ function App() {
       });
   }, []);
 
+  const token = localStorage.getItem("token");
+
   return (
     <>
-      <MyAppNav />
+      {token && <MyAppNav />}
       <main>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/signin" element={<SignIn />} />
+          <Route
+            path="/"
+            element={token ? <Dashboard /> : <Navigate to="/signin" replace />}
+          />
+          <Route
+            path="/signin"
+            element={token ? <Navigate to="/" replace /> : <SignIn />}
+          />
           <Route
             path="/profile"
             element={
@@ -91,6 +99,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       {import.meta.env.VITE_SHOW_CONSOLE === "true" && <DevLogViewer />}

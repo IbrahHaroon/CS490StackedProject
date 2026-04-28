@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, select
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
@@ -30,6 +30,8 @@ class Interview(Base):
 
     # Relationships
     job: Mapped["Job"] = relationship(back_populates="interviews")
+
+    __table_args__ = (Index("idx_interview_job", "job_id"),)
 
 
 # --------------------------------------------------------------------------- #

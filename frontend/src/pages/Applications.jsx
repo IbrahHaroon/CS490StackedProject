@@ -4,6 +4,17 @@ import "./Applications.css";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { api } from "../lib/apiClient";
 
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 const STAGES = [
   "Interested",
   "Applied",
@@ -245,7 +256,8 @@ function ApplicationCard({
   const copyToClipboard = () => {
     navigator.clipboard.writeText(coverLetter);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const id = setTimeout(() => setCopied(false), 2000);
+    timeoutIdsRef.current.push(id);
   };
 
   const saveDetails = async () => {
@@ -1646,17 +1658,24 @@ function ApplicationCard({
             setViewingContent("");
           }}
         >
-          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="history-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-modal-title"
+          >
             <button
               className="history-close-btn"
               onClick={() => {
                 setViewingLink(null);
                 setViewingContent("");
               }}
+              aria-label="Close"
             >
               ✕
             </button>
-            <h2 className="history-modal-title">
+            <h2 className="history-modal-title" id="history-modal-title">
               📄{" "}
               {viewingLink.document_title ||
                 `Version #${viewingLink.version_id}`}
@@ -2122,7 +2141,8 @@ function Applications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("All");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounce(searchInput, 200);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -2130,6 +2150,7 @@ function Applications() {
   const [highlightedId, setHighlightedId] = useState(null);
   const [autoLinkMsg, setAutoLinkMsg] = useState("");
   const cardRefs = useRef({});
+  const timeoutIdsRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const token = localStorage.getItem("token");
 
@@ -2168,17 +2189,26 @@ function Applications() {
     const targetId = Number(jobIdParam);
     if (!jobs.find((j) => j.job_id === targetId)) return;
     setFilter("All");
-    setSearch("");
+    setSearchInput("");
     setHighlightedId(targetId);
     setSearchParams({}, { replace: true });
-    setTimeout(() => {
+    const id1 = setTimeout(() => {
       cardRefs.current[targetId]?.scrollIntoView({
         behavior: "smooth",
         block: "center",
       });
     }, 120);
-    setTimeout(() => setHighlightedId(null), 3500);
+    timeoutIdsRef.current.push(id1);
+    const id2 = setTimeout(() => setHighlightedId(null), 3500);
+    timeoutIdsRef.current.push(id2);
   }, [searchParams, loading, jobs]);
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+      timeoutIdsRef.current = [];
+    };
+  }, []);
 
   const filtered = jobs
     .filter((j) => {
@@ -2252,7 +2282,8 @@ function Applications() {
           l.role === "resume" ? "Resume" : "Cover Letter"
         );
         setAutoLinkMsg(`Linked your latest ${labels.join(" & ")} to this job.`);
-        setTimeout(() => setAutoLinkMsg(""), 4000);
+        const id = setTimeout(() => setAutoLinkMsg(""), 4000);
+        timeoutIdsRef.current.push(id);
       }
     } catch {
       // auto-link is best-effort
@@ -2342,9 +2373,10 @@ function Applications() {
               <input
                 type="text"
                 placeholder="Search jobs..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="app-search"
+                aria-label="Search applications by job title or company"
               />
 
               <select
@@ -2363,10 +2395,10 @@ function Applications() {
               <button
                 type="button"
                 className="app-clear-btn"
-                disabled={!search && filter === "All"}
+                disabled={!searchInput && filter === "All"}
                 onClick={() => {
                   setFilter("All");
-                  setSearch("");
+                  setSearchInput("");
                 }}
               >
                 Clear

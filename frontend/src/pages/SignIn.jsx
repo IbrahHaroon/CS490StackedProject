@@ -1,31 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient";
 import { logAction } from "../lib/actionLogger";
 import "./SignIn.css";
 
-const EMPTY_SIGNUP = {
-  firstName: "",
-  lastName: "",
-  dob: "",
-  address: "",
-  state: "",
-  zipCode: "",
-};
-
 function SignIn() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [signup, setSignup] = useState(EMPTY_SIGNUP);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
-  const handleSignupField = (e) => {
-    const { name, value } = e.target;
-    setSignup((prev) => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +31,11 @@ function SignIn() {
     logAction("form_submit", { component: "SignIn", action: mode });
 
     if (mode === "signup") {
+      if (!firstName.trim() || !lastName.trim()) {
+        setError("First and last name are required.");
+        return;
+      }
+
       // 1. Register
       const regRes = await api.post(
         "/auth/register",
@@ -61,30 +62,15 @@ function SignIn() {
       const loginData = await loginRes.json();
       const token = loginData.access_token;
 
-      // 3. Create profile (v2 shape — address fields inlined)
+      // 3. Save token and remember me preference
       localStorage.setItem("token", token);
-      const profileRes = await api.post(
-        "/profile/",
-        {
-          user_id: newUser.user_id,
-          first_name: signup.firstName,
-          last_name: signup.lastName,
-          dob: signup.dob,
-          address_line: signup.address,
-          state: signup.state,
-          zip_code: signup.zipCode,
-        },
-        { caller: "SignIn.createProfile", action: "create_profile" }
-      );
-
-      if (!profileRes.ok) {
-        const err = await profileRes.json().catch(() => ({}));
-        setError(err.detail || "Account created but profile setup failed.");
-        return;
+      if (rememberMe) {
+        localStorage.setItem("rememberMe", "true");
+        localStorage.setItem("rememberedEmail", email);
       }
 
       setSuccess("Account created! Signing you in…");
-      navigate("/");
+      setTimeout(() => navigate("/"), 1000);
       return;
     }
 
@@ -105,109 +91,148 @@ function SignIn() {
 
     const data = await res.json();
     localStorage.setItem("token", data.access_token);
+
+    if (rememberMe) {
+      localStorage.setItem("rememberMe", "true");
+      localStorage.setItem("rememberedEmail", email);
+    } else {
+      localStorage.removeItem("rememberMe");
+      localStorage.removeItem("rememberedEmail");
+    }
+
     navigate("/");
   };
 
-  const switchMode = () => {
-    setMode(mode === "signin" ? "signup" : "signin");
-    setError("");
-    setSuccess("");
+  const handleGoogleSignIn = () => {
+    setError("Google Sign-In coming soon!");
+    logAction("oauth_attempt", { provider: "google" });
+  };
+
+  const handleGitHubSignIn = () => {
+    setError("GitHub Sign-In coming soon!");
+    logAction("oauth_attempt", { provider: "github" });
   };
 
   return (
     <div className="signin-container">
-      <div className="signin-card">
-        <h2>{mode === "signin" ? "Sign In" : "Create Account"}</h2>
-        {error && <p className="signin-error">{error}</p>}
-        {success && <p className="signin-success">{success}</p>}
-        <form onSubmit={handleSubmit} className="signin-form">
-          {mode === "signup" && (
-            <>
-              <label>First Name</label>
-              <input
-                type="text"
-                name="firstName"
-                value={signup.firstName}
-                onChange={handleSignupField}
-                placeholder="Jane"
-                required
-              />
-              <label>Last Name</label>
-              <input
-                type="text"
-                name="lastName"
-                value={signup.lastName}
-                onChange={handleSignupField}
-                placeholder="Doe"
-                required
-              />
-              <label>Date of Birth</label>
-              <input
-                type="date"
-                name="dob"
-                value={signup.dob}
-                onChange={handleSignupField}
-                required
-              />
-              <label>Address</label>
-              <input
-                type="text"
-                name="address"
-                value={signup.address}
-                onChange={handleSignupField}
-                placeholder="123 Main St"
-                required
-              />
-              <label>State</label>
-              <input
-                type="text"
-                name="state"
-                value={signup.state}
-                onChange={handleSignupField}
-                placeholder="NY"
-                maxLength={2}
-                required
-              />
-              <label>Zip Code</label>
-              <input
-                type="text"
-                name="zipCode"
-                value={signup.zipCode}
-                onChange={handleSignupField}
-                placeholder="10001"
-                required
-              />
-            </>
-          )}
-
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-          />
-          <label>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-          />
-          <button type="submit" className="signin-btn">
-            {mode === "signin" ? "Sign In" : "Sign Up"}
-          </button>
-        </form>
-        <p className="signin-switch">
-          {mode === "signin"
-            ? "Don't have an account?"
-            : "Already have an account?"}{" "}
-          <button className="signin-switch-btn" onClick={switchMode}>
-            {mode === "signin" ? "Sign Up" : "Sign In"}
-          </button>
+      <div className="signin-content">
+        <h1 className="signin-title">Job Tracker</h1>
+        <p className="signin-subtitle">
+          Sign in to track jobs, generate resumes, and manage your pipeline
         </p>
+
+        <div className="signin-card">
+          {/* Tabs */}
+          <div className="signin-tabs">
+            <button
+              className={`signin-tab ${mode === "signin" ? "active" : ""}`}
+              onClick={() => setMode("signin")}
+            >
+              Sign In
+            </button>
+            <button
+              className={`signin-tab ${mode === "signup" ? "active" : ""}`}
+              onClick={() => setMode("signup")}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {error && <p className="signin-error">{error}</p>}
+          {success && <p className="signin-success">{success}</p>}
+
+          <form onSubmit={handleSubmit} className="signin-form">
+            {mode === "signup" && (
+              <>
+                <div className="signin-form-group">
+                  <label htmlFor="firstName">First Name</label>
+                  <input
+                    id="firstName"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Jane"
+                    required
+                  />
+                </div>
+                <div className="signin-form-group">
+                  <label htmlFor="lastName">Last Name</label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Doe"
+                    required
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="signin-form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div className="signin-form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+
+            {mode === "signin" && (
+              <div className="signin-remember-forgot">
+                <label htmlFor="rememberMe" className="signin-checkbox-label">
+                  <input
+                    id="rememberMe"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+              </div>
+            )}
+
+            <button type="submit" className="signin-btn">
+              {mode === "signin" ? "Sign In" : "Sign Up"}
+            </button>
+          </form>
+
+          {/* OAuth */}
+          <div className="signin-oauth">
+            <p className="signin-oauth-text">Or continue with</p>
+            <div className="signin-oauth-buttons">
+              <button
+                type="button"
+                className="signin-oauth-btn signin-google"
+                onClick={handleGoogleSignIn}
+              >
+                Google
+              </button>
+              <button
+                type="button"
+                className="signin-oauth-btn signin-github"
+                onClick={handleGitHubSignIn}
+              >
+                GitHub
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -69,6 +69,11 @@ app.include_router(library.router, prefix="/library", tags=["Library"])
 app.include_router(frontend_logs.router, prefix="/logs", tags=["Logs"])
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "candidate-tracker"}
+
+
 @app.get("/")
 def root():
     return {"status": "Backend Online"}

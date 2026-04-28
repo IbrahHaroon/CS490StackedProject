@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, ForeignKey, Integer, String, select
+from sqlalchemy import Date, ForeignKey, Index, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
@@ -30,6 +30,8 @@ class Education(Base):
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="educations")
+
+    __table_args__ = (Index("idx_education_user", "user_id"),)
 
 
 # --------------------------------------------------------------------------- #

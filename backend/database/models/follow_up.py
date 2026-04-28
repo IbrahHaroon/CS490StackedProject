@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, select
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
@@ -26,6 +26,8 @@ class FollowUp(Base):
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     job: Mapped["Job"] = relationship(back_populates="follow_ups")
+
+    __table_args__ = (Index("idx_follow_up_job", "job_id"),)
 
 
 # --------------------------------------------------------------------------- #

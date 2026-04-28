@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, String, select
+from sqlalchemy import ForeignKey, Index, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database.base import Base
@@ -22,6 +22,8 @@ class Skill(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     user: Mapped["User"] = relationship(back_populates="skills")
+
+    __table_args__ = (Index("idx_skill_user", "user_id"),)
 
 
 def create_skill(
