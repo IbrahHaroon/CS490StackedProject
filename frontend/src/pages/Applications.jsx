@@ -149,9 +149,6 @@ function ApplicationCard({
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [unlinkingId, setUnlinkingId] = useState(null);
-  const [viewingLink, setViewingLink] = useState(null);
-  const [viewingContent, setViewingContent] = useState("");
-  const [viewingLoading, setViewingLoading] = useState(false);
 
   const [showNotes, setShowNotes] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -545,56 +542,6 @@ function ApplicationCard({
     if (refreshed.ok) setDocLinks(await refreshed.json());
     setAddingLink(false);
     setNewLink({ document_id: "", role: "resume" });
-  };
-
-  const handleViewLinkedDoc = async (link) => {
-    setViewingLink(link);
-    setViewingContent("");
-    setViewingLoading(true);
-    const res = await api.get(
-      `/documents/${link.document_id}/versions/${link.version_id}/content`,
-      {
-        caller: "Applications.handleViewLinkedDoc",
-        action: "view_linked_document_version",
-      }
-    );
-    setViewingLoading(false);
-    if (res.ok) {
-      const data = await res.json();
-      setViewingContent(data.content || "");
-    } else {
-      setViewingContent("(Could not load this document version.)");
-    }
-  };
-
-  const handleDownloadLinkedDoc = async (link) => {
-    try {
-      const res = await api.download(
-        `/documents/${link.document_id}/versions/${link.version_id}/download`,
-        {
-          caller: "Applications.handleDownloadLinkedDoc",
-          action: "download_linked_document_version",
-        }
-      );
-      if (!res.ok) {
-        alert("Failed to download document.");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const fileName = link.document_title?.endsWith(".docx")
-        ? link.document_title
-        : `${link.document_title || "document"}.docx`;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Failed to download document.");
-    }
   };
 
   const handleUnlinkDoc = async (link) => {
@@ -1631,89 +1578,6 @@ function ApplicationCard({
               No history yet.
             </p>
           )}
-        </div>
-      )}
-
-      {viewingLink && (
-        <div
-          className="history-overlay"
-          onClick={() => {
-            setViewingLink(null);
-            setViewingContent("");
-          }}
-        >
-          <div
-            className="history-modal"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="history-modal-title"
-          >
-            <button
-              className="history-close-btn"
-              onClick={() => {
-                setViewingLink(null);
-                setViewingContent("");
-              }}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-            <h2 className="history-modal-title" id="history-modal-title">
-              📄{" "}
-              {viewingLink.document_title ||
-                `Version #${viewingLink.version_id}`}
-              <span
-                style={{
-                  marginLeft: 10,
-                  fontSize: "0.85rem",
-                  color: "var(--text-muted)",
-                  textTransform: "capitalize",
-                }}
-              >
-                {(viewingLink.role || "—").replace("_", " ")} · v
-                {viewingLink.version_id}
-              </span>
-            </h2>
-            {viewingLoading ? (
-              <p>Loading…</p>
-            ) : (
-              <pre
-                style={{
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  background: "var(--surface-2)",
-                  padding: "1rem",
-                  borderRadius: 8,
-                  maxHeight: "50vh",
-                  overflowY: "auto",
-                  fontSize: "13px",
-                  lineHeight: 1.5,
-                }}
-              >
-                {viewingContent}
-              </pre>
-            )}
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
-              <button
-                className="app-history-btn"
-                onClick={() => handleDownloadLinkedDoc(viewingLink)}
-                style={{ padding: "6px 12px", fontSize: "14px" }}
-              >
-                Download
-              </button>
-              <button
-                className="history-close-btn"
-                onClick={() => {
-                  setViewingLink(null);
-                  setViewingContent("");
-                }}
-                style={{ padding: "6px 12px", fontSize: "14px" }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
