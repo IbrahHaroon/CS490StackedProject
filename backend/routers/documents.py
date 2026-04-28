@@ -1315,7 +1315,7 @@ def _generate_doc(
         _write_docx_content(dest_path, content)
 
     version = create_document_version(
-        session, doc.document_id, storage_location=dest_path, source="ai"
+        session, doc.document_id, storage_location=dest_path, content=content, source="ai"
     )
     update_document(session, doc.document_id, current_version_id=version.version_id)
     if job is not None:
