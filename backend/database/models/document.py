@@ -3,8 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func, select
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    func,
+    select,
+)
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship, selectinload
 
 from database.base import Base
 
@@ -57,6 +66,8 @@ class Document(Base):
         back_populates="document", cascade="all, delete-orphan"
     )
 
+    __table_args__ = (Index("idx_document_user", "user_id"),)
+
 
 # --------------------------------------------------------------------------- #
 #  Functions                                                                    #
@@ -93,7 +104,11 @@ def get_document(session: Session, document_id: int) -> "Document | None":
 def get_documents_for_user(
     session: Session, user_id: int, *, include_deleted: bool = False
 ) -> list["Document"]:
-    stmt = select(Document).where(Document.user_id == user_id)
+    stmt = (
+        select(Document)
+        .where(Document.user_id == user_id)
+        .options(selectinload(Document.tags))
+    )
     if not include_deleted:
         stmt = stmt.where(Document.is_deleted.is_(False))
     stmt = stmt.order_by(Document.updated_at.desc())

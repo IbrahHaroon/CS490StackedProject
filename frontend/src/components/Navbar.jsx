@@ -36,7 +36,7 @@ export function MyAppNav() {
         </>
       )}
 
-      {token ? (
+      {token && (
         <button
           className="signout-nav-btn"
           style={{ marginLeft: "auto" }}
@@ -44,15 +44,6 @@ export function MyAppNav() {
         >
           Sign Out
         </button>
-      ) : (
-        <NavLink
-          to="/signin"
-          end
-          className="signin-nav-btn"
-          style={{ marginLeft: "auto" }}
-        >
-          Sign In
-        </NavLink>
       )}
     </nav>
   );

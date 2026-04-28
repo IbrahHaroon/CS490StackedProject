@@ -231,6 +231,11 @@ function DocumentLibrary() {
 
   const token = localStorage.getItem("token");
 
+  const formattedResumeContent = useMemo(
+    () => formatResumeContent(viewContent),
+    [viewContent]
+  );
+
   const fetchDocuments = async () => {
     if (!token) {
       setLoadError("You must be signed in to view documents.");
@@ -893,9 +898,14 @@ function DocumentLibrary() {
 
       {viewingDoc && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal">
+          <div
+            className="doclibrary-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="doc-view-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2>View {viewingDoc.title}</h2>
+              <h2 id="doc-view-title">View {viewingDoc.title}</h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={() => {
@@ -904,6 +914,7 @@ function DocumentLibrary() {
                   setViewFormat("");
                   setViewBinaryData(null);
                 }}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -926,7 +937,7 @@ function DocumentLibrary() {
                 </div>
               ) : viewingDoc?.document_type === "Resume" ? (
                 <div className="doclibrary-resume-content">
-                  {formatResumeContent(viewContent)}
+                  {formattedResumeContent}
                 </div>
               ) : (
                 <pre>{viewContent}</pre>
@@ -957,9 +968,14 @@ function DocumentLibrary() {
 
       {editingDoc && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal">
+          <div
+            className="doclibrary-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="doc-edit-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2>Edit {editingDoc.title}</h2>
+              <h2 id="doc-edit-title">Edit {editingDoc.title}</h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={() => {
@@ -967,6 +983,7 @@ function DocumentLibrary() {
                   setEditContent("");
                   setEditError("");
                 }}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -1003,12 +1020,18 @@ function DocumentLibrary() {
 
       {genResumeOpen && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal doclibrary-ai-modal">
+          <div
+            className="doclibrary-modal doclibrary-ai-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gen-resume-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2>Generate AI Resume</h2>
+              <h2 id="gen-resume-title">Generate AI Resume</h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={handleGenResumeClose}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -1096,12 +1119,18 @@ function DocumentLibrary() {
 
       {genCoverOpen && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal doclibrary-ai-modal">
+          <div
+            className="doclibrary-modal doclibrary-ai-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gen-cover-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2>Generate AI Cover Letter</h2>
+              <h2 id="gen-cover-title">Generate AI Cover Letter</h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={handleGenCoverClose}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -1191,12 +1220,21 @@ function DocumentLibrary() {
 
       {renameDoc && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal" style={{ maxWidth: "400px" }}>
+          <div
+            className="doclibrary-modal"
+            style={{ maxWidth: "400px" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-doc-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2 style={{ margin: 0 }}>Rename Document</h2>
+              <h2 style={{ margin: 0 }} id="rename-doc-title">
+                Rename Document
+              </h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={handleCancelRename}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -1257,12 +1295,21 @@ function DocumentLibrary() {
 
       {deleteConfirmDoc && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal" style={{ maxWidth: "400px" }}>
+          <div
+            className="doclibrary-modal"
+            style={{ maxWidth: "400px" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-doc-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2 style={{ margin: 0, color: "#ef4444" }}>Delete Document</h2>
+              <h2 style={{ margin: 0, color: "#ef4444" }} id="delete-doc-title">
+                Delete Document
+              </h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={handleCancelDelete}
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -1323,12 +1370,19 @@ function DocumentLibrary() {
       {/* S3-003: Version history modal */}
       {historyDoc && (
         <div className="doclibrary-modal-overlay">
-          <div className="doclibrary-modal" style={{ maxWidth: "640px" }}>
+          <div
+            className="doclibrary-modal"
+            style={{ maxWidth: "640px" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-title"
+          >
             <div className="doclibrary-modal-header">
-              <h2>Version history — {historyDoc.title}</h2>
+              <h2 id="history-title">Version history — {historyDoc.title}</h2>
               <button
                 className="doclibrary-modal-close"
                 onClick={() => setHistoryDoc(null)}
+                aria-label="Close"
               >
                 ✕
               </button>

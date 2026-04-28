@@ -30,7 +30,7 @@ def get_metrics(
     return get_dashboard_metrics(session, current_user.user_id)
 
 
-@router.get("/dashboard/sorted", response_model=list[JobResponse])
+@router.get("/sorted", response_model=list[JobResponse])
 def get_sorted_dashboard(
     sort_by: str = "created_at",
     order: str = "desc",

@@ -325,8 +325,9 @@
   background-color: var(--surface);
   border-radius: 8px;
   width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -500,7 +501,6 @@
 
 /* AI Modal */
 .doclibrary-ai-modal {
-  max-width: 1000px;
   width: 95%;
 }
 

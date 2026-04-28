@@ -1,7 +1,18 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../lib/apiClient";
 import "./Dashboard.css";
+
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 const PIPELINE_STAGES = [
   "Interested",
@@ -13,6 +24,19 @@ const PIPELINE_STAGES = [
   "Accepted",
   "Archived",
 ];
+
+function getDeadlineBoxShadow(deadline) {
+  if (!deadline) return undefined;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline + "T00:00:00");
+  const daysLeft = Math.ceil((dl - today) / (1000 * 60 * 60 * 24));
+  return daysLeft < 7 && daysLeft >= 0
+    ? "0 0 12px rgba(239, 68, 68, 0.6)"
+    : daysLeft < 0
+      ? "0 0 12px rgba(239, 68, 68, 0.8)"
+      : undefined;
+}
 
 function DeadlineBadge({ deadline, className = "job-card-meta" }) {
   if (!deadline) return null;
@@ -65,13 +89,22 @@ function DocViewerModal({ doc, onClose }) {
         className="apply-modal"
         style={{ maxWidth: "680px", maxHeight: "80vh" }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="doc-viewer-title"
       >
         <div className="apply-modal-header">
           <div>
-            <h3 className="apply-modal-title">{doc.title}</h3>
+            <h3 className="apply-modal-title" id="doc-viewer-title">
+              {doc.title}
+            </h3>
             <p className="apply-modal-company">{doc.document_type}</p>
           </div>
-          <button className="apply-modal-x" onClick={onClose}>
+          <button
+            className="apply-modal-x"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ✕
           </button>
         </div>
@@ -113,7 +146,8 @@ function Dashboard() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [expandedJob, setExpandedJob] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchQuery = useDebounce(searchInput, 200);
   const [firstName, setFirstName] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -134,6 +168,7 @@ function Dashboard() {
 
   const jobBoardRef = useRef(null);
   const filterRef = useRef(null);
+  const timeoutIdsRef = useRef([]);
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -178,7 +213,8 @@ function Dashboard() {
         setSelectedJob(updatedJob);
         setEditingJob(null);
         setActionMessage("Job updated successfully!");
-        setTimeout(() => setActionMessage(""), 3000);
+        const id = setTimeout(() => setActionMessage(""), 3000);
+        timeoutIdsRef.current.push(id);
       }
     } catch {
       // handled by api client
@@ -243,10 +279,11 @@ function Dashboard() {
       setSelectedJob(target);
       fetchJobDocuments(target.job_id);
       setSearchParams({}, { replace: true });
-      setTimeout(
+      const id = setTimeout(
         () => jobBoardRef.current?.scrollIntoView({ behavior: "smooth" }),
         100
       );
+      timeoutIdsRef.current.push(id);
     }
   }, [searchParams, jobs]);
 
@@ -289,7 +326,8 @@ function Dashboard() {
       if (docRes.ok) setDocuments(await docRes.json());
 
       setActionMessage(`AI ${genDocType} generated successfully!`);
-      setTimeout(() => setActionMessage(""), 3000);
+      const id = setTimeout(() => setActionMessage(""), 3000);
+      timeoutIdsRef.current.push(id);
       setGenDocType(null);
       setGenInstructions("");
       setGenJobId(null);
@@ -306,15 +344,20 @@ function Dashboard() {
   // here, this is empty; the document itself is shown on the Documents page.
   const jobResumeMap = {};
 
-  const uniqueCompanies = [
-    ...new Set(jobs.map((j) => j.company_name).filter(Boolean)),
-  ].sort();
-  const hasActiveFilters =
-    filterStage ||
-    filterCompany ||
-    filterTitle ||
-    filterMinSalary ||
-    filterMaxSalary;
+  const uniqueCompanies = useMemo(
+    () => [...new Set(jobs.map((j) => j.company_name).filter(Boolean))].sort(),
+    [jobs]
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      filterStage ||
+      filterCompany ||
+      filterTitle ||
+      filterMinSalary ||
+      filterMaxSalary,
+    [filterStage, filterCompany, filterTitle, filterMinSalary, filterMaxSalary]
+  );
 
   const clearFilters = () => {
     setFilterStage("");
@@ -324,58 +367,69 @@ function Dashboard() {
     setFilterMaxSalary("");
   };
 
-  let filteredJobs = searchQuery.trim()
-    ? jobs.filter((job) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          job.title?.toLowerCase().includes(q) ||
-          job.company_name?.toLowerCase().includes(q) ||
-          job.location?.toLowerCase().includes(q) ||
-          job.stage?.toLowerCase().includes(q)
-        );
-      })
-    : jobs;
+  const filteredJobs = useMemo(() => {
+    let result = searchQuery.trim()
+      ? jobs.filter((job) => {
+          const q = searchQuery.toLowerCase();
+          return (
+            job.title?.toLowerCase().includes(q) ||
+            job.company_name?.toLowerCase().includes(q) ||
+            job.location?.toLowerCase().includes(q) ||
+            job.stage?.toLowerCase().includes(q)
+          );
+        })
+      : jobs;
 
-  if (filterStage) {
-    filteredJobs = filteredJobs.filter((j) => j.stage === filterStage);
-  }
-  if (filterCompany) {
-    filteredJobs = filteredJobs.filter((j) => j.company_name === filterCompany);
-  }
-  if (filterTitle) {
-    const t = filterTitle.toLowerCase();
-    filteredJobs = filteredJobs.filter((j) =>
-      j.title?.toLowerCase().includes(t)
-    );
-  }
-  if (filterMinSalary) {
-    filteredJobs = filteredJobs.filter(
-      (j) => j.salary && Number(j.salary) >= Number(filterMinSalary)
-    );
-  }
-  if (filterMaxSalary) {
-    filteredJobs = filteredJobs.filter(
-      (j) => j.salary && Number(j.salary) <= Number(filterMaxSalary)
-    );
-  }
+    if (filterStage) {
+      result = result.filter((j) => j.stage === filterStage);
+    }
+    if (filterCompany) {
+      result = result.filter((j) => j.company_name === filterCompany);
+    }
+    if (filterTitle) {
+      const t = filterTitle.toLowerCase();
+      result = result.filter((j) => j.title?.toLowerCase().includes(t));
+    }
+    if (filterMinSalary) {
+      result = result.filter(
+        (j) => j.salary && Number(j.salary) >= Number(filterMinSalary)
+      );
+    }
+    if (filterMaxSalary) {
+      result = result.filter(
+        (j) => j.salary && Number(j.salary) <= Number(filterMaxSalary)
+      );
+    }
 
-  if (sortOrder === "date-asc") {
-    filteredJobs = [...filteredJobs].sort(
-      (a, b) => new Date(a.created_at) - new Date(b.created_at)
-    );
-  } else if (sortOrder === "date-desc") {
-    filteredJobs = [...filteredJobs].sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
-    );
-  } else if (sortOrder === "salary-asc") {
-    filteredJobs = [...filteredJobs].sort(
-      (a, b) => (Number(a.salary) || 0) - (Number(b.salary) || 0)
-    );
-  } else if (sortOrder === "salary-desc") {
-    filteredJobs = [...filteredJobs].sort(
-      (a, b) => (Number(b.salary) || 0) - (Number(a.salary) || 0)
-    );
-  }
+    if (sortOrder === "date-asc") {
+      result = [...result].sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at)
+      );
+    } else if (sortOrder === "date-desc") {
+      result = [...result].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      );
+    } else if (sortOrder === "salary-asc") {
+      result = [...result].sort(
+        (a, b) => (Number(a.salary) || 0) - (Number(b.salary) || 0)
+      );
+    } else if (sortOrder === "salary-desc") {
+      result = [...result].sort(
+        (a, b) => (Number(b.salary) || 0) - (Number(a.salary) || 0)
+      );
+    }
+
+    return result;
+  }, [
+    searchQuery,
+    jobs,
+    filterStage,
+    filterCompany,
+    filterTitle,
+    filterMinSalary,
+    filterMaxSalary,
+    sortOrder,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -385,6 +439,13 @@ function Dashboard() {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+      timeoutIdsRef.current = [];
+    };
   }, []);
 
   const scrollToJobBoard = () => {
@@ -551,8 +612,9 @@ function Dashboard() {
           className="job-board-search"
           type="text"
           placeholder="Search by title, company, location, or stage…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          aria-label="Search jobs by title, company, location, or stage"
         />
         <div className="job-board-controls">
           <div className="job-board-filter-wrap" ref={filterRef}>
@@ -672,21 +734,7 @@ function Dashboard() {
                     fetchJobDocuments(job.job_id);
                   }}
                   style={{
-                    boxShadow: job.deadline
-                      ? (() => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          const dl = new Date(job.deadline + "T00:00:00");
-                          const daysLeft = Math.ceil(
-                            (dl - today) / (1000 * 60 * 60 * 24)
-                          );
-                          return daysLeft < 7 && daysLeft >= 0
-                            ? "0 0 12px rgba(239, 68, 68, 0.6)"
-                            : daysLeft < 0
-                              ? "0 0 12px rgba(239, 68, 68, 0.8)"
-                              : undefined;
-                        })()
-                      : undefined,
+                    boxShadow: getDeadlineBoxShadow(job.deadline),
                     transition: "all 0.3s ease",
                   }}
                 >
@@ -1397,16 +1445,20 @@ function Dashboard() {
                       className="apply-modal"
                       style={{ maxWidth: "680px" }}
                       onClick={(e) => e.stopPropagation()}
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="gen-doc-title"
                     >
                       <div className="apply-modal-header">
                         <div>
-                          <h3 className="apply-modal-title">
+                          <h3 className="apply-modal-title" id="gen-doc-title">
                             Generate AI {genDocType}
                           </h3>
                         </div>
                         <button
                           className="apply-modal-x"
                           onClick={() => setGenDocType(null)}
+                          aria-label="Close"
                         >
                           ✕
                         </button>
