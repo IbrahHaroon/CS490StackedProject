@@ -93,6 +93,7 @@ function ApplicationCard({
   isHighlighted,
   cardRef,
 }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [activity, setActivity] = useState(null);
   const [activityLoaded, setActivityLoaded] = useState(false);
