@@ -90,9 +90,15 @@ export async function apiRequest(path, options = {}, context = {}) {
 
     pushLog(logEntry);
 
-    // Auto-toast on server errors. Skip 401 (token expiry handled in App.jsx).
+    // Auto-toast on server errors.
     if (response.status >= 500) {
       emitToast({ message: "Server error — please try again in a moment." });
+    }
+
+    // Global 401 handler — token expired or invalid mid-session.
+    if (response.status === 401 && path !== "/auth/login") {
+      localStorage.removeItem("token");
+      window.location.href = "/signin";
     }
 
     return response;

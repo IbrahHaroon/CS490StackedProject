@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://user:postgres@localhost/jobsdb"
     secret_key: str = "supersecret"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 10080  # 7 days
 
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
